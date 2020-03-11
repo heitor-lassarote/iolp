@@ -1,0 +1,19 @@
+1. Por que usar programação funcional para manipular símbolos?
+
+2. Por que o F# foi escolhido para backend?
+O fato de F# dar suporte a tipos de dados algébricos (ADT: Algebraic Datatypes, também chamados de Tagged Unions ou Discriminated Unions) é a capacidade dele representar e manipular símbolos de forma eficiente.
+
+3. Por que o Elm foi escolhido para frontend?
+
+4. O que é uma arquitetura?
+Uma arquitetura é um documento descrevendo aspectos de como o "big picture" de um software deve ser implementado, contendo pontos como: quais módulos devem ser definidos e como eles se comunicam? O que deve ser definido em cada módulo e por quê?
+Uma boa arquitetura deve conter informação de como os componentes se comportam e como eles se comunicam, devendo ser de fácil ampliação (escalabilidade) e modificação (i.e., se uma parte da arquitetura deve ser modificada, então a mudança não deve ser difícil de propagar com relação a como os componentes se conectam ou se comportam). 
+
+5. Como esperamos que seja a arquitetura?
+IDE: Representação gráfica -> AST
+Tradutor: AST -> Código-fonte
+Compilador: Código-fonte -> Código compilado
+
+6. Pensar se seria interessante adicionar ou retirar algum passo anterior.
+
+7. Responder coisas como "por que a IDE já não gera código-fonte sem passar pela geração da AST?"
