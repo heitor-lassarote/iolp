@@ -8,13 +8,12 @@
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "editor": "pulp build --main LowCode.Editor.Main --include src/LowCode/Editor --to dist/LowCode/Editor/editor.js"
+    "logic-editor": "spago bundle-app --main LowCode.Logic.Editor.Main --include src/LowCode/Logic/Editor/ --to dist/LowCode/Logic/editor.js",
+    "drag-test": "spago bundle-app --main Main --to dist/drag.js"
   },
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "pulp": "^13.0.0",
-    "purescript": "^0.13.6",
-    "svgen": "^0.1.2-2"
+    "purescript": "^0.13.6"
   }
 }

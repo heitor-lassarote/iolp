@@ -1,4 +1,4 @@
-module LowCode.Editor.Icons where
+module LowCode.Logic.Editor.Icons where
 
 import Prelude
 

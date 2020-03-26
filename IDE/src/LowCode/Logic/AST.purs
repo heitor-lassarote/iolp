@@ -1,4 +1,4 @@
-module LowCode.AST where
+module LowCode.Logic.AST where
 
 import Prelude
 
