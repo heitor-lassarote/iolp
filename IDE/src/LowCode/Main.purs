@@ -19,19 +19,7 @@ import Halogen.VDom.Driver (runUI)
 import Web.Event.Event as WE
 import Web.UIEvent.MouseEvent as ME
 
-type Point =
-    { x :: Int
-    , y :: Int
-    }
-
-_x :: Lens.Lens' Point Int
-_x = Lens.lens _.x $ _ { x = _ }
-
-_y :: Lens.Lens' Point Int
-_y = Lens.lens _.y $ _ { y = _ }
-
-pointZero :: Point
-pointZero = { x: 0, y: 0 }
+import LowCode.Point (Point)
 
 type Element =
     { point :: Point
@@ -40,7 +28,7 @@ type Element =
 
 newElement :: Int -> Element
 newElement identifier =
-    { point: pointZero
+    { point: zero
     , identifier: identifier
     }
 
@@ -50,21 +38,28 @@ _point = Lens.lens _.point $ _ { point = _ }
 _identifier :: Lens.Lens' Element Int
 _identifier = Lens.lens _.identifier $ _ { identifier = _ }
 
+type DragStatus =
+    { delta :: Point
+    , dragging :: Int
+    }
+
+_delta :: Lens.Lens' DragStatus Point
+_delta = Lens.lens _.delta $ _ { delta = _ }
+
+_dragging :: Lens.Lens' DragStatus Int
+_dragging = Lens.lens _.dragging $ _ { dragging = _ }
+
 type State =
     { elements :: Map.Map Int Element
-    , dragging :: Maybe Int
-    , delta :: Point
+    , dragStatus :: Maybe DragStatus
     , generator :: Int
     }
 
 _elements :: Lens.Lens' State (Map.Map Int Element)
 _elements = Lens.lens _.elements $ _ { elements = _ }
 
-_dragging :: Lens.Lens' State (Maybe Int)
-_dragging = Lens.lens _.dragging $ _ { dragging = _ }
-
-_delta :: Lens.Lens' State Point
-_delta = Lens.lens _.delta $ _ { delta = _ }
+_dragStatus :: Lens.Lens' State (Maybe DragStatus)
+_dragStatus = Lens.lens _.dragStatus $ _ { dragStatus = _ }
 
 _generator :: Lens.Lens' State Int
 _generator = Lens.lens _.generator $ _ { generator = _ }
@@ -90,8 +85,7 @@ ui =
     initialState =
         { elements: Map.empty
         , generator: 0
-        , dragging: Nothing
-        , delta: pointZero
+        , dragStatus: Nothing
         }
 
     elementStyle :: Element -> CSS.CSS
@@ -146,40 +140,28 @@ handleAction = case _ of
 
     HandleMouseMove evTy ev -> case evTy of
         MouseDown id ->
-            H.modify_ \st ->
-                case Map.lookup id st.elements of
-                    Just element ->
-                        let
-                            mousePos = { x: ME.clientX ev, y: ME.clientY ev }
-                            delta = { x: element.point.x - mousePos.x
-                                    , y: element.point.y - mousePos.y
-                                    }
-                        in
-                        st { dragging = Just id, delta = delta }
-                    Nothing -> st
+            H.modify_ \st -> case Map.lookup id st.elements of
+                Nothing -> st
+                Just element ->
+                    st { dragStatus = Just { dragging: id
+                                           , delta: element.point - getClientXY ev}
+                                           }
 
-        MouseUp -> H.modify_ _ { dragging = Nothing, delta = pointZero }
+        MouseUp -> H.modify_ _ { dragStatus = Nothing }
 
         MouseMove -> do
             H.liftEffect $ WE.preventDefault $ ME.toEvent ev
-            H.modify_ \st ->
-                case st.dragging of
-                    Just id ->
-                        Lens.set
-                            _elements
-                            (Map.update
-                                (\element ->
-                                    let
-                                        mousePos = { x: ME.clientX ev, y: ME.clientY ev }
-                                        point = { x: st.delta.x + mousePos.x
-                                                , y: st.delta.y + mousePos.y
-                                                }
-                                    in
-                                    Just $ element { point = point })
-                                id
-                                st.elements)
-                            st
-                    Nothing -> st
+            H.modify_ \st -> case st.dragStatus of
+                Nothing -> st
+                Just dragStatus -> Lens.over
+                    _elements
+                    (Map.update
+                        (Just <<< _ { point = getClientXY ev + dragStatus.delta })
+                        dragStatus.dragging)
+                    st
+
+getClientXY :: ME.MouseEvent -> Point
+getClientXY ev = { x: ME.clientX ev, y: ME.clientY ev }
 
 main :: Effect Unit
 main = HA.runHalogenAff do
