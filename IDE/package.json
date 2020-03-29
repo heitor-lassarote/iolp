@@ -7,11 +7,10 @@
     "test": "test"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "logic-editor": "spago bundle-app --main LowCode.Logic.Editor.Main --include src/LowCode/Logic/Editor/ --to dist/LowCode/Logic/editor.js",
-    "drag-test": "spago bundle-app --main Main --to dist/drag.js"
+    "logic-editor": "spago bundle-app --main LowCode.Logic.Editor.Main --to dist/LowCode/Logic/editor.js",
+    "ui-editor": "spago bundle-app --main LowCode.UI.Editor.Main --to dist/LowCode/UI/editor.js"
   },
-  "author": "",
+  "author": "Heitor Toledo Lassarote de Paula",
   "license": "MIT",
   "dependencies": {
     "purescript": "^0.13.6"

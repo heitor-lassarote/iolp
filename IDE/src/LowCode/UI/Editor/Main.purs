@@ -12,5 +12,5 @@ import LowCode.UI.Editor.Editor as Editor
 main :: Effect Unit
 main = HA.runHalogenAff do
     body <- HA.awaitBody
-    runUI Editor.app unit body
+    runUI Editor.component unit body
 
