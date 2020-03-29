@@ -10,10 +10,12 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.CSS as HCSS
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Elements as HEl
 import Halogen.HTML.Properties as HP
 import Web.UIEvent.MouseEvent as ME
 
 import LowCode.Point (Point)
+import LowCode.Util as Util
 
 type Slot = H.Slot Query Message
 
@@ -65,11 +67,7 @@ postitionElement point = do
 
 render :: forall f m. Element -> H.ComponentHTML Action f m
 render element =
-    HH.p
-        [ HCSS.style $ postitionElement element.point
-        , HP.class_ $ HH.ClassName "draggable"
-        , HE.onMouseDown (Just <<< Drag)
-        ]
+    draggableNode_ element.point HH.p
         [ HH.text $ "Drag me around! ID: " <> show element.identifier
         ]
 
@@ -77,7 +75,7 @@ handleAction :: forall f m. Action -> H.HalogenM Element Action f Message m Unit
 handleAction = case _ of
     Drag ev -> do
         element <- H.get
-        H.raise $ Clicked element $ getClientXY ev
+        H.raise $ Clicked element $ Util.getClientXY ev
 
 handleQuery :: forall f m a. Query a -> H.HalogenM Element Action f Message m (Maybe a)
 handleQuery = case _ of
@@ -85,5 +83,56 @@ handleQuery = case _ of
         H.modify_ _ { point = point }
         pure $ Just a
 
-getClientXY :: ME.MouseEvent -> Point
-getClientXY ev = { x: ME.clientX ev, y: ME.clientY ev }
+draggableNode
+    :: forall r w
+     . Point
+    -> HEl.Node
+        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
+        w
+        Action
+    -> Array (HP.IProp (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r) Action)
+    -> Array (HH.HTML w Action)
+    -> HH.HTML w Action
+draggableNode point html props =
+    Util.mkNode html $
+        [ HP.class_ $ HH.ClassName "draggable"
+        , HE.onMouseDown (Just <<< Drag)
+        , HCSS.style $ postitionElement point
+        ] <> props
+
+draggableNode_
+    :: forall r w
+     . Point
+    -> HEl.Node
+        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
+        w
+        Action
+    -> Array (HH.HTML w Action)
+    -> HH.HTML w Action
+draggableNode_ point html = draggableNode point html []
+
+draggableLeaf
+    :: forall r w
+     . Point
+    -> HEl.Leaf
+        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
+        w
+        Action
+    -> Array (HP.IProp (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r) Action)
+    -> HH.HTML w Action
+draggableLeaf point html props =
+    Util.mkLeaf html $
+        [ HP.class_ $ HH.ClassName "draggable"
+        , HE.onMouseDown (Just <<< Drag)
+        , HCSS.style $ postitionElement point
+        ] <> props
+
+draggableLeaf_
+    :: forall r w
+     . Point
+    -> HEl.Leaf
+        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
+        w
+        Action
+    -> HH.HTML w Action
+draggableLeaf_ point html = draggableLeaf point html []

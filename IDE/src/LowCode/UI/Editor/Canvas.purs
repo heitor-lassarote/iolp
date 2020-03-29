@@ -17,6 +17,7 @@ import Web.UIEvent.MouseEvent as ME
 import LowCode.Draggable (Element, newElement)
 import LowCode.Draggable as Draggable
 import LowCode.Point (Point)
+import LowCode.Util as Util
 
 type Slot = H.Slot Query Message
 
@@ -132,7 +133,7 @@ handleAction = case _ of
             case st.dragStatus of
                 Nothing -> pure unit
                 Just dragStatus -> do
-                    let point = Draggable.getClientXY ev + dragStatus.delta
+                    let point = Util.getClientXY ev + dragStatus.delta
                         id = dragStatus.dragging
                     _ <- H.query _inner id $ H.tell (Draggable.Dragged point)
                     H.put $ Lens.over
