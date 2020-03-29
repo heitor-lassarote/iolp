@@ -4,6 +4,7 @@ import Prelude
 
 import Data.Array as Array
 import Data.Lens as Lens
+import Data.Map as Map
 import Data.Maybe (Maybe (..))
 import Data.Symbol (SProxy (..))
 import Effect.Aff (Aff)
@@ -13,7 +14,7 @@ import Halogen.HTML.Events as HE
 import Web.Event.Event as WE
 import Web.UIEvent.MouseEvent as ME
 
-import LowCode.Draggable (Element)
+import LowCode.Draggable (Element, newElement)
 import LowCode.Draggable as Draggable
 import LowCode.Point (Point)
 
@@ -32,10 +33,18 @@ _dragging = Lens.lens _.dragging $ _ { dragging = _ }
 
 type State =
     { dragStatus :: Maybe DragStatus
+    , elements :: Map.Map Int Element
+    , generator :: Int
     }
 
 _dragStatus :: Lens.Lens' State (Maybe DragStatus)
 _dragStatus = Lens.lens _.dragStatus $ _ { dragStatus = _ }
+
+_elements :: Lens.Lens' State (Map.Map Int Element)
+_elements = Lens.lens _.elements $ _ { elements = _ }
+
+_generator :: Lens.Lens' State Int
+_generator = Lens.lens _.generator $ _ { generator = _ }
 
 data MouseEventType
     = MouseUp
@@ -44,9 +53,9 @@ data MouseEventType
 data Action
     = HandleMouseMove MouseEventType ME.MouseEvent
     | HandleInner Draggable.Message
+    | AddDraggable
 
 data Message
-    = ElementDragged Element
 
 data Query a
 
@@ -60,6 +69,8 @@ type ChildSlots =
 initialState :: forall i. i -> State
 initialState _ =
     { dragStatus: Nothing
+    , elements: Map.empty
+    , generator: 0
     }
 
 type InnerComponent m =
@@ -69,12 +80,11 @@ type InnerComponent m =
 
 component
     :: forall i
-     . Array (InnerComponent Aff)
-    -> H.Component HH.HTML Query i Message Aff
-component innerComponents =
+     . H.Component HH.HTML Query i Message Aff
+component =
     H.mkComponent
         { initialState: initialState
-        , render: render innerComponents
+        , render: render
         , eval: H.mkEval $ H.defaultEval
             { handleAction = handleAction
             --, handleQuery  = handleQuery
@@ -83,23 +93,36 @@ component innerComponents =
 
 render
     :: forall m
-     . Array (InnerComponent m)
-    -> State
+     . State
     -> H.ComponentHTML Action ChildSlots m
-render innerComponents state =
+render state =
     HH.div
         [ HE.onMouseMove (Just <<< HandleMouseMove MouseMove)
         , HE.onMouseUp   (Just <<< HandleMouseMove MouseUp)
+        ] $
+        [ HH.h1_
+            [ HH.text $ "Elements in Canvas: " <> show (Map.size state.elements) ]
+        , HH.button
+            [ HE.onClick \_ -> Just AddDraggable ]
+            [ HH.text "Add draggable thing" ]
         ]
-        ((map mkSlot innerComponents)
-        <> [ HH.h1_ [ HH.text $ "Elements in Canvas: " <> show (Array.length innerComponents) ] ])
+        <> draggableSlots
   where
-    mkSlot innerComponent =
-        HH.slot _inner innerComponent.element.identifier innerComponent.component unit (Just <<< HandleInner)
-
+    mkSlot element =
+        HH.slot _inner element.identifier (Draggable.component element) unit (Just <<< HandleInner)
+    draggableSlots =
+        map mkSlot $ Array.fromFoldable $ Map.values state.elements
 
 handleAction :: Action -> H.HalogenM State Action ChildSlots Message Aff Unit
 handleAction = case _ of
+    AddDraggable -> do
+        H.modify_ \st ->
+            let id = st.generator
+            in
+            st { elements = Map.insert id (newElement id) st.elements
+               , generator = id + 1
+               }
+
     HandleMouseMove evTy ev -> case evTy of
         MouseUp -> H.modify_ _ { dragStatus = Nothing }
 
@@ -112,10 +135,10 @@ handleAction = case _ of
                     let point = Draggable.getClientXY ev + dragStatus.delta
                         id = dragStatus.dragging
                     _ <- H.query _inner id $ H.tell (Draggable.Dragged point)
-                    H.raise $ ElementDragged
-                        { point: point
-                        , identifier: id
-                        }
+                    H.put $ Lens.over
+                        _elements
+                        (Map.update (Just <<< _ { point = point }) id)
+                        st
 
     HandleInner (Draggable.Clicked element mousePos) ->
         H.modify_ _ { dragStatus = Just { dragging: element.identifier
@@ -123,11 +146,8 @@ handleAction = case _ of
                                         }
                     }
 
---handleQuery
---    :: forall f i o a
---     . Query a
---    -> H.HalogenM (State i) Action (ChildSlots f o) Message Aff (Maybe a)
---handleQuery = case _ of
---    StartDrag dragStatus a -> do
---        H.modify_ _ { dragStatus = Just dragStatus }
---        pure $ Just a
+handleQuery
+    :: forall a
+     . Query a
+    -> H.HalogenM State Action ChildSlots Message Aff (Maybe a)
+handleQuery _ = pure Nothing

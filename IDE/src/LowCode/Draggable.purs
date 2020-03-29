@@ -70,7 +70,8 @@ render element =
         , HP.class_ $ HH.ClassName "draggable"
         , HE.onMouseDown (Just <<< Drag)
         ]
-        [ HH.text $ "Drag me around! ID: " <> show element.identifier]
+        [ HH.text $ "Drag me around! ID: " <> show element.identifier
+        ]
 
 handleAction :: forall f m. Action -> H.HalogenM Element Action f Message m Unit
 handleAction = case _ of
