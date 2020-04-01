@@ -6,11 +6,13 @@ You can edit this file as you like.
 , dependencies =
   [ "arrays"
   , "console"
+  , "control"
   , "css"
   , "effect"
   , "halogen"
   , "halogen-css"
   , "lists"
+  , "ordered-collections"
   , "profunctor-lenses"
   , "psci-support"
   ]

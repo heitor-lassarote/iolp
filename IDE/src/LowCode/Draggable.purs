@@ -19,12 +19,14 @@ import LowCode.Util as Util
 
 type Slot = H.Slot Query Message
 
+type Identifier = Int
+
 type Element =
     { point :: Point
-    , identifier :: Int
+    , identifier :: Identifier
     }
 
-newElement :: Int -> Element
+newElement :: Identifier -> Element
 newElement identifier =
     { point: zero
     , identifier: identifier
@@ -33,11 +35,11 @@ newElement identifier =
 _point :: Lens.Lens' Element Point
 _point = Lens.lens _.point $ _ { point = _ }
 
-_identifier :: Lens.Lens' Element Int
+_identifier :: Lens.Lens' Element Identifier
 _identifier = Lens.lens _.identifier $ _ { identifier = _ }
 
 class Draggable item where
-    identifier :: item -> Int
+    identifier :: item -> Identifier
     point :: item -> Point
 
 data Action
@@ -45,14 +47,15 @@ data Action
 
 data Message
     = Clicked Element Point
+    | Remove Identifier
 
 data Query a
     = Dragged Point a
 
-component :: forall i m. Element -> H.Component HH.HTML Query i Message m
-component initialElement =
+component :: forall i m. Int -> H.Component HH.HTML Query i Message m
+component id =
     H.mkComponent
-        { initialState: const initialElement
+        { initialState: const $ newElement id
         , render: render
         , eval: H.mkEval $ H.defaultEval
             { handleAction = handleAction
@@ -79,18 +82,22 @@ handleAction = case _ of
 
 handleQuery :: forall f m a. Query a -> H.HalogenM Element Action f Message m (Maybe a)
 handleQuery = case _ of
-    Dragged point a -> do
+    Dragged point _ -> do
         H.modify_ _ { point = point }
-        pure $ Just a
+        pure Nothing
+
+type DragProperty r =
+    ( class :: String
+    , onMouseDown :: ME.MouseEvent
+    , style :: String
+    | r
+    )
 
 draggableNode
     :: forall r w
      . Point
-    -> HEl.Node
-        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
-        w
-        Action
-    -> Array (HP.IProp (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r) Action)
+    -> HEl.Node (DragProperty r) w Action
+    -> Array (HP.IProp (DragProperty r) Action)
     -> Array (HH.HTML w Action)
     -> HH.HTML w Action
 draggableNode point html props =
@@ -103,10 +110,7 @@ draggableNode point html props =
 draggableNode_
     :: forall r w
      . Point
-    -> HEl.Node
-        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
-        w
-        Action
+    -> HEl.Node (DragProperty r) w Action
     -> Array (HH.HTML w Action)
     -> HH.HTML w Action
 draggableNode_ point html = draggableNode point html []
@@ -114,11 +118,8 @@ draggableNode_ point html = draggableNode point html []
 draggableLeaf
     :: forall r w
      . Point
-    -> HEl.Leaf
-        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
-        w
-        Action
-    -> Array (HP.IProp (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r) Action)
+    -> HEl.Leaf (DragProperty r) w Action
+    -> Array (HP.IProp (DragProperty r) Action)
     -> HH.HTML w Action
 draggableLeaf point html props =
     Util.mkLeaf html $
@@ -130,9 +131,6 @@ draggableLeaf point html props =
 draggableLeaf_
     :: forall r w
      . Point
-    -> HEl.Leaf
-        (class :: String, onMouseDown :: ME.MouseEvent, style :: String | r)
-        w
-        Action
+    -> HEl.Leaf (DragProperty r) w Action
     -> HH.HTML w Action
 draggableLeaf_ point html = draggableLeaf point html []

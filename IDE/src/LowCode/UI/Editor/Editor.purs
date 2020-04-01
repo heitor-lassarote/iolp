@@ -56,4 +56,4 @@ handleCanvasMessage
     :: forall o
      . Canvas.Message
     -> H.HalogenM State Action ChildSlots o Aff Unit
-handleCanvasMessage _ = pure unit
+handleCanvasMessage = const $ pure unit
