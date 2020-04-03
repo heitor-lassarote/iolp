@@ -107,7 +107,7 @@ typings/
 .nuxt
 
 # rollup.js default build output
-dist/
+#dist/
 
 # Uncomment the public line if your project uses Gatsby
 # https://nextjs.org/blog/next-9-1#public-directory-support
@@ -142,6 +142,12 @@ node_modules
 # Generated files
 .psci
 output
+
+### Project output ###
+.pulp-cache
+.spago
+.purs-repl
+editor.js
 
 ### Vim ###
 # Swap
