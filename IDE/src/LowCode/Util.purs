@@ -7,9 +7,6 @@ import Web.UIEvent.MouseEvent as ME
 
 import LowCode.Point (Point)
 
-getClientXY :: ME.MouseEvent -> Point
-getClientXY ev = { x: ME.clientX ev, y: ME.clientY ev }
-
 mkNode
     :: forall r w i
      . HE.Node r w i

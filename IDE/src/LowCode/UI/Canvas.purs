@@ -1,13 +1,14 @@
 module LowCode.UI.Canvas
     ( Slot
-    , Message
     , Query
+    , Message
     , component
     ) where
 
 import Prelude
 
 import Data.Lens as Lens
+import Data.List.NonEmpty as NEL
 import Data.Map as Map
 import Data.Maybe (Maybe (..))
 import Data.Symbol (SProxy (..))
@@ -21,41 +22,41 @@ import Web.Event.Event as WE
 import Web.UIEvent.MouseEvent as ME
 
 import LowCode.Draggable as Draggable
-import LowCode.MouseEventType (MouseEventType (..))
+import LowCode.Draggable (Identifier, Family)
+import LowCode.MouseEventType (clientXY, MouseEventType (..))
 import LowCode.Point (Point)
 import LowCode.UI.Element (Tag (..))
-import LowCode.Util as Util
 
 type Slot = H.Slot Query Message
 
 type DragStatus =
     { delta :: Point
-    , identifier :: Int
-    , onBounds :: Boolean
+    , child :: Family
+    , inBounds :: Boolean
     }
 
 _delta :: Lens.Lens' DragStatus Point
 _delta = Lens.lens _.delta $ _ { delta = _ }
 
-_identifier :: Lens.Lens' DragStatus Int
-_identifier = Lens.lens _.identifier $ _ { identifier = _ }
+_child :: Lens.Lens' DragStatus Family
+_child = Lens.lens _.child $ _ { child = _ }
 
-_onBounds :: Lens.Lens' DragStatus Boolean
-_onBounds = Lens.lens _.onBounds $ _ { onBounds = _ }
+_inBounds :: Lens.Lens' DragStatus Boolean
+_inBounds = Lens.lens _.inBounds $ _ { inBounds = _ }
 
 type State =
     { dragStatus :: Maybe DragStatus
-    , elements :: Map.Map Int Item
-    , generator :: Int
+    , elements :: Map.Map Identifier Item
+    , generator :: Identifier
     }
 
 _dragStatus :: Lens.Lens' State (Maybe DragStatus)
 _dragStatus = Lens.lens _.dragStatus $ _ { dragStatus = _ }
 
-_elements :: Lens.Lens' State (Map.Map Int Item)
+_elements :: Lens.Lens' State (Map.Map Identifier Item)
 _elements = Lens.lens _.elements $ _ { elements = _ }
 
-_generator :: Lens.Lens' State Int
+_generator :: Lens.Lens' State Identifier
 _generator = Lens.lens _.generator $ _ { generator = _ }
 
 type Item =
@@ -64,13 +65,13 @@ type Item =
     }
 
 data Action
-    = HandleMouseEvent MouseEventType ME.MouseEvent
+    = AddDraggable Item
     | HandleInner Draggable.Message
-    | AddDraggable Item
+    | HandleMouseEvent MouseEventType ME.MouseEvent
+
+data Query i
 
 data Message
-
-data Query a
 
 _inner :: SProxy "inner"
 _inner = SProxy
@@ -92,12 +93,17 @@ component
 component =
     H.mkComponent
         { initialState: initialState
-        , render: render
+        , render: HH.memoized eqStates render
         , eval: H.mkEval $ H.defaultEval
             { handleAction = handleAction
             --, handleQuery  = handleQuery
             }
         }
+  where
+    -- Don't render every time the DragStatus is changed, neither when generator
+    -- changes (as it means elements changed):
+    eqStates :: State -> State -> Boolean
+    eqStates a b = a.elements == b.elements
 
 render
     :: forall m
@@ -112,13 +118,18 @@ render state =
         , HP.class_ $ HH.ClassName "canvas"
         ]
         [ HH.h1_
-            [ HH.text $ "Elements in Canvas: " <> show (Map.size state.elements) ]
+            [ HH.text $ "Elements in Canvas: " <> show (Map.size state.elements)
+            ]
         , HH.div
             [ HP.class_ $ HH.ClassName "canvas-editor"
             ]
             draggableSlots
         , HH.div
-            [ HP.class_ $ HH.ClassName "sidebar canvas-items" ]
+            [ HP.classes
+                [ HH.ClassName "sidebar"
+                , HH.ClassName "canvas-items"
+                ]
+            ]
             [ HH.p
                 [ HE.onClick \ev -> createDraggable ev Button ]
                 [ HH.text "Button" ]
@@ -133,7 +144,11 @@ render state =
                 [ HH.text "Paragraph" ]
             ]
         , HH.div
-            [ HP.class_ $ HH.ClassName "sidebar canvas-properties" ]
+            [ HP.classes
+                [ HH.ClassName "sidebar"
+                , HH.ClassName "canvas-properties"
+                ]
+            ]
             [ HH.h2_ [ HH.text "Properties" ]
             ]
         ]
@@ -174,19 +189,19 @@ handleAction = case _ of
                , generator = st.generator + 1
                }
 
-    HandleMouseEvent evTy ev -> handleMouseEvent evTy ev
-
     HandleInner msg -> handleInner msg
+
+    HandleMouseEvent evTy ev -> handleMouseEvent evTy ev
 
 handleInner
     :: forall f i o m
      . Draggable.Message
     -> H.HalogenM State i f o m Unit
 handleInner = case _ of
-    Draggable.Clicked point identifier mousePos ->
-        H.modify_ _ { dragStatus = Just { identifier: identifier
+    Draggable.Clicked point child mousePos ->
+        H.modify_ _ { dragStatus = Just { child: child
                                         , delta: point - mousePos
-                                        , onBounds: true
+                                        , inBounds: true
                                         }
                     }
 
@@ -208,27 +223,28 @@ handleMouseEvent evTy ev = case evTy of
         case st.dragStatus of
             Nothing -> pure unit
             Just dragStatus -> do
-                let point = Util.getClientXY ev + dragStatus.delta
-                    id = dragStatus.identifier
-                if point.x >= 0 && point.y >= 0 then do
-                    void $ H.query _inner id $ H.tell $ Draggable.Dragged point
-                    pure unit
+                let point = clientXY ev + dragStatus.delta
+                    child = NEL.uncons dragStatus.child
+                if point.x >= 0 && point.y >= 0 then
+                    void $ H.query _inner child.head $ H.tell $ Draggable.Dragged child.tail point
                 else
                     pure unit
 
     MouseEnter -> setBounded true =<< H.get
 
     MouseLeave -> setBounded false =<< H.get
+
+    _ -> pure unit
   where
     setBounded
-        :: forall i' f o'
+        :: forall i' f o' m
          . Boolean
         -> State
-        -> H.HalogenM State i' f o' Aff Unit
+        -> H.HalogenM State i' f o' m Unit
     setBounded b st = case st.dragStatus of
         Nothing -> pure unit
         Just dragStatus ->
-            let dragStatus' = dragStatus { onBounds = b }
+            let dragStatus' = dragStatus { inBounds = b }
             in H.put $ st { dragStatus = Just dragStatus' }
 
 --handleQuery
