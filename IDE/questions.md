@@ -1,31 +1,31 @@
 **Q1.** Suppose I have a component with 5 children, and each children have 2 of
 their own, and each has 3 children. How do I message 4.0.1, given that I
-received a message from it, for example?  That is, suppose I received a message
+received a message from it, for example? That is, suppose I received a message
 and now I want to query it. How do I retrace its steps?
 
-**A.** Each child knows its ID. When a message is raised, the child could insert its
-ID in a list. Every time the message is raised, each parent conses its ID. The
-parent component can now retrace its steps to query the child, popping the list
-as it goes down in a query chain.
+**A.** Each child knows its ID. When a message is raised, the child could
+insert its ID in a list. Every time the message is raised, each parent conses
+its ID. The parent component can now retrace its steps to query the child,
+popping the list as it goes down in a query chain.
 
 We'll call this message followed by a query by **relay.**
 
 **Q2.** How do I drag a component into or out of a component?
 
-**A.** First, consider that whenever a component begins being dragged (MouseDown
-event), it should detach itself from its parent and return to the Canvas. With
-the current generator method, it should have its ID regenerated.
+**A.** First, consider that whenever a component begins being dragged
+(MouseDown event), it should detach itself from its parent and return to the
+Canvas. With the current generator method, it should have its ID regenerated.
 
-When the mouse is released (MouseUp event), we need to insert the Draggable as a
-child. For this, we need to record which element the mouse is over (MouseEnter
-event).
+When the mouse is released (MouseUp event), we need to insert the Draggable as
+a child. For this, we need to record which element the mouse is over
+(MouseEnter event).
 
 Additionally, each Draggable will need to be sorted by Z-index on its CSS
 according to the component's depth. One thing to discuss is whether the user
 should be able to alter this property on the Properties panel (which I believe
-they should). For this, it will be necessary a **Query** that updates each child,
-either setting the base with the specified index and its children with the new
-depth, or setting everything to the same depth,
+they should). For this, it will be necessary a **Query** that updates each
+child, either setting the base with the specified index and its children with
+the new depth, or setting everything to the same depth,
 
 **Q3.** Are there any problems with using the current ID generator method?
 
@@ -40,8 +40,8 @@ impossible, unless a hack/bot/macro is created.
 As an alternative solution, we could generate UUIDs or something similar, and
 then we wouldn't need to worry about a generator, or changing IDs when the
 parent changes. However, I think this might be overkill for something so
-trivial, besides that would give the Draggable an Aff dependency, which is to be
-avoided. There would be no real benefit.
+trivial, besides that would give the Draggable an Aff dependency, which is to
+be avoided. There would be no real benefit.
 
 **Q4.** What would be a good scheme to generating the AST?
 
@@ -52,8 +52,30 @@ avoided. There would be no real benefit.
 4. Its children;
 5. Its position, which may already be contained in **2.**.
 
-Then a **generateAST** function should be created for the Canvas and each Draggable.
-It should be a **Query** for **AST -> a** which recurses all the way into the leaf
-children, which will just return their ASTs. Their parent will then generate
-its AST using the ones from its children and continue this process until
-arriving on the Canvas, which will then create the root of the AST and return.
+Then a **generateAST** function should be created for the Canvas and each
+Draggable. It should be a **Query** for **AST -> a** which recurses all the way
+into the leaf children, which will just return their ASTs. Their parent will
+then generate its AST using the ones from its children and continue this
+process until arriving on the Canvas, which will then create the root of the
+AST and return.
+
+**Q5.** How can I initialize a Draggable?
+
+**A.** The Draggable expects a component to be inserted. Its initializer can
+receive a **[component]** which represents its children. When a Draggable is
+released upon it, its initializer should insert the released component to the
+existing array. The initial component should be the HTML that it represents (or
+other custom component). One thing to discuss is whether something should
+expect to have children or not.
+
+**Q6.** How do I transform HTML into a Draggable?
+
+**A.** One way would be to have **component** accept a Maybe HTML, which will
+be partially applied to **render** when creating the component. In **render**,
+this HTML could be concatenated to the **div**'s children, in case of **Just**.
+
+Another way is to turn **Item** to accept an **Either**, representing either
+the component or the HTML, or possibly even another **Array**.
+
+Finally, we can also make a generic component function to accept the HTML, and
+create a **slot** in **render**.

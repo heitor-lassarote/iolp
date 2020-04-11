@@ -25,7 +25,7 @@ import LowCode.Draggable as Draggable
 import LowCode.Draggable (Identifier, Family)
 import LowCode.MouseEventType (clientXY, MouseEventType (..))
 import LowCode.Point (Point)
-import LowCode.UI.Element (Tag (..))
+import LowCode.UI.Element (Tag (..), toHtml)
 
 type Slot = H.Slot Query Message
 
@@ -153,30 +153,14 @@ render state =
             ]
         ]
   where
-    mkSlot id item = HH.slot _inner id (tagToHtml id item.tag item.point) unit (Just <<< HandleInner)
-
-    -- TODO: Should we accept components instead of plain HTML? Suppose I wanted
-    -- to create some kind of container that has a specific logic to tile compo-
-    -- _nents in it; then a specific component might be required, or some
-    -- specific CSS. Also, if we ever want to support custom user components,
-    -- then we'll need such a thing.
-    -- Also, notice that Draggable.component is already a function that turns
-    -- basic HTML into components! Perhaps we could create a component' function
-    -- that expects components instead of HTML nodes/leafs as well?
-    tagToHtml id Button = Draggable.component id HH.button
-    tagToHtml id Div    = Draggable.component id HH.div
-    tagToHtml id H1     = Draggable.component id HH.h1
-    tagToHtml id P      = Draggable.component id HH.p
-
+    mkSlot id item = HH.slot
+        _inner
+        id
+        (Draggable.component id item.point)
+        [Draggable.Item { html: toHtml item.tag }]
+        (Just <<< HandleInner)
     draggableSlots = map (uncurry mkSlot) $ Map.toUnfoldable state.elements
-
     createDraggable ev html = Just $ AddDraggable { tag: html, point: zero }
-    --createDraggable
-    --    :: forall r m
-    --     . ME.MouseEvent
-    --    -> Draggable.HTMLNode r m
-    --    -> Maybe (Action r m)
-    --createDraggable ev html = Just $ AddDraggable { html }
 
 handleAction
     :: forall o
@@ -252,32 +236,3 @@ handleMouseEvent evTy ev = case evTy of
 --     . Query a
 --    -> H.HalogenM (State r m) i f o m (Maybe a)
 --handleQuery _ = pure Nothing
-
--- Apparently we can't do that... Possible alternative solutions:
--- * Have an enum defining what we can make instead. However, we need to analyze
---   whether this will eventually run into the same problem somewhere.
---   * It works, but it's cumbersome to redefine every possible HTML element,
---     besides having to pattern match on them and map to each function.
---   * However, we won't be adding support for literally everything (I hope), so
---     this might be feasible.
---   * Since we have to pass each button type and define a small text for every-
---     _thing anyway, might as well stick to this solution.
--- * Take a look if Prim.Row can help. It can do union of rows, but the problem
---   is that I don't have enough knownledge of how the types work out here.
--- * unsafeCoerce.
---test :: forall p i. HH.HTML p i
---test = HH.div
---    [ HP.class_ $ HH.ClassName "sidenav" ]
---    [ HH.p
---        [ HE.onClick \ev -> Just $ HH.button ]
---        [ HH.text "Button" ]
---    , HH.p
---        [ HE.onClick \ev -> Just $ HH.div ]
---        [ HH.text "Div" ]
---    , HH.p
---        [ HE.onClick \ev -> Just $ HH.h1 ]
---        [ HH.text "Header" ]
---    , HH.p
---        [ HE.onClick \ev -> Just $ HH.p ]
---        [ HH.text "Paragraph" ]
---    ]
