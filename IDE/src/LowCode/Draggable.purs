@@ -46,27 +46,26 @@ newtype Item m = Item
     }
 
 type State m =
-    { element :: Draggable m
+    { element :: Draggable
     , children :: Map.Map Identifier (Item m)
     , generator :: Identifier
     }
 
-_element :: forall m. Lens.Lens' (State m) (Draggable m)
+_element :: forall m. Lens.Lens' (State m) Draggable
 _element = Lens.lens _.element $ _ { element = _ }
 
 -- One thing to consider: the element should store ALL information used to
 -- render it, including its position, the tag that created it (Div, Button, P
 -- etc), its CSS information (class, background-color, border etc) and children.
-type Draggable m =
+type Draggable =
     { point :: Point
     , identifier :: Identifier
-    , item :: Item m
     }
 
-_point :: forall m. Lens.Lens' (Draggable m) Point
+_point :: Lens.Lens' Draggable Point
 _point = Lens.lens _.point $ _ { point = _ }
 
-_identifier :: forall m. Lens.Lens' (Draggable m) Identifier
+_identifier :: Lens.Lens' Draggable Identifier
 _identifier = Lens.lens _.identifier $ _ { identifier = _ }
 
 data Action
@@ -79,9 +78,9 @@ data Message
     | Removed Identifier
 
 data Query m a
-    = AddChild Child (Item m) a
+    = AddChildren Child (L.List (Item m)) a
     | Drag Child Point a
-    | GetItem Child (Item m -> a)
+    | GetItems Child (L.List (Item m) -> a)
 
 _inner :: SProxy "inner"
 _inner = SProxy
@@ -92,17 +91,15 @@ type ChildSlots m =
 
 component
     :: forall m
-     . Item m
-    -> Identifier
+     . Identifier
     -> Point
     -> H.Component HH.HTML (Query m) (Array (Item m)) Message m
-component item id initialPosition =
+component id initialPosition =
     H.mkComponent
         { initialState: \items ->
             { element:
                 { point: initialPosition
                 , identifier: id
-                , item: item
                 }
             , children: Map.fromFoldable $ Array.zip (Array.range 0 $ Array.length items) items
             , generator: Array.length items
@@ -182,15 +179,17 @@ handleQuery
      . Query m a
     -> H.HalogenM (State m) i (ChildSlots m) Message m (Maybe a)
 handleQuery = case _ of
-    AddChild family item _ -> case L.uncons family of
+    AddChildren family items _ -> case L.uncons family of
         Nothing -> do
             H.modify_ \st ->
-                st { children = Map.insert st.generator item st.children
-                   , generator = st.generator + 1
+                let newMap = Map.fromFoldable $ L.zip (L.range st.generator $ st.generator + L.length items) items
+                in
+                st { children = Map.union st.children newMap
+                   , generator = st.generator + L.length items
                    }
             pure Nothing
         Just child -> do
-            void $ H.query _inner child.head $ H.tell $ AddChild child.tail item
+            void $ H.query _inner child.head $ H.tell $ AddChildren child.tail items
             pure Nothing
 
     Drag family point _ -> case L.uncons family of
@@ -203,6 +202,9 @@ handleQuery = case _ of
                 H.modify_ \st -> st { children = Map.delete child.head st.children }
             pure Nothing
 
-    GetItem family f -> case L.uncons family of
-        Nothing -> H.get >>= pure <<< Just <<< f <<< _.element.item
-        Just child -> H.query _inner child.head (H.request (GetItem child.tail)) >>= pure <<< map f
+    GetItems family f -> case L.uncons family of
+        Nothing -> H.get >>= pure <<< Just <<< f <<< Map.values <<< _.children
+        Just child -> do
+            st <- H.get
+            items <- H.query _inner child.head $ H.request $ GetItems child.tail
+            pure $ map (f <<< (_ <> Map.values st.children)) items

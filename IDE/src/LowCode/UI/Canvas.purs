@@ -152,14 +152,7 @@ render state =
             ]
         ]
   where
-    -- FIXME: it feels quite wrong to me that I need to pass item twice...
-    mkSlot id item = HH.slot
-        _inner
-        id
-        (Draggable.component item id zero)
-        [item]
-        (Just <<< HandleInner)
-
+    mkSlot id item = HH.slot _inner id (Draggable.component id zero) [item] (Just <<< HandleInner)
     draggableSlots = map (uncurry mkSlot) $ Map.toUnfoldable state.elements
     createDraggable ev = Just <<< AddDraggable
 
@@ -228,11 +221,11 @@ handleMouseEvent evTy ev = case evTy of
                 -- check, as it might be useful for other things as well.
                 over@(c L.: cs) -> when (NEL.toList dragStatus.child /= over) $ do
                     let child = NEL.uncons dragStatus.child
-                    item' <- H.query _inner child.head $ H.request $ Draggable.GetItem child.tail
+                    item' <- H.query _inner child.head $ H.request $ Draggable.GetItems child.tail
                     case item' of
                         Nothing -> pure unit  -- Absurd.
                         Just item -> do
-                            void $ H.query _inner c $ H.tell $ Draggable.AddChild cs item
+                            void $ H.query _inner c $ H.tell $ Draggable.AddChildren cs item
                             H.put $ st { elements = Map.delete child.head st.elements }
 
         H.modify_ _ { dragStatus = Nothing }
