@@ -35,38 +35,39 @@ import Web.UIEvent.MouseEvent as ME
 import LowCode.MouseEventType (MouseEventType (..), clientXY)
 import LowCode.Point (Point)
 
-type Slot = H.Slot Query Message
+type Slot m = H.Slot (Query m) Message
 
 type Identifier = Int
 type Family = NonEmptyList Identifier
 type Child = List Identifier
 
--- One thing to consider: the element should store ALL information used to
--- render it, including its position, the tag that created it (Div, Button, P
--- etc), its CSS information (class, background-color, border etc) and children.
-type Draggable =
-    { point :: Point
-    , identifier :: Identifier
-    }
-
-_point :: Lens.Lens' Draggable Point
-_point = Lens.lens _.point $ _ { point = _ }
-
-_identifier :: Lens.Lens' Draggable Identifier
-_identifier = Lens.lens _.identifier $ _ { identifier = _ }
-
 newtype Item m = Item
-    { html :: H.Component HH.HTML Query (Array (Item m)) Message m
+    { component :: H.Component HH.HTML (Query m) (Array (Item m)) Message m
     }
 
 type State m =
-    { element :: Draggable
+    { element :: Draggable m
     , children :: Map.Map Identifier (Item m)
     , generator :: Identifier
     }
 
-_element :: forall m. Lens.Lens' (State m) Draggable
+_element :: forall m. Lens.Lens' (State m) (Draggable m)
 _element = Lens.lens _.element $ _ { element = _ }
+
+-- One thing to consider: the element should store ALL information used to
+-- render it, including its position, the tag that created it (Div, Button, P
+-- etc), its CSS information (class, background-color, border etc) and children.
+type Draggable m =
+    { point :: Point
+    , identifier :: Identifier
+    , item :: Item m
+    }
+
+_point :: forall m. Lens.Lens' (Draggable m) Point
+_point = Lens.lens _.point $ _ { point = _ }
+
+_identifier :: forall m. Lens.Lens' (Draggable m) Identifier
+_identifier = Lens.lens _.identifier $ _ { identifier = _ }
 
 data Action
     = HandleInner Message
@@ -74,29 +75,34 @@ data Action
 
 data Message
     = Clicked Point Family Point
+    | Entered Family
     | Removed Identifier
 
-data Query a
-    = Dragged Child Point a
+data Query m a
+    = AddChild Child (Item m) a
+    | Drag Child Point a
+    | GetItem Child (Item m -> a)
 
 _inner :: SProxy "inner"
 _inner = SProxy
 
-type ChildSlots =
-    ( inner :: Slot Int
+type ChildSlots m =
+    ( inner :: Slot m Int
     )
 
 component
     :: forall m
-     . Identifier
+     . Item m
+    -> Identifier
     -> Point
-    -> H.Component HH.HTML Query (Array (Item m)) Message m
-component id initialPosition =
+    -> H.Component HH.HTML (Query m) (Array (Item m)) Message m
+component item id initialPosition =
     H.mkComponent
         { initialState: \items ->
             { element:
                 { point: initialPosition
                 , identifier: id
+                , item: item
                 }
             , children: Map.fromFoldable $ Array.zip (Array.range 0 $ Array.length items) items
             , generator: Array.length items
@@ -116,7 +122,7 @@ postitionDraggable point = do
 render
     :: forall m
      . State m
-    -> H.ComponentHTML Action ChildSlots m
+    -> H.ComponentHTML Action (ChildSlots m) m
 render state =
     HH.div
         [ HE.onMouseEnter (Just <<< HandleMouseEvent MouseEnter)
@@ -126,7 +132,7 @@ render state =
         ]
         draggableSlots
   where
-    mkSlot id (Item item) = HH.slot _inner id item.html [] (Just <<< HandleInner)
+    mkSlot id (Item item) = HH.slot _inner id item.component [] (Just <<< HandleInner)
     draggableSlots = map (uncurry mkSlot) $ Map.toUnfoldable state.children
 
 handleAction
@@ -143,7 +149,13 @@ handleInner
      . Message
     -> H.HalogenM (State m) i f Message m Unit
 handleInner = case _ of
-    Clicked point child mousePos -> H.raise $ Clicked point child mousePos
+    Clicked point child mousePos -> do
+        st <- H.get
+        H.raise $ Clicked point (NEL.cons st.element.identifier child) mousePos
+
+    Entered child -> do
+        st <- H.get
+        H.raise $ Entered $ NEL.cons st.element.identifier child
 
     Removed id -> H.modify_ \st -> st { children = Map.delete id st.children }
 
@@ -160,19 +172,37 @@ handleMouseEvent evTy ev = case evTy of
         H.raise $ Clicked element.point family $ clientXY ev
 
     MouseEnter -> do
-        pure unit
+        state <- H.get
+        H.raise $ Entered $ NEL.singleton state.element.identifier
 
     _ -> pure unit
 
 handleQuery
-    :: forall o i m a
-     . Query a
-    -> H.HalogenM (State m) i ChildSlots o m (Maybe a)
+    :: forall i m a
+     . Query m a
+    -> H.HalogenM (State m) i (ChildSlots m) Message m (Maybe a)
 handleQuery = case _ of
-    Dragged family point _ -> case L.uncons family of
+    AddChild family item _ -> case L.uncons family of
+        Nothing -> do
+            H.modify_ \st ->
+                st { children = Map.insert st.generator item st.children
+                   , generator = st.generator + 1
+                   }
+            pure Nothing
+        Just child -> do
+            void $ H.query _inner child.head $ H.tell $ AddChild child.tail item
+            pure Nothing
+
+    Drag family point _ -> case L.uncons family of
         Nothing -> do
             H.modify_ $ Lens.set (_element <<< _point) point
             pure Nothing
         Just child -> do
-            void $ H.query _inner child.head $ H.tell $ Dragged child.tail point
+            void $ H.query _inner child.head $ H.tell $ Drag child.tail point
+            when (L.null child.tail) $
+                H.modify_ \st -> st { children = Map.delete child.head st.children }
             pure Nothing
+
+    GetItem family f -> case L.uncons family of
+        Nothing -> H.get >>= pure <<< Just <<< f <<< _.element.item
+        Just child -> H.query _inner child.head (H.request (GetItem child.tail)) >>= pure <<< map f
