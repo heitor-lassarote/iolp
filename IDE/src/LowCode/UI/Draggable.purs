@@ -3,17 +3,20 @@ module LowCode.Draggable
    , Identifier
    , Family
    , Child
-   , Draggable
    , Item (..)
+   , mkItem
+   , Draggable
    , Action
    , Message (..)
    , Query (..)
    , ChildSlots
    , component
+   , component'
    ) where
 
 import Prelude
 
+import Control.Comonad.Cofree as CF
 import CSS as CSS
 import Data.Array as Array
 import Data.Int (toNumber)
@@ -24,7 +27,10 @@ import Data.List.Types (List, NonEmptyList)
 import Data.Map as Map
 import Data.Maybe (Maybe (..))
 import Data.Symbol (SProxy (..))
-import Data.Tuple (uncurry)
+import Data.Tree as Tree
+import Data.Tuple (Tuple, uncurry)
+import Data.Tuple.Nested (uncurry3, tuple3)
+import Data.Unfoldable (fromMaybe)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.CSS as HCSS
@@ -44,6 +50,12 @@ type Child = List Identifier
 newtype Item m = Item
     { component :: H.Component HH.HTML (Query m) (Array (Item m)) Message m
     }
+
+mkItem
+    :: forall m
+     . H.Component HH.HTML (Query m) (Array (Item m)) Message m
+    -> Item m
+mkItem c = Item { component: c }
 
 type State m =
     { element :: Draggable
@@ -78,9 +90,10 @@ data Message
     | Removed Identifier
 
 data Query m a
-    = AddChildren Child (L.List (Item m)) a
+    = AddChildren Child (Tree.Forest (Item m)) a
     | Drag Child Point a
-    | GetItems Child (L.List (Item m) -> a)
+    | GetAllItems (Tree.Forest (Item m) -> a)
+    | GetItems Child (Tree.Forest (Item m) -> a)
 
 _inner :: SProxy "inner"
 _inner = SProxy
@@ -94,7 +107,15 @@ component
      . Identifier
     -> Point
     -> H.Component HH.HTML (Query m) (Array (Item m)) Message m
-component id initialPosition =
+component id initialPosition = component' id initialPosition Nothing
+
+component'
+    :: forall m
+     . Identifier
+    -> Point
+    -> Maybe (H.ComponentHTML Action (ChildSlots m) m)
+    -> H.Component HH.HTML (Query m) (Array (Item m)) Message m
+component' id initialPosition staticHtml =
     H.mkComponent
         { initialState: \items ->
             { element:
@@ -104,7 +125,7 @@ component id initialPosition =
             , children: Map.fromFoldable $ Array.zip (Array.range 0 $ Array.length items) items
             , generator: Array.length items
             }
-        , render: render
+        , render: render staticHtml
         , eval: H.mkEval $ H.defaultEval
             { handleAction = handleAction
             , handleQuery  = handleQuery
@@ -118,19 +139,41 @@ postitionDraggable point = do
 
 render
     :: forall m
-     . State m
+     . Maybe (H.ComponentHTML Action (ChildSlots m) m)
+    -> State m
     -> H.ComponentHTML Action (ChildSlots m) m
-render state =
+render staticHtml state =
     HH.div
         [ HE.onMouseEnter (Just <<< HandleMouseEvent MouseEnter)
         , HE.onMouseDown  (Just <<< HandleMouseEvent MouseDown)
         , HP.class_ $ HH.ClassName "draggable"
         , HCSS.style $ postitionDraggable state.element.point
         ]
-        draggableSlots
-  where
-    mkSlot id (Item item) = HH.slot _inner id item.component [] (Just <<< HandleInner)
-    draggableSlots = map (uncurry mkSlot) $ Map.toUnfoldable state.children
+        (draggableSlots (Map.toUnfoldable state.children) <> fromMaybe staticHtml)
+
+createChildren :: forall m. Tree.Forest (Item m) -> Array (Item m)
+createChildren L.Nil = []
+createChildren items =
+    let family = L.mapWithIndex (\index item -> tuple3 index (CF.head item) (CF.tail item)) items
+        children id child grandchildren =
+            mkItem $ component' id zero $ Just $ mkSlot grandchildren id child
+        slots = map (uncurry3 children) family
+     in Array.fromFoldable slots
+
+mkSlot
+    :: forall m
+     . Tree.Forest (Item m)
+    -> Identifier
+    -> Item m
+    -> H.ComponentHTML Action (ChildSlots m) m
+mkSlot items id (Item item) =
+    HH.slot _inner id item.component (createChildren items) (Just <<< HandleInner)
+
+draggableSlots
+    :: forall m
+     . Array (Tuple Identifier (Item m))
+    -> Array (H.ComponentHTML Action (ChildSlots m) m)
+draggableSlots = map (uncurry (\id item -> mkSlot L.Nil id item))
 
 handleAction
     :: forall f m
@@ -182,15 +225,27 @@ handleQuery = case _ of
     AddChildren family items _ -> case L.uncons family of
         Nothing -> do
             H.modify_ \st ->
-                let newMap = Map.fromFoldable $ L.zip (L.range st.generator $ st.generator + L.length items) items
+                let items' = map CF.head items
+                    newGenerator = st.generator + L.length items'
+                    newMap = Map.fromFoldable $ L.zip (L.range st.generator newGenerator) items'
                 in
                 st { children = Map.union st.children newMap
-                   , generator = st.generator + L.length items
+                   , generator = newGenerator
                    }
             pure Nothing
         Just child -> do
-            void $ H.query _inner child.head $ H.tell $ AddChildren child.tail items
-            pure Nothing
+            st <- H.get
+            if Map.isEmpty st.children then do
+                -- There are no slots.
+                let children = Map.fromFoldable $ Array.zip (Array.range 0 st.generator) $ createChildren items
+                    generator = Map.size children
+                H.put $ st { children = children
+                           , generator = generator
+                           }
+                pure Nothing
+            else do
+                void $ H.query _inner child.head $ H.tell $ AddChildren child.tail items
+                pure Nothing
 
     Drag family point _ -> case L.uncons family of
         Nothing -> do
@@ -202,9 +257,23 @@ handleQuery = case _ of
                 H.modify_ \st -> st { children = Map.delete child.head st.children }
             pure Nothing
 
+    GetAllItems f -> getAllItems f
+
     GetItems family f -> case L.uncons family of
-        Nothing -> H.get >>= pure <<< Just <<< f <<< Map.values <<< _.children
+        Nothing -> getAllItems f
         Just child -> do
             st <- H.get
-            items <- H.query _inner child.head $ H.request $ GetItems child.tail
-            pure $ map (f <<< (_ <> Map.values st.children)) items
+            case Map.lookup child.head st.children of
+                Nothing -> pure Nothing  -- Absurd.
+                Just item ->
+                    H.query _inner child.head (H.request (GetItems child.tail)) >>=
+                        pure <<< map (f <<< L.singleton <<< CF.mkCofree item)
+  where
+    getAllItems
+        :: forall m' a' i' o
+         . (Tree.Forest (Item m') -> a')
+        -> H.HalogenM (State m') i' (ChildSlots m') o m' (Maybe a')
+    getAllItems f = do
+        st <- H.get
+        items <- H.queryAll _inner $ H.request GetAllItems
+        pure $ Just $ f $ L.zipWith CF.mkCofree (Map.values st.children) (Map.values items)

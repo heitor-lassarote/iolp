@@ -1,3 +1,7 @@
-[2020/04/09]
-1. Add add and remove component to Draggable;
-2. After **1.** is done, generate ASTs.
+[2020/04/16]
+1. Make `AddChildren` and `GetItems` work on trees and figure a way to initialize these components on their slots:
+    1. Looking at [Halogen's slot function](https://github.com/purescript-halogen/purescript-halogen/blob/master/src/Halogen/HTML.purs), it seems a solution would be storing the tree instead of querying it, as it will be quite difficult passing that to the slot in `render`...
+    2. Alternatively, when querying for `AddChildren`, add how to initialize each children to the `State`. `Canvas` can do it, so why can't `Draggable`s do the same? Just keep in mind that `Query` uses `Tag`s to achieve this. Perhaps `Draggable` will need it as well (and perhaps `Canvas` doesn't really need it);
+    3. Using the idea from **2.**, we could store the children's children in `State` while querying. Make sure the children are stored in the `State` before querying. My fear is that the `eval` has to run to add the child before querying on it... in the worst-case scenario, I imagine we'll need one query to add the children and another to initialize them.
+    4. Perhaps we could have some success saving the slots in `State` instead. For this, we'll need to create an `initialize` function in `eval` so that `render` can have a non-empty collection of slots.
+2. Use `Draggable.component` instead of `genericComponent` function so that children can be nested. You might need to think how to initialize them in `slot` as well.

@@ -123,6 +123,19 @@ let upstream =
 
 let overrides = {=}
 
-let additions = {=}
+let additions =
+    { tree =
+        { dependencies =
+            [ "prelude"
+            , "console"
+            , "lists"
+            , "free"
+            ]
+        , repo =
+            "https://github.com/JordanMartinez/purescript-tree.git"
+        , version =
+            "v1.3.2"
+        }
+    }
 
 in  upstream // overrides // additions

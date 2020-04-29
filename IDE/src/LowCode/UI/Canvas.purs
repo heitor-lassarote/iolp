@@ -7,14 +7,17 @@ module LowCode.UI.Canvas
 
 import Prelude
 
+import Control.Comonad.Cofree as CF
 import Data.Lens as Lens
 import Data.List as L
 import Data.List.NonEmpty as NEL
 import Data.Map as Map
 import Data.Maybe (Maybe (..))
 import Data.Symbol (SProxy (..))
+import Data.Tree (showTree)
 import Data.Tuple (uncurry)
 import Effect.Aff (Aff)
+import Effect.Console (log)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -23,10 +26,10 @@ import Web.Event.Event as WE
 import Web.UIEvent.MouseEvent as ME
 
 import LowCode.Draggable as Draggable
-import LowCode.Draggable (Family, Identifier, Item (..))
+import LowCode.Draggable (Family, Identifier, Item (..), mkItem)
 import LowCode.MouseEventType (clientXY, MouseEventType (..))
 import LowCode.Point (Point)
-import LowCode.UI.Element (Tag (..), toHtml)
+import LowCode.UI.Element (Tag (..), toComponent)
 
 type Slot = H.Slot Query Message
 
@@ -92,17 +95,10 @@ component =
     H.mkComponent
         { initialState: initialState
         , render: render
-        --, render: HH.memoized eqStates render
         , eval: H.mkEval $ H.defaultEval
             { handleAction = handleAction
-            --, handleQuery  = handleQuery
             }
         }
---  where
---    -- Don't render every time the DragStatus is changed, neither when generator
---    -- changes (as it means elements changed):
---    eqStates :: forall m'. State m' -> State m' -> Boolean
---    eqStates a b = a.elements == b.elements
 
 render
     :: forall m
@@ -152,7 +148,7 @@ render state =
             ]
         ]
   where
-    mkSlot id item = HH.slot _inner id (Draggable.component id zero) [item] (Just <<< HandleInner)
+    mkSlot id (Item item) = HH.slot _inner id (item.component) [] (Just <<< HandleInner)
     draggableSlots = map (uncurry mkSlot) $ Map.toUnfoldable state.elements
     createDraggable ev = Just <<< AddDraggable
 
@@ -163,9 +159,7 @@ handleAction
 handleAction = case _ of
     AddDraggable tag ->
         H.modify_ \st ->
-            -- FIXME: toHtml creates uses genericComponent, but it doesn't play
-            -- well with the current logic as is (because it's not a Draggable).
-            let item = Item { component: toHtml tag }
+            let item = mkItem $ toComponent tag (Draggable.component' st.generator zero <<< Just)
             in
             st { elements  = Map.insert st.generator item st.elements
                , generator = st.generator + 1
@@ -213,20 +207,24 @@ handleMouseEvent evTy ev = case evTy of
 
     MouseUp -> do
         st <- H.get
-        case st.dragStatus of
-            Nothing -> pure unit
-            Just dragStatus -> case st.mouseOver of
-                L.Nil -> pure unit
-                -- TODO: think of a way to disable "collision" instead of this
-                -- check, as it might be useful for other things as well.
-                over@(c L.: cs) -> when (NEL.toList dragStatus.child /= over) $ do
+        case st.mouseOver of
+            L.Nil -> pure unit
+            -- TODO: think of a way to disable "collision" instead of this
+            -- check, as it might be useful for other things as well.
+            over@(c L.: cs) -> case st.dragStatus of
+                Nothing -> pure unit
+                Just dragStatus -> when (NEL.toList dragStatus.child /= over) do
                     let child = NEL.uncons dragStatus.child
-                    item' <- H.query _inner child.head $ H.request $ Draggable.GetItems child.tail
-                    case item' of
+                    items' <- H.query _inner child.head $ H.request $ Draggable.GetItems child.tail
+                    case items' of
                         Nothing -> pure unit  -- Absurd.
-                        Just item -> do
-                            void $ H.query _inner c $ H.tell $ Draggable.AddChildren cs item
-                            H.put $ st { elements = Map.delete child.head st.elements }
+                        Just items -> case Map.lookup child.head st.elements of
+                            Nothing -> pure unit  -- Absurd.
+                            Just item' -> do
+                                let item = L.singleton $ item' CF.:< items
+                                H.liftEffect $ log $ show $ map showTree $ (map <<< map) (const unit) item
+                                void $ H.query _inner c $ H.tell $ Draggable.AddChildren cs item
+                                H.put $ st { elements = Map.delete child.head st.elements }
 
         H.modify_ _ { dragStatus = Nothing }
 
