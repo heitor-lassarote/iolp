@@ -8,14 +8,14 @@ module LowCode.UI.Canvas
 import Prelude
 
 import Control.Comonad.Cofree as CF
+import Data.Array as Array
 import Data.Lens as Lens
 import Data.List as L
 import Data.List.NonEmpty as NEL
-import Data.Map as Map
 import Data.Maybe (Maybe (..))
 import Data.Symbol (SProxy (..))
-import Data.Tree (showTree)
-import Data.Tuple (uncurry)
+import Data.Tree as Tree
+import Data.Tuple (Tuple (..))
 import Effect.Aff (Aff)
 import Effect.Console (log)
 import Halogen as H
@@ -26,17 +26,16 @@ import Web.Event.Event as WE
 import Web.UIEvent.MouseEvent as ME
 
 import LowCode.Draggable as Draggable
-import LowCode.Draggable (Family, Identifier, Item (..), mkItem)
+import LowCode.Draggable (Child, Family, Identifier, Item)
 import LowCode.MouseEventType (clientXY, MouseEventType (..))
 import LowCode.Point (Point)
-import LowCode.UI.Element (Tag (..), toComponent)
+import LowCode.UI.Element (Tag (..))
 
 type Slot = H.Slot Query Message
 
 type DragStatus =
     { delta :: Point
     , child :: Family
-    , inBounds :: Boolean
     }
 
 _delta :: Lens.Lens' DragStatus Point
@@ -45,23 +44,20 @@ _delta = Lens.lens _.delta $ _ { delta = _ }
 _child :: Lens.Lens' DragStatus Family
 _child = Lens.lens _.child $ _ { child = _ }
 
-_inBounds :: Lens.Lens' DragStatus Boolean
-_inBounds = Lens.lens _.inBounds $ _ { inBounds = _ }
-
-type State m =
+type State =
     { dragStatus :: Maybe DragStatus
-    , elements :: Map.Map Identifier (Item m)
+    , children :: Tree.Forest Item
     , generator :: Identifier
-    , mouseOver :: L.List Identifier
+    , mouseOver :: Child
     }
 
-_dragStatus :: forall m. Lens.Lens' (State m) (Maybe DragStatus)
+_dragStatus :: Lens.Lens' State (Maybe DragStatus)
 _dragStatus = Lens.lens _.dragStatus $ _ { dragStatus = _ }
 
-_elements :: forall m. Lens.Lens' (State m) (Map.Map Identifier (Item m))
-_elements = Lens.lens _.elements $ _ { elements = _ }
+_children :: Lens.Lens' State (Tree.Forest Item)
+_children = Lens.lens _.children $ _ { children = _ }
 
-_generator :: forall m. Lens.Lens' (State m) Identifier
+_generator :: Lens.Lens' State Identifier
 _generator = Lens.lens _.generator $ _ { generator = _ }
 
 data Action
@@ -76,14 +72,14 @@ data Message
 _inner :: SProxy "inner"
 _inner = SProxy
 
-type ChildSlots m =
-    ( inner :: Draggable.Slot m Int
+type ChildSlots =
+    ( inner :: Draggable.Slot Int
     )
 
-initialState :: forall i m. i -> State m
+initialState :: forall i. i -> State
 initialState _ =
     { dragStatus: Nothing
-    , elements: Map.empty
+    , children: L.Nil
     , generator: 0
     , mouseOver: L.Nil
     }
@@ -102,8 +98,8 @@ component =
 
 render
     :: forall m
-     . State m
-    -> H.ComponentHTML Action (ChildSlots m) m
+     . State
+    -> H.ComponentHTML Action ChildSlots m
 render state =
     HH.div
         [ HE.onMouseEnter (Just <<< HandleMouseEvent MouseEnter)
@@ -113,7 +109,10 @@ render state =
         , HP.class_ $ HH.ClassName "canvas"
         ]
         [ HH.h1_
-            [ HH.text $ show state.mouseOver
+            [ HH.text $ "Mouse over: " <> show state.mouseOver
+            ]
+        , HH.h1_
+            [ HH.text $ "Tree: " <> show (map Tree.showTree state.children)
             ]
         , HH.div
             [ HP.class_ $ HH.ClassName "canvas-editor"
@@ -148,20 +147,22 @@ render state =
             ]
         ]
   where
-    mkSlot id (Item item) = HH.slot _inner id (item.component) [] (Just <<< HandleInner)
-    draggableSlots = map (uncurry mkSlot) $ Map.toUnfoldable state.elements
+    mkSlot tree =
+        let id = (CF.head tree).identifier
+         in HH.slot _inner id Draggable.component tree (Just <<< HandleInner)
+    draggableSlots = Array.fromFoldable $ map mkSlot state.children
     createDraggable ev = Just <<< AddDraggable
 
 handleAction
-    :: forall o m
+    :: forall o
      . Action
-    -> H.HalogenM (State m) Action (ChildSlots m) o Aff Unit
+    -> H.HalogenM State Action ChildSlots o Aff Unit
 handleAction = case _ of
     AddDraggable tag ->
         H.modify_ \st ->
-            let item = mkItem $ toComponent tag (Draggable.component' st.generator zero <<< Just)
+            let item = { tag: tag, point: zero, properties: [], identifier: st.generator }
             in
-            st { elements  = Map.insert st.generator item st.elements
+            st { children = CF.mkCofree item L.Nil L.: st.children
                , generator = st.generator + 1
                }
 
@@ -170,27 +171,25 @@ handleAction = case _ of
     HandleMouseEvent evTy ev -> handleMouseEvent evTy ev
 
 handleInner
-    :: forall f i o m m'
+    :: forall f i o m
      . Draggable.Message
-    -> H.HalogenM (State m') i f o m Unit
+    -> H.HalogenM State i f o m Unit
 handleInner = case _ of
     Draggable.Clicked point child mousePos ->
-        H.modify_ _ { dragStatus = Just { child: child
-                                        , delta: point - mousePos
-                                        , inBounds: true
-                                        }
-                    }
+        H.modify_ _
+            { dragStatus = Just
+                { child: child
+                , delta: point - mousePos
+                }
+            }
 
     Draggable.Entered child -> H.modify_ _ { mouseOver = NEL.toList child }
 
-    Draggable.Removed id ->
-        H.modify_ \st -> st { elements = Map.delete id st.elements }
-
 handleMouseEvent
-    :: forall i o m
+    :: forall i o
      . MouseEventType
     -> ME.MouseEvent
-    -> H.HalogenM (State m) i (ChildSlots m) o Aff Unit
+    -> H.HalogenM State i ChildSlots o Aff Unit
 handleMouseEvent evTy ev = case evTy of
     MouseMove -> do
         let ev' = ME.toEvent ev
@@ -200,32 +199,75 @@ handleMouseEvent evTy ev = case evTy of
             Nothing -> pure unit
             Just dragStatus -> do
                 let point = clientXY ev + dragStatus.delta
-                    child = NEL.uncons dragStatus.child
-                --when (point.x >= 0 && point.y >= 0) $
-                void $ H.query _inner child.head $ H.tell $ Draggable.Drag child.tail point
-                pure unit
+                    child = NEL.toList dragStatus.child
+                case updateChild st.children (_ { point = point }) child of
+                    Nothing -> pure unit
+                    Just tree -> H.put $ st { children = tree }
 
     MouseUp -> do
         st <- H.get
-        case st.mouseOver of
-            L.Nil -> pure unit
-            -- TODO: think of a way to disable "collision" instead of this
-            -- check, as it might be useful for other things as well.
-            over@(c L.: cs) -> case st.dragStatus of
-                Nothing -> pure unit
-                Just dragStatus -> when (NEL.toList dragStatus.child /= over) do
-                    let child = NEL.uncons dragStatus.child
-                    items' <- H.query _inner child.head $ H.request $ Draggable.GetItems child.tail
-                    case items' of
-                        Nothing -> pure unit  -- Absurd.
-                        Just items -> case Map.lookup child.head st.elements of
-                            Nothing -> pure unit  -- Absurd.
-                            Just item' -> do
-                                let item = L.singleton $ item' CF.:< items
-                                H.liftEffect $ log $ show $ map showTree $ (map <<< map) (const unit) item
-                                void $ H.query _inner c $ H.tell $ Draggable.AddChildren cs item
-                                H.put $ st { elements = Map.delete child.head st.elements }
+        case Tuple st.mouseOver st.dragStatus of
+            Tuple over@(c L.: cs) (Just dragStatus) ->
+                -- Parent: over
+                -- Child: dragStatus.child
+                case recreateTree st.children over (NEL.toList dragStatus.child) of
+                    Nothing ->
+                        H.liftEffect $ log $
+                            "Could not add children. Relevant paths:\n"
+                            <> "Parent:\n\t"
+                            <> show over
+                            <> "\nChild:\n\t"
+                            <> show (NEL.toList dragStatus.child)
+                            <> "\nOver the tree:\n"
+                            <> show (map Tree.showTree $ (map <<< map) _.identifier st.children)
+                    Just newTree -> do
+                        H.liftEffect $ log $
+                            "Successfully added children, with tree:\n"
+                            <> show (map Tree.showTree $ (map <<< map) _.identifier newTree)
+                        H.put $ st { children = newTree }
+            _ -> pure unit
 
         H.modify_ _ { dragStatus = Nothing }
 
     _ -> pure unit
+  where
+    updateChild :: Tree.Forest Item -> (Item -> Item) -> Child -> Maybe (Tree.Forest Item)
+    updateChild tree f L.Nil = Nothing
+    updateChild tree f (i L.: is) = case is of
+        L.Nil -> do
+            Just $ map (\cf -> if (CF.head cf).identifier == i then CF.mkCofree (f $ CF.head cf) (CF.tail cf) else cf) tree
+        _ -> do
+            subTree <- L.find (\cf -> (CF.head cf).identifier == i) tree
+            newTree <- updateChild (CF.tail subTree) f is
+            Just $ L.singleton $ CF.mkCofree (CF.head subTree) newTree
+
+    getChildren :: Tree.Forest Item -> Child -> Maybe (Tree.Forest Item)
+    getChildren tree L.Nil = Nothing
+    getChildren tree (i L.: is) = do
+        subTree <- L.find (\cf -> (CF.head cf).identifier == i) tree
+        case is of
+            L.Nil -> Just $ L.singleton subTree
+            _ -> getChildren (CF.tail subTree) is
+
+    removeChildren :: Tree.Forest Item -> Child -> Maybe (Tree.Forest Item)
+    removeChildren tree L.Nil = Nothing
+    removeChildren tree (i L.: is) = case is of
+        L.Nil -> Just $ L.filter ((_ /= i) <<< _.identifier <<< CF.head) tree
+        _ -> do
+            subTree <- L.find (\cf -> (CF.head cf).identifier == i) tree
+            newTree <- removeChildren (CF.tail subTree) is
+            Just $ L.singleton $ CF.mkCofree (CF.head subTree) newTree
+
+    addChildren :: Tree.Forest Item -> Child -> Tree.Forest Item -> Maybe (Tree.Forest Item)
+    addChildren tree L.Nil children = Nothing
+    addChildren tree (i L.: is) children = do
+        subTree <- L.find (\cf -> (CF.head cf).identifier == i) tree
+        case is of
+            L.Nil -> Just $ L.singleton $ CF.mkCofree (CF.head subTree) (CF.tail subTree <> children)
+            _ -> addChildren (CF.tail subTree) is children
+
+    recreateTree :: Tree.Forest Item -> Child -> Child -> Maybe (Tree.Forest Item)
+    recreateTree tree parentPath childrenPath = do
+        newTree <- removeChildren tree childrenPath
+        childrenSubTree <- getChildren tree childrenPath
+        addChildren newTree parentPath childrenSubTree

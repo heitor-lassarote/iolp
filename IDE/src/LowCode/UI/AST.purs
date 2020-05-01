@@ -2,14 +2,12 @@ module LowCode.UI.AST where
 
 import Prelude
 
-import Data.List as L
-
 type Attribute =
     { key   :: String
     , value :: String
     }
 
-type Attributes = L.List Attribute
+type Attributes = Array Attribute
 
 type Name = String
 
