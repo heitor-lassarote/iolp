@@ -1,8 +1,8 @@
-module LowCode.Logic
-    ( module LowCode.Logic.Codegen
+module Language.LowCode.UI
+    ( module Language.LowCode.UI.Codegen
     ) where
 
-import LowCode.Logic.Codegen hiding
+import Language.LowCode.UI.Codegen hiding
     ( Options (..)
     , defaultOptions
     , GeneratorState (..)

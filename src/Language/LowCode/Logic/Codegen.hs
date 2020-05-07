@@ -1,4 +1,4 @@
-module LowCode.Logic.Codegen
+module Language.LowCode.Logic.Codegen
     ( VariableType (..)
     , Variable
     , ValueType (..)
@@ -18,8 +18,8 @@ import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-import qualified LowCode.Codegen as C
-import           LowCode.Emit
+import qualified Language.LowCode.Codegen as C
+import           Language.LowCode.Emit
 
 type JavaScriptCodegen = StateT GeneratorState (Except Text)
 

@@ -1,4 +1,4 @@
-module LowCode.UI.Codegen
+module Language.LowCode.UI.Codegen
     ( Attribute
     , Attributes
     , HtmlAST (..)
@@ -17,8 +17,8 @@ import           Text.Printf (printf)
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-import qualified LowCode.Codegen as C
-import           LowCode.Emit
+import qualified Language.LowCode.Codegen as C
+import           Language.LowCode.Emit
 
 type HTMLCodegen = StateT GeneratorState (Except Text)
 

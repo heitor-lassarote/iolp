@@ -1,8 +1,8 @@
 module Main where
 
-import LowCode.Codegen as C
-import LowCode.Logic as L
-import LowCode.UI as UI
+import Language.LowCode.Codegen as C
+import Language.LowCode.Logic as L
+import Language.LowCode.UI as UI
 
 prototypeLogic :: L.LogicAST
 prototypeLogic =

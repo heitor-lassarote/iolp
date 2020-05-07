@@ -1,8 +1,8 @@
-module LowCode.Codegen where
+module Language.LowCode.Codegen where
 
 import Data.Text
 
-import LowCode.Emit
+import Language.LowCode.Emit
 
 class Codegen ast where
     codegen :: (Emit gen, Monoid gen) => ast -> Either Text gen
