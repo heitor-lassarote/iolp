@@ -1,0 +1,44 @@
+name:                LowCode
+version:             0.1.0.0
+synopsis:            A low-code platform for generating builds and source codes.
+-- description:         
+license:             MIT
+license-file:        LICENSE
+author:              Heitor Toledo Lassarote de Paula
+maintainer:          heitortoledo@gec.inatel.br
+-- copyright:           
+category:            Development
+build-type:          Simple
+extra-source-files:  ChangeLog.md
+cabal-version:       >=1.10
+
+library
+  build-depends:
+        base         >=4 && <5
+      , containers   >=0 && <1
+      , text         >=1 && <2
+      , transformers >=0 && <1
+  default-extensions:
+        FlexibleInstances
+      , GADTs
+      , LambdaCase
+      , OverloadedStrings
+  default-language:     Haskell2010
+  exposed-modules:
+        LowCode
+      , LowCode.Codegen
+      , LowCode.Emit
+      , LowCode.Logic
+      , LowCode.Logic.Codegen
+      , LowCode.UI
+      , LowCode.UI.Codegen
+--  ghc-options:          -Wall
+  hs-source-dirs:       src
+
+--executable LowCode
+--  main-is:             Main.hs
+--  -- other-modules:       
+--  -- other-extensions:    
+--  build-depends:       base >=4 && <5
+--  hs-source-dirs:      src
+--  default-language:    Haskell2010

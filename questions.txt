@@ -1,9 +1,9 @@
 1. Por que usar programação funcional para manipular símbolos?
 
-2. Por que o F# foi escolhido para backend?
-O fato de F# dar suporte a tipos de dados algébricos (ADT: Algebraic Datatypes, também chamados de Tagged Unions ou Discriminated Unions) é a capacidade dele representar e manipular símbolos de forma eficiente.
+2. Por que o Haskell foi escolhido para backend?
+O fato de Haskell dar suporte a tipos de dados algébricos (ADT: Algebraic Datatypes, também chamados de Tagged Unions ou Discriminated Unions) é a capacidade dele representar e manipular símbolos de forma eficiente.
 
-3. Por que o Elm foi escolhido para frontend?
+3. Por que o Angular foi escolhido para frontend?
 
 4. O que é uma arquitetura?
 Uma arquitetura é um documento descrevendo aspectos de como o "big picture" de um software deve ser implementado, contendo pontos como: quais módulos devem ser definidos e como eles se comunicam? O que deve ser definido em cada módulo e por quê?
