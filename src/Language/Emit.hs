@@ -1,4 +1,4 @@
-module Language.LowCode.Emit where
+module Language.Emit where
 
 import Data.Text as T
 

@@ -1,14 +1,4 @@
-module Language.LowCode.Logic.Codegen
-    ( VariableType (..)
-    , Variable
-    , ValueType (..)
-    , Comparison (..)
-    , LogicAST (..)
-    , Options (..)
-    , defaultOptions
-    , GeneratorState (..)
-    , defaultGeneratorState
-    ) where
+module Language.JavaScript.Printer where
 
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except
@@ -18,39 +8,13 @@ import qualified Data.Map as Map
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-import qualified Language.LowCode.Codegen as C
-import           Language.LowCode.Emit
+import qualified Language.Codegen as C
+import           Language.Emit
+import           Language.JavaScript.AST
 
 type JavaScriptCodegen = StateT GeneratorState (Except Text)
 
-data VariableType
-    = FloatTy Float
-    | IntegerTy Integer
-    | TextTy Text
-    deriving (Eq, Show)
-
-type Variable = (Text, VariableType)
-
-data ValueType
-    = Variable Text
-    | Constant VariableType
-
-data Comparison
-    = IsEqual ValueType ValueType
-    | IsDifferent ValueType ValueType
-    | IsGreaterThan ValueType ValueType
-    | IsLessThan ValueType ValueType
-    | IsGreaterOrEqualTo ValueType ValueType
-    | IsLessOrEqualTo ValueType ValueType
-
-data LogicAST
-    = Start LogicAST
-    | Var Variable LogicAST
-    | If Comparison LogicAST LogicAST LogicAST
-    | Print Text LogicAST
-    | End
-
-instance C.Codegen LogicAST where
+instance C.Codegen AST where
     codegen ast = runIdentity $ runExceptT $ evalStateT (javaScriptCodegen ast) defaultGeneratorState
 
 data Options = Options
@@ -65,7 +29,7 @@ defaultOptions = Options False False 4
 data GeneratorState = GeneratorState
     { currentIndentLevel :: Int
     , options            :: Options
-    , symbols            :: Map.Map Text VariableType
+    , symbols            :: Map.Map Text JSType
     } deriving (Eq, Show)
 
 defaultGeneratorState :: GeneratorState
@@ -90,12 +54,11 @@ withIndent action = do
 
 printVariableTy
     :: (Emit gen)
-    => VariableType
+    => JSType
     -> gen
 printVariableTy = emit . \case
-    FloatTy x -> T.pack $ show x
-    IntegerTy x -> T.pack $ show x
-    TextTy x -> x
+    Number x -> T.pack $ show x
+    Text x -> x
 
 nl :: (Emit gen) => JavaScriptCodegen gen
 nl = do
@@ -104,31 +67,37 @@ nl = do
 
 genBlock
     :: (Emit gen, Monoid gen)
-    => LogicAST
+    => [AST]
     -> JavaScriptCodegen gen
-genBlock ast = do
+genBlock asts = do
+    bracesOnNewLine <- bracesOnNewLine . options <$> get
     indent' <- indent
     nl' <- nl
-    bracesOnNewLine <- bracesOnNewLine . options <$> get
-    code <- withIndent $ javaScriptCodegen ast
+    codes <- genLines $ fmap (withIndent . javaScriptCodegen) asts
     pure $ mconcat
         [ if bracesOnNewLine then nl' <> indent' else emit " "
         , emit "{"
         , nl'
-        , code
+        , codes
         , indent'
         , emit "}"
         , nl'
         ]
+  where
+    genLines [] = pure $ emit mempty
+    genLines (code : codes) = do
+        code' <- code
+        codes' <- genLines codes
+        pure $ code' <> codes'
 
 genFunction
     :: (Emit gen, Monoid gen)
     => Text
     -> [Text]
-    -> LogicAST
+    -> AST
     -> JavaScriptCodegen gen
 genFunction name args body = do
-    body' <- withIndent $ genBlock body
+    body' <- withIndent $ javaScriptCodegen body
     pure $ mconcat
         [ emit "function "
         , emit name
@@ -140,26 +109,23 @@ genFunction name args body = do
 
 javaScriptCodegen
     :: (Emit gen, Monoid gen)
-    => LogicAST
+    => AST
     -> JavaScriptCodegen gen
 javaScriptCodegen = \case
-    Start l -> genFunction "TODO_addFunctionNames" [] l
-    Var (k, v) l -> do
-        modify $ \st -> st { symbols = Map.insert k v (symbols st) }
+    Block asts -> genBlock asts
+    Call name args -> do
         indent' <- indent
         nl' <- nl
-        next <- go l
         pure $ mconcat
             [ indent'
-            , emit "var "
-            , emit k
-            , emit " = "
-            , printVariableTy v
-            , emit ";"
+            , emit name
+            , emit "("
+            , emit $ T.intercalate "," args
+            , emit ");"
             , nl'
-            , next
             ]
-    If p t f l -> do
+    Function name args inner -> genFunction name args inner
+    If p t f -> do
         let
             get = \case
                 Variable v -> emit $ v
@@ -173,32 +139,32 @@ javaScriptCodegen = \case
                 IsLessOrEqualTo a b -> [get a, emit " <= ", get b]
 
         indent' <- indent
-        trueBranch <- genBlock t
-        falseBranch <- genBlock f
-        next <- go l
+        trueBranch <- go t
+        falseBranch <- case f of
+            Nothing -> pure $ emit ""
+            Just f' -> do
+                falseBranch <- go f'
+                pure $ mconcat [indent', emit "else", falseBranch]
         pure $ mconcat
             [ indent'
             , emit "if ("
             , expr
             , emit ")"
             , trueBranch
-            , indent'
-            , emit "else"
             , falseBranch
-            , next
             ]
-    Print s l -> do
+    Var k v -> do
+        modify $ \st -> st { symbols = Map.insert k v (symbols st) }
         indent' <- indent
         nl' <- nl
-        next <- go l
         pure $ mconcat
             [ indent'
-            , emit "alert(\""
-            , emit s
-            , emit "\");"
+            , emit "var "
+            , emit k
+            , emit " = "
+            , printVariableTy v
+            , emit ";"
             , nl'
-            , next
             ]
-    End -> pure $ emit ""
   where
     go = javaScriptCodegen

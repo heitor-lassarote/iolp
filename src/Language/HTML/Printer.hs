@@ -1,36 +1,25 @@
-module Language.LowCode.UI.Codegen
-    ( Attribute
-    , Attributes
-    , HtmlAST (..)
-    , Options (..)
+module Language.HTML.Printer
+    ( Options (..)
     , defaultOptions
     , GeneratorState (..)
     , defaultGeneratorState
-    )  where
+    ) where
 
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State
 import           Data.Either
 import           Data.Functor.Identity
-import           Text.Printf (printf)
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-import qualified Language.LowCode.Codegen as C
-import           Language.LowCode.Emit
+import qualified Language.Codegen as C
+import           Language.Emit
+import           Language.HTML.AST
 
 type HTMLCodegen = StateT GeneratorState (Except Text)
 
-type Attribute = (Text, Text)
-type Attributes = [Attribute]
-type Name = Text
-
-data HtmlAST
-    = Tag Name Attributes [HtmlAST]
-    | Text Text
-
-instance C.Codegen HtmlAST where
+instance C.Codegen AST where
     codegen ast = runIdentity $ runExceptT $ evalStateT (htmlCodegen ast) defaultGeneratorState
 
 data Options = Options
@@ -78,7 +67,7 @@ genAttributes = \case
 
 genElements
     :: (Emit gen, Monoid gen)
-    => [HtmlAST]
+    => [AST]
     -> HTMLCodegen gen
 genElements = \case
     x : xs -> do
@@ -89,7 +78,7 @@ genElements = \case
 
 htmlCodegen
     :: (Emit gen, Monoid gen)
-    => HtmlAST
+    => AST
     -> HTMLCodegen gen
 htmlCodegen = \case
     Tag name attributes asts -> do
