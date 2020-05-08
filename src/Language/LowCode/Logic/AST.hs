@@ -15,8 +15,8 @@ data VariableType
     deriving (Eq, Show)
 
 data AST
-    = Start AST
-    | Var Text VariableType AST
+    = End
     | If (Comparison VariableType) AST AST AST
     | Print Text AST
-    | End
+    | Start AST
+    | Var Text VariableType AST

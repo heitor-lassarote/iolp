@@ -32,6 +32,8 @@ library
     , Language.Emit
     , Language.HTML
     , Language.HTML.AST
+    , Language.HTML.Attributes
+    , Language.HTML.Elements
     , Language.HTML.Printer
     , Language.JavaScript
     , Language.JavaScript.AST

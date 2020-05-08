@@ -3,7 +3,9 @@ module Main where
 import Data.Text
 
 import Language.Codegen
-import Language.HTML as HTML
+import Language.HTML as H
+import Language.HTML.Attributes as HA
+import Language.HTML.Elements as HE
 import Language.JavaScript as JS
 import Language.LanguageConverter
 import Language.LowCode.Logic as L
@@ -18,12 +20,12 @@ prototypeLogic = convert $
                  (L.Print "Different" L.End)
                  L.End
 
-prototypeHtml :: HTML.AST
+prototypeHtml :: H.AST
 prototypeHtml = convert $
-    UI.Tag "div" []
-        [ UI.Tag "h1" [] [UI.Text "Hello, HTML!"]
-        , UI.Tag "p" [("title", "And I'm a tooltip!")] [UI.Text "This is my first paragraph. :)"]
-        , UI.Tag "script" [] [either UI.Text UI.Text $ codegen $ prototypeLogic]
+    HE.div'
+        [ HE.h1' [H.text "Hello, HTML!"]
+        , HE.p [HA.title "And I'm a tooltip!"] [H.text "This is my first paragraph. :)"]
+        , HE.script' [either H.text H.text $ codegen prototypeLogic]
         ]
 
 main :: IO ()
@@ -34,4 +36,3 @@ main =
         Right code -> do
             putStrLn code
             writeFile "/home/heitor/prototype.html" code
-
