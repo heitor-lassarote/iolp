@@ -1,8 +1,9 @@
 module Main where
 
-import Data.Text
+import Universum
 
 import Language.Codegen
+import Language.CSS as C
 import Language.HTML as H
 import Language.HTML.Attributes as HA
 import Language.HTML.Elements as HE
@@ -15,24 +16,42 @@ prototypeLogic :: JS.AST
 prototypeLogic = convert $
     L.Start $
         L.Var "x" (L.IntegerTy 5) $
-            L.If (L.IsEqual (L.Constant $ L.IntegerTy 5) (L.Variable "x"))
+            L.If (L.Constant $ L.IntegerTy 5, L.IsEqual, L.Variable "x")
                  (L.Print "Equal" L.End)
                  (L.Print "Different" L.End)
                  L.End
 
+prototypeCss :: C.AST
+prototypeCss =
+    C.CSS
+        [ C.Class "body"
+            [ ("background", "black")
+            , ("color", "white")
+            ]
+        ]
+
 prototypeHtml :: H.AST
 prototypeHtml = convert $
-    HE.div'
-        [ HE.h1' [H.text "Hello, HTML!"]
-        , HE.p [HA.title "And I'm a tooltip!"] [H.text "This is my first paragraph. :)"]
-        , HE.script' [either H.text H.text $ codegen prototypeLogic]
+    H.Tag "html" []
+        [ H.Tag "head" []
+            [ H.Tag "style" [] [either H.text H.text $ evalCSS prototypeCss]
+            ]
+        , H.Tag "body" []
+            [ HE.div'
+                [ HE.h1' [H.text "Hello, HTML!"]
+                , HE.p [HA.title "And I'm a tooltip!"] [H.text "This is my first paragraph. :)"]
+                , HE.script' [either H.text H.text $ evalJS prototypeLogic]
+                ]
+            ]
         ]
+  where
+    evalCSS = evalCodegenT  C.defaultGeneratorState . codegen
+    evalJS  = evalCodegenT JS.defaultGeneratorState . codegen
 
 main :: IO ()
 main =
-    let html = codegen prototypeHtml
-     in case html of
+    case evalCodegenT H.defaultGeneratorState $ codegen prototypeHtml of
         Left e -> print e
         Right code -> do
-            putStrLn code
+            putTextLn code
             writeFile "/home/heitor/prototype.html" code

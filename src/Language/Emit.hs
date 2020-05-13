@@ -1,5 +1,7 @@
 module Language.Emit where
 
+import Universum
+
 import Data.Text as T
 
 class Emit gen where

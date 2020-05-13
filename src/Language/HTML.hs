@@ -1,7 +1,7 @@
 module Language.HTML
     ( module Language.HTML.AST
-    , module Language.HTML.Printer
+    , module Language.HTML.Codegen
     ) where
 
 import Language.HTML.AST
-import Language.HTML.Printer
+import Language.HTML.Codegen

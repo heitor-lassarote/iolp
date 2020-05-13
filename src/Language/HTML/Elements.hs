@@ -1,7 +1,5 @@
 module Language.HTML.Elements where
 
-import Data.Text
-
 import Language.HTML.AST
 
 type Node = Attributes -> [AST] -> AST

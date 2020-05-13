@@ -1,19 +1,18 @@
 module Language.LowCode.Logic.JavaScriptConverter where
 
-import           Data.Text (Text)
-import           GHC.Float (float2Double)
+import Universum
 
 import qualified Language.JavaScript.AST    as JS
 import           Language.LanguageConverter
 import qualified Language.LowCode.Logic.AST as L
 
 instance LanguageConverter L.AST JS.AST where
-    convert = JS.Function "TODO_addFunctionNames" [] . JS.Block . convert'
+    convert = JS.Function (Just "TODO_addFunctionNames") [] . JS.Block . convert'
       where
         convert' = \case
             L.End -> []
-            L.If comp true false next ->
-                JS.If (logicTyToJsTy <$> comp)
+            L.If (left, op, right) true false next ->
+                JS.If (logicTyToJsTy <$> left, op, logicTyToJsTy <$> right)
                       (JS.Block $ convert' true)
                       (tryElse false) : convert' next
             L.Print text ast ->
@@ -25,6 +24,7 @@ instance LanguageConverter L.AST JS.AST where
         tryElse L.End = Nothing
         tryElse ast   = Just $ JS.Block $ convert' ast
 
-logicTyToJsTy (L.FloatTy x) = JS.Number $ float2Double x
+logicTyToJsTy :: L.VariableType -> JS.JSType
+logicTyToJsTy (L.FloatTy x) = JS.Number $ realToFrac x
 logicTyToJsTy (L.IntegerTy x) = JS.Number $ fromInteger x
 logicTyToJsTy (L.TextTy x) = JS.Text x

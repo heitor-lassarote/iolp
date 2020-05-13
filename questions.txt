@@ -1,7 +1,7 @@
 1. Por que usar programação funcional para manipular símbolos?
 
 2. Por que o Haskell foi escolhido para backend?
-O fato de Haskell dar suporte a tipos de dados algébricos (ADT: Algebraic Datatypes, também chamados de Tagged Unions ou Discriminated Unions) é a capacidade dele representar e manipular símbolos de forma eficiente.
+O fato de Haskell dar suporte a tipos de dados algébricos (ADT: Algebraic Datatypes, também chamados de Tagged Unions ou Discriminated Unions) e a capacidade dele representar e manipular símbolos de forma eficiente.
 
 3. Por que o Angular foi escolhido para frontend?
 

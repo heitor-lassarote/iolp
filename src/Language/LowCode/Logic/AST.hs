@@ -4,6 +4,8 @@ module Language.LowCode.Logic.AST
     , AST (..)
     ) where
 
+import Universum
+
 import Data.Text
 
 import Language.Common

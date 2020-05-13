@@ -1,26 +1,23 @@
-module Language.HTML.Printer
+module Language.HTML.Codegen
     ( Options (..)
     , defaultOptions
     , GeneratorState (..)
     , defaultGeneratorState
     ) where
 
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.State
-import           Data.Either
-import           Data.Functor.Identity
-import           Data.Text (Text)
+import Universum
+
 import qualified Data.Text as T
 
-import qualified Language.Codegen as C
-import           Language.Emit
-import           Language.HTML.AST
+import Language.Codegen
+import Language.Emit
+import Language.HTML.AST
 
-type HTMLCodegen = StateT GeneratorState (Except Text)
+type HTMLCodegen = CodegenT HTMLGeneratorState
 
-instance C.Codegen AST where
-    codegen ast = runIdentity $ runExceptT $ evalStateT (htmlCodegen ast) defaultGeneratorState
+instance Codegen AST where
+    type GeneratorState AST = HTMLGeneratorState
+    codegen = htmlCodegen
 
 data Options = Options
     { compactCode     :: Bool
@@ -30,26 +27,18 @@ data Options = Options
 defaultOptions :: Options
 defaultOptions = Options False 2
 
-data GeneratorState = GeneratorState
+data HTMLGeneratorState = HTMLGeneratorState
     { currentIndentLevel :: Int
     , options            :: Options
     } deriving (Eq, Show)
 
-defaultGeneratorState :: GeneratorState
-defaultGeneratorState = GeneratorState 0 defaultOptions
+instance HasIndentation HTMLGeneratorState where
+    getIndentation = indentLevel . options
+    getCurrentIndentation = currentIndentLevel
+    setCurrentIndentation l st = st { currentIndentLevel = l }
 
-indent :: (Emit gen) => HTMLCodegen gen
-indent = do
-    indent <- currentIndentLevel <$> get
-    pure $ emit $ T.replicate indent " "
-
-withIndent :: HTMLCodegen gen -> HTMLCodegen gen
-withIndent action = do
-    indent <- indentLevel . options <$> get
-    modify $ \st -> st { currentIndentLevel = currentIndentLevel st + indent }
-    result <- action
-    modify $ \st -> st { currentIndentLevel = currentIndentLevel st - indent }
-    pure result
+defaultGeneratorState :: HTMLGeneratorState
+defaultGeneratorState = HTMLGeneratorState 0 defaultOptions
 
 genAttributes :: (Emit gen, Monoid gen) => Attributes -> HTMLCodegen gen
 genAttributes = \case
@@ -82,22 +71,22 @@ htmlCodegen
     -> HTMLCodegen gen
 htmlCodegen = \case
     Tag name attributes asts -> do
-        attributes <- genAttributes attributes
-        elements <- genElements asts
         indent' <- indent
+        attributes' <- genAttributes attributes
+        elements <- genElements asts
         pure $ mconcat
             [ indent'
             , emit "<"
             , emit name
-            , attributes
+            , attributes'
             , emit ">\n"
             , elements
-            , emit "\n"
             , indent'
             , emit "</"
             , emit name
-            , emit ">\n"
+            , emit ">"
+            , emit $ if null asts then "" else "\n"
             ]
     Text str -> do
         indent' <- indent
-        pure $ mconcat [indent', emit str]
+        pure $ mconcat [indent', emit str, emit "\n"]

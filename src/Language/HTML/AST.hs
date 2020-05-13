@@ -1,6 +1,6 @@
 module Language.HTML.AST where
 
-import Data.Text
+import Universum
 
 type Attribute = (Text, Text)
 type Attributes = [Attribute]

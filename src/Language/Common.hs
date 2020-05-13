@@ -1,6 +1,6 @@
 module Language.Common where
 
-import Data.Text
+import Universum
 
 type Variable varType = (Text, varType)
 
@@ -9,11 +9,12 @@ data ValueType varType
     | Constant varType
     deriving (Functor)
 
-data Comparison varType
-    = IsEqual (ValueType varType) (ValueType varType)
-    | IsDifferent (ValueType varType) (ValueType varType)
-    | IsGreaterThan (ValueType varType) (ValueType varType)
-    | IsLessThan (ValueType varType) (ValueType varType)
-    | IsGreaterOrEqualTo (ValueType varType) (ValueType varType)
-    | IsLessOrEqualTo (ValueType varType) (ValueType varType)
-    deriving (Functor)
+type Comparison varType = (ValueType varType, EqualityOp, ValueType varType)
+
+data EqualityOp
+    = IsEqual
+    | IsDifferent
+    | IsGreaterThan
+    | IsLessThan
+    | IsGreaterOrEqualTo
+    | IsLessOrEqualTo

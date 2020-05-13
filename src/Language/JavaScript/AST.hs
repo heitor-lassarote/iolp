@@ -4,7 +4,7 @@ module Language.JavaScript.AST
     , AST (..)
     ) where
 
-import Data.Text
+import Universum
 
 import Language.Common
 
@@ -17,6 +17,6 @@ data JSType
 data AST
     = Block [AST]
     | Call Text [Text]
-    | Function Text [Text] AST
+    | Function (Maybe Text) [Text] AST
     | If (Comparison JSType) AST (Maybe AST)
     | Var Text JSType
