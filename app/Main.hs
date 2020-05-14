@@ -14,12 +14,16 @@ import Language.LowCode.UI as UI
 
 prototypeLogic :: JS.AST
 prototypeLogic = convert $
-    L.Start $
-        L.Var "x" (L.IntegerTy 5) $
-            L.If (L.Constant $ L.IntegerTy 5, L.IsEqual, L.Variable "x")
-                 (L.Print "Equal" L.End)
-                 (L.Print "Different" L.End)
-                 L.End
+    L.Start "test" $
+    L.Var "x" (L.Value $ L.Constant $ L.IntegerTy 0) $
+    L.While (L.BinaryOp (L.Value $ L.Variable "x") L.Less (L.Value $ L.Constant $ L.IntegerTy 5))
+        (L.Print (L.Value $ L.Constant $ L.TextTy "x") $
+        (L.Assign "x" (L.BinaryOp (L.Value $ L.Variable "x") L.Add (L.Value $ L.Constant $ L.IntegerTy 1)))
+        (L.End Nothing)) $
+    L.If (L.BinaryOp (L.Value $ L.Variable "x") L.Equal (L.Value $ L.Constant $ L.IntegerTy 5))
+         (L.Print (L.Value $ L.Constant $ L.TextTy "\"Equal\"") $ L.End Nothing)
+         (L.Print (L.Value $ L.Constant $ L.TextTy "\"Different\"") $ L.End Nothing)
+         (L.End Nothing)
 
 prototypeCss :: C.AST
 prototypeCss =
