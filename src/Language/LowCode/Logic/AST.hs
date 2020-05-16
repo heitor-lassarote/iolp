@@ -43,8 +43,3 @@ data Expression
     | UnaryOp Symbol Expression
     | Value (ValueType VariableType)
     deriving (Eq, Show)
-
-data ExpressionType
-    = OperatorTy Symbol
-    | ValueTy (ValueType VariableType)
-    deriving (Eq, Show)
