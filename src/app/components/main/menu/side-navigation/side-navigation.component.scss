@@ -1,0 +1,13 @@
+.logo {
+    width: 100%;
+}
+.menu-animation {
+    -webkit-animation-duration: 0.4s;
+    -moz-animation-duration: 0.4s;
+    -ms-animation-duration: 0.4s;
+    animation-duration: 0.4s;
+}
+.text-overflow-ellipsis {
+    text-overflow: ellipsis;
+    overflow-x: hidden;
+}
