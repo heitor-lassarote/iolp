@@ -1,6 +1,7 @@
 module Main where
 
-import Universum
+import           Universum
+import qualified Universum.Unsafe as Unsafe
 
 import Language.Codegen
 import Language.CSS as C
@@ -16,14 +17,19 @@ prototypeLogic :: JS.AST
 prototypeLogic = convert $
     L.Start "test" $
     L.Var "x" (L.Value $ L.Constant $ L.IntegerTy 0) $
-    L.While (L.BinaryOp (L.Value $ L.Variable "x") L.Less (L.Value $ L.Constant $ L.IntegerTy 5))
+    L.While whileCond
         (L.Print (L.Value $ L.Constant $ L.TextTy "x") $
-        (L.Assign "x" (L.BinaryOp (L.Value $ L.Variable "x") L.Add (L.Value $ L.Constant $ L.IntegerTy 1)))
+        (L.Assign "x" xPlus1)
         (L.End Nothing)) $
-    L.If (L.BinaryOp (L.Value $ L.Variable "x") L.Equal (L.Value $ L.Constant $ L.IntegerTy 5))
+    L.If ifCond
          (L.Print (L.Value $ L.Constant $ L.TextTy "\"Equal\"") $ L.End Nothing)
-         (L.Print (L.Value $ L.Constant $ L.TextTy "\"Different\"") $ L.End Nothing)
-         (L.End Nothing)
+         (L.Print (L.Value $ L.Constant $ L.TextTy "\"Different\"") $ L.End Nothing) $
+    L.Print formula (L.End Nothing)
+  where
+    whileCond = Unsafe.fromJust $ rightToMaybe $ L.parseExpression "x < 5"
+    xPlus1 = Unsafe.fromJust $ rightToMaybe $ L.parseExpression "x + 1"
+    ifCond = Unsafe.fromJust $ rightToMaybe $ L.parseExpression "x = 5"
+    formula = Unsafe.fromJust $ rightToMaybe $ L.parseExpression "1 * (2 + x) * 4 + -2 - x"
 
 prototypeCss :: C.AST
 prototypeCss =

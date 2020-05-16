@@ -199,6 +199,13 @@ genExpression = \case
             , emit $ symbolToText op
             , right'
             ]
+    Parenthesis expr -> do
+        expr' <- genExpression expr
+        pure $ mconcat
+            [ emit "("
+            , expr'
+            , emit ")"
+            ]
     UnaryOp op expr -> do
         expr' <- genExpression expr
         pure $ mconcat

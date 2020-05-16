@@ -11,7 +11,7 @@ import Language.Common
 
 data VariableType
     = BoolTy Bool
-    | FloatTy Float
+    | DoubleTy Double
     | IntegerTy Integer
     | TextTy Text
     deriving (Eq, Show)
@@ -39,5 +39,12 @@ data AST
 
 data Expression
     = BinaryOp Expression Symbol Expression
+    | Parenthesis Expression
     | UnaryOp Symbol Expression
     | Value (ValueType VariableType)
+    deriving (Eq, Show)
+
+data ExpressionType
+    = OperatorTy Symbol
+    | ValueTy (ValueType VariableType)
+    deriving (Eq, Show)

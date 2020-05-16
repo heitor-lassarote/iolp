@@ -25,14 +25,16 @@ data JSType
 
 getName :: JSType -> Text
 getName = \case
-    Number _ -> "Number"
-    Text   _ -> "Text"
+    Boolean _ -> "Boolean"
+    Number _  -> "Number"
+    Text   _  -> "Text"
 
 sameType :: JSType -> JSType -> Bool
 sameType left right = case (left, right) of
-    (Number _, Number _) -> True
-    (Text   _, Text   _) -> True
-    (       _,        _) -> False
+    (Boolean _, Boolean _) -> True
+    (Number  _, Number  _) -> True
+    (Text    _, Text    _) -> True
+    (        _,         _) -> False
 
 -- Simplified version to be good enough to create the conversion.
 data AST
@@ -47,6 +49,7 @@ data AST
 data Expression
     = Call Text [Expression]
     | BinaryOp Expression Symbol Expression
+    | Parenthesis Expression
     | UnaryOp Symbol Expression
     | Value (ValueType JSType)
 

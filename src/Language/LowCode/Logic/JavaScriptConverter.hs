@@ -2,7 +2,6 @@ module Language.LowCode.Logic.JavaScriptConverter where
 
 import Universum
 
-import qualified Language.Common            as C
 import qualified Language.JavaScript.AST    as JS
 import           Language.LanguageConverter
 import qualified Language.LowCode.Logic.AST as L
@@ -37,10 +36,12 @@ instance LanguageConverter L.AST JS.AST where
 convertExpression :: L.Expression -> JS.Expression
 convertExpression = \case
     L.BinaryOp left op right -> JS.BinaryOp (convertExpression left) op (convertExpression right)
+    L.Parenthesis expr -> JS.Parenthesis $ convertExpression expr
     L.UnaryOp op expr -> JS.UnaryOp op (convertExpression expr)
     L.Value variable -> JS.Value $ fmap logicTyToJsTy variable
 
 logicTyToJsTy :: L.VariableType -> JS.JSType
-logicTyToJsTy (L.FloatTy x) = JS.Number $ realToFrac x
+logicTyToJsTy (L.BoolTy x) = JS.Boolean x
+logicTyToJsTy (L.DoubleTy x) = JS.Number x
 logicTyToJsTy (L.IntegerTy x) = JS.Number $ fromInteger x
 logicTyToJsTy (L.TextTy x) = JS.Text x
