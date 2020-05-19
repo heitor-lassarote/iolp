@@ -5,6 +5,8 @@ import { MainRoutingModule } from './main.routing.module';
 import { SideNavigationComponent } from './menu/side-navigation/side-navigation.component';
 import { TopNavbarComponent } from './menu/top-navbar/top-navbar.component';
 import { CanvasComponent } from './canvas/canvas.component';
+import { DragDropModule } from '@angular/cdk/drag-drop';
+import { ResizableModule } from 'angular-resizable-element';
 
 @NgModule({
     declarations: [
@@ -13,6 +15,11 @@ import { CanvasComponent } from './canvas/canvas.component';
         TopNavbarComponent,
         CanvasComponent
     ],
-    imports: [CommonModule, MainRoutingModule],
+    imports: [
+        CommonModule,
+        MainRoutingModule,
+        DragDropModule,
+        ResizableModule
+    ],
 })
 export class MainModule {}

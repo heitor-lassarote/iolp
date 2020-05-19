@@ -18,7 +18,7 @@ $(document).ready(function () {
     }
 
     // MetisMenu
-    // var sideMenu = $("#side-menu").metisMenu();
+    var sideMenu = $("#side-menu").metisMenu();
 
     sideMenu.on("shown.metisMenu", function (e) {
         fix_height();

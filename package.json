@@ -25,6 +25,7 @@
     "@ngx-progressbar/http": "^5.3.2",
     "@ngx-translate/core": "^12.1.2",
     "@ngx-translate/http-loader": "^4.0.0",
+    "angular-resizable-element": "^3.3.0",
     "animate.css": "^4.0.0",
     "bootstrap": "^4.4.1",
     "font-awesome": "^4.7.0",
