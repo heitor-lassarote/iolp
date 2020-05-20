@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Language.LowCode.Logic.JavaScriptConverter where
 
 import Universum

@@ -1,8 +1,8 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Language.CSS.Codegen where
 
 import Universum
-
-import qualified Data.Text as T
 
 import Language.Codegen
 import Language.CSS.AST
