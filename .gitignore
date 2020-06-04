@@ -1,3 +1,5 @@
+# Annoying file that Yesod will create:
+*.aes
 
 # Created by https://www.gitignore.io/api/vim,haskell
 # Edit at https://www.gitignore.io/?templates=vim,haskell
