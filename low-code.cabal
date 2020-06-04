@@ -14,14 +14,13 @@ version:             0.1.0.0
 
 library
   build-depends:
-      aeson        >=1 && <2
-    , attoparsec   >=0 && <1
-    , base         >=4 && <5
-    , containers   >=0 && <1
-    , text         >=1 && <2
-    , transformers >=0 && <1
-    , universum    >=1 && <2
-    , vector       >=0 && <1
+      aeson                 >=1 && <2
+    , attoparsec            >=0 && <1
+    , base                  >=4 && <5
+    , containers            >=0 && <1
+    , text                  >=1 && <2
+    , transformers          >=0 && <1
+    , universum             >=1 && <2
   default-extensions:
       DeriveFunctor
     , DeriveGeneric
@@ -33,7 +32,8 @@ library
     , TypeFamilies
   default-language:     Haskell2010
   exposed-modules:
-      Language.Codegen
+      Language.Bundles
+    , Language.Codegen
     , Language.Common
     , Language.CSS
     , Language.CSS.AST
@@ -41,9 +41,7 @@ library
     , Language.Emit
     , Language.HTML
     , Language.HTML.AST
-    , Language.HTML.Attributes
     , Language.HTML.Codegen
-    , Language.HTML.Elements
     , Language.JavaScript
     , Language.JavaScript.AST
     , Language.JavaScript.Codegen
@@ -59,14 +57,47 @@ library
 
 executable LowCode
   build-depends:
-      low-code  >=0 && <1
-    , text      >=1 && <2
-    , universum >=1 && <2
+      aeson                 >=1 && <2
+    , base                  >=4 && <5
+    , cryptonite            >=0 && <1
+    , esqueleto             >=3 && <4
+    , http-types            >=0 && <1
+    , low-code              >=0 && <1
+    , monad-logger          >=0 && <1
+    , optparse-applicative  >=0 && <1
+--    , path                  >=0 && <1
+    , persistent            >=2 && <3
+    , persistent-postgresql >=2 && <3
+    , persistent-template   >=2 && <3
+--    , temporary             >=1 && <2
+    , text                  >=1 && <2
+    , universum             >=1 && <2
+    , unliftio-core         >=0 && <1
+    , yesod                 >=1 && <2
+    , yesod-persistent      >=1 && <2
+--    , zip                   >=1 && <2
   default-extensions:
-      NoImplicitPrelude
+      DeriveAnyClass
+    , DeriveGeneric
+    , DerivingStrategies
+    , FlexibleContexts
+    , GADTs
+    , GeneralizedNewtypeDeriving
+    , MultiParamTypeClasses
+    , NoImplicitPrelude
     , OverloadedStrings
+    , QuasiQuotes
+    , RecordWildCards
+    , StandaloneDeriving
+    , TemplateHaskell
     , TypeFamilies
+    , ViewPatterns
   default-language:     Haskell2010
+  other-extensions:
+      UndecidableInstances
+  other-modules:
+      Database
+    , Foundation
   ghc-options:          -Wall
   hs-source-dirs:       app
   main-is:              Main.hs

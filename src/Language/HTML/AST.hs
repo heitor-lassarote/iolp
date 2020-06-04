@@ -36,10 +36,8 @@ instance FromJSON AST where
 
 instance ToJSON AST where
     toJSON (Tag name attributes ast) = object
-        [ "tag" .= object
-            [ "name"       .= String name
-            , "attributes" .= toJSON attributes
-            , "ast"        .= toJSON ast
-            ]
+        [ "tag"        .= String name
+        , "attributes" .= toJSON attributes
+        , "ast"        .= toJSON ast
         ]
     toJSON (Text t) = object [ "text" .= String t ]
