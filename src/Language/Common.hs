@@ -48,25 +48,24 @@ data Symbol
     deriving (Eq, Ord, Show)
 
 instance FromJSON Symbol where
-    parseJSON (Object o) = either fail pure . toSymbol =<< o .: "symbol"
+    parseJSON = withObject "Symbol" $ \o -> toSymbol <$> o .: "symbol"
       where
         toSymbol = \case
-            "Add"          -> Right Add
-            "Divide"       -> Right Divide
-            "Multiply"     -> Right Multiply
-            "Negate"       -> Right Negate
-            "Subtract"     -> Right Subtract
-            "Different"    -> Right Different
-            "Equal"        -> Right Equal
-            "Greater"      -> Right Greater
-            "GreaterEqual" -> Right GreaterEqual
-            "Less"         -> Right Less
-            "LessEqual"    -> Right LessEqual
-            "And"          -> Right And
-            "Not"          -> Right Not
-            "Or"           -> Right Or
-            other          -> Left $ "Unknown symbol '" <> other <> "'."
-    parseJSON _ = empty
+            "Add"          -> Add
+            "Divide"       -> Divide
+            "Multiply"     -> Multiply
+            "Negate"       -> Negate
+            "Subtract"     -> Subtract
+            "Different"    -> Different
+            "Equal"        -> Equal
+            "Greater"      -> Greater
+            "GreaterEqual" -> GreaterEqual
+            "Less"         -> Less
+            "LessEqual"    -> LessEqual
+            "And"          -> And
+            "Not"          -> Not
+            "Or"           -> Or
+            other          -> error $ "Unknown symbol '" <> other <> "'."
 
 instance ToJSON Symbol where
     toJSON symbol = object [ "symbol" .= String (show symbol) ]

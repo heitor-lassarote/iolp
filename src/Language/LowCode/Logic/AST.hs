@@ -148,6 +148,7 @@ instance ToJSON Expression where
 
 instance Codegen Expression where
     type GeneratorState Expression = ()
+
     codegen = \case
         BinaryOp left symbol' right -> mconcat <$> sequence
             [ codegen left
