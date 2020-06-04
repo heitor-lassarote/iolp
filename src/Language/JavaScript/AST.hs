@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import Language.Common
 
 data JSType
-    = Boolean {-# UNPACK #-} !Bool
+    = Boolean                !Bool
     | Number  {-# UNPACK #-} !Double
     | Text                    Text
     deriving (Eq, Show)
