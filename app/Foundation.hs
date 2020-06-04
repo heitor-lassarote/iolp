@@ -111,7 +111,7 @@ deleteProjectR pid = do
     sendResponse ("OK" :: Text)
 
 getBuildR :: ProjectId -> Handler Value
-getBuildR pid = sendResponseStatus notImplemented501 ("Building is not implemented yet." :: Text)
+getBuildR _ = sendResponseStatus notImplemented501 ("Building is not implemented yet." :: Text)
 
 -- Reason behind comment:
 -- More work should be done to analyse how each component will be connected.

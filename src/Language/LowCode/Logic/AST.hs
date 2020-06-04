@@ -29,13 +29,13 @@ data VariableType
 
 instance FromJSON VariableType where
     parseJSON = withObject "variable" $ \o -> do
-        tag   <- o .: "type"
-        value <- o .: "value"
+        tag    <- o .: "type"
+        value' <- o .: "value"
         case tag of
-            "bool"    -> BoolTy    <$> parseJSON value
-            "double"  -> DoubleTy  <$> parseJSON value
-            "integer" -> IntegerTy <$> parseJSON value
-            "text"    -> TextTy    <$> parseJSON value
+            "bool"    -> BoolTy    <$> parseJSON value'
+            "double"  -> DoubleTy  <$> parseJSON value'
+            "integer" -> IntegerTy <$> parseJSON value'
+            "text"    -> TextTy    <$> parseJSON value'
             other     -> fail $ "Expected 'bool', 'double', 'integer' or 'text', but got '" <> other <> "'."
 
 instance ToJSON VariableType where
@@ -146,14 +146,12 @@ instance FromJSON Expression where
 instance ToJSON Expression where
     toJSON = String . Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
 
-type ExpressionCodegen = CodegenT ()
-
 instance Codegen Expression where
     type GeneratorState Expression = ()
     codegen = \case
-        BinaryOp left symbol right -> mconcat <$> sequence
+        BinaryOp left symbol' right -> mconcat <$> sequence
             [ codegen left
-            , pure $ emit $ binarySymbolToText Map.! symbol
+            , pure $ emit $ binarySymbolToText Map.! symbol'
             , codegen right
             ]
         Parenthesis expression -> mconcat <$> sequence
@@ -161,11 +159,11 @@ instance Codegen Expression where
             , codegen expression
             , pure $ emit ")"
             ]
-        UnaryOp symbol expression -> mconcat <$> sequence
-            [ pure $ emit $ unarySymbolToText Map.! symbol
+        UnaryOp symbol' expression -> mconcat <$> sequence
+            [ pure $ emit $ unarySymbolToText Map.! symbol'
             , codegen expression
             ]
-        Value value -> pure $ case value of
+        Value value' -> pure $ case value' of
             Variable v -> emit v
             Constant c -> case c of
                 BoolTy b -> emit $ show b
@@ -206,12 +204,12 @@ symbolToOperator = \case
     Or           -> Operator Binary LeftAssoc   5 Or
 
 parseExpression :: Text -> Either Text Expression
-parseExpression = first toText . parseOnly expression
+parseExpression = first toText . parseOnly expression0
 
 -- Reference:
 -- https://en.wikipedia.org/wiki/Operator-precedence_parser#Precedence_climbing_method
-expression :: Parser Expression
-expression = expression1 0 =<< nonBinary
+expression0 :: Parser Expression
+expression0 = expression1 0 =<< nonBinary
 
 expression1 :: Int -> Expression -> Parser Expression
 expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
@@ -263,7 +261,7 @@ between :: (Applicative f) => f left -> f middle -> f right -> f middle
 between left middle right = left *> middle <* right
 
 parenthesis :: Parser Expression
-parenthesis = between (char '(') (Parenthesis <$> expression) (char ')')
+parenthesis = between (char '(') (Parenthesis <$> expression0) (char ')')
 
 boolCI :: Parser Bool
 boolCI = do

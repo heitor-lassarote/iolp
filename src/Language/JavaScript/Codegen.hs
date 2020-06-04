@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Language.JavaScript.Codegen
     ( JavaScriptCodegen
     , Options (..)
@@ -11,7 +13,6 @@ import Universum
 
 import           Control.Monad.Trans.Except (throwE)
 import qualified Data.Set  as S
-import qualified Data.Text as T
 
 import Language.Codegen
 import Language.Emit
@@ -60,6 +61,7 @@ printVariableTy
     => JSType
     -> gen
 printVariableTy = emit . \case
+    Boolean x -> show x
     Number x -> show x
     Text x -> x
 

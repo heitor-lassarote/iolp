@@ -1,13 +1,13 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Language.HTML.Codegen
     ( Options (..)
     , defaultOptions
-    , GeneratorState (..)
+    , GeneratorState
     , defaultGeneratorState
     ) where
 
 import Universum
-
-import qualified Data.Text as T
 
 import Language.Codegen
 import Language.Emit

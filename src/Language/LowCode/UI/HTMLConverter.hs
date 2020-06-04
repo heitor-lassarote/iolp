@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Language.LowCode.UI.HTMLConverter where
 
 import qualified Language.HTML.AST as HTML

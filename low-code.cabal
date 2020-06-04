@@ -52,7 +52,7 @@ library
     , Language.LowCode.UI
     , Language.LowCode.UI.AST
     , Language.LowCode.UI.HTMLConverter
-  ghc-options:          -Wall
+  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
   hs-source-dirs:       src
 
 executable LowCode
@@ -98,6 +98,6 @@ executable LowCode
   other-modules:
       Database
     , Foundation
-  ghc-options:          -Wall
+  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
   hs-source-dirs:       app
   main-is:              Main.hs
