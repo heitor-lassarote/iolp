@@ -22,7 +22,8 @@ library
     , transformers          >=0 && <1
     , universum             >=1 && <2
   default-extensions:
-      DeriveFunctor
+      DeriveDataTypeable
+    , DeriveFunctor
     , DeriveGeneric
     , FlexibleInstances
     , LambdaCase
@@ -47,6 +48,7 @@ library
     , Language.JavaScript.Codegen
     , Language.LanguageConverter
     , Language.LowCode.Logic
+    , Language.LowCode.Logic.Analyzer
     , Language.LowCode.Logic.AST
     , Language.LowCode.Logic.JavaScriptConverter
     , Language.LowCode.UI

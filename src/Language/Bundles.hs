@@ -9,9 +9,9 @@ import qualified Language.LowCode.Logic as Logic
 import qualified Language.LowCode.UI as UI
 
 data BundleCssLogicUi = BundleCssLogicUi
-    { css   :: Maybe CSS.AST
-    , logic :: Maybe Logic.AST
-    , ui    :: Maybe UI.AST
+    { css   :: [CSS.AST]
+    , logic :: [Logic.AST]
+    , ui    :: [UI.AST]
     } deriving (Generic)
 
 instance ToJSON   BundleCssLogicUi

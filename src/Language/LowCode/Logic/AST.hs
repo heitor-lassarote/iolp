@@ -13,6 +13,7 @@ import           Data.Aeson
 import           Data.Attoparsec.Combinator
 import           Data.Attoparsec.Text
 import           Data.Char (isAlphaNum, toLower)
+import           Data.Data
 import qualified Data.Map.Strict as Map
 import           Data.Text (cons, map)
 
@@ -25,7 +26,7 @@ data VariableType
     | DoubleTy Double
     | IntegerTy Integer
     | TextTy Text
-    deriving (Eq, Show)
+    deriving (Data, Eq, Show, Typeable)
 
 instance FromJSON VariableType where
     parseJSON = withObject "variable" $ \o -> do
