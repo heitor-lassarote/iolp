@@ -56,10 +56,10 @@ prototypeHtml = convert $
     evalCSS = evalCodegenT  C.defaultGeneratorState . codegen
     evalJS  = evalCodegenT JS.defaultGeneratorState . codegen
 
---main :: IO ()
---main =
---    case evalCodegenT H.defaultGeneratorState $ codegen prototypeHtml of
---        Left e -> print e
---        Right code -> do
---            putTextLn code
---            writeFile "/home/heitor/prototype.html" code
+main :: IO ()
+main =
+    case evalCodegenT H.defaultGeneratorState $ codegen prototypeHtml of
+        Left e -> print e
+        Right code -> do
+            putTextLn code
+            writeFile "/home/heitor/prototype.html" code

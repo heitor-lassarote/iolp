@@ -38,35 +38,27 @@ genAttributes
     :: (Emit gen, Monoid gen)
     => [Attribute]
     -> CSSCodegen gen
-
-genAttributes [] = pure mempty
-genAttributes ((key, value) : as) = do
-    attributes <- genAttributes as
-    indent' <- indent
-    pure $ mconcat
-        [ indent'
-        , emit key
-        , emit ": "
-        , emit value
-        , emit ";\n"
-        , attributes
+genAttributes = fmap mconcat . traverse genAttribute
+  where
+    genAttribute (key, value) = mconcat <$> sequence
+        [ indent
+        , emitM key
+        , emitM ": "
+        , emitM value
+        , emitM ";\n"
         ]
 
 genClasses
     :: (Emit gen, Monoid gen)
     => [Class]
     -> CSSCodegen gen
-genClasses [] = pure mempty
-genClasses ((Class className attributes) : cs) = do
-    classes <- genClasses cs
-    attributes' <- withIndent $ genAttributes attributes
-    pure $ mconcat
-        [ emit className
-        , emit " {\n"
-        , attributes'
-        , emit "}"
-        , emit $ if null cs then "" else "\n"
-        , classes
+genClasses = fmap (mconcat . fmap emit . intersperse "\n") . traverse genClass
+  where
+    genClass (Class className attributes) = mconcat <$> sequence
+        [ emitM className
+        , emitM " {\n"
+        , withIndent $ genAttributes attributes
+        , emitM "}"
         ]
 
 cssCodegen

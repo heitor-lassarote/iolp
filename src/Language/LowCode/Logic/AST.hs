@@ -135,9 +135,9 @@ instance ToJSON AST where
             ]
 
 data Expression
-    = BinaryOp Expression Symbol Expression
+    = BinaryOp Expression BinarySymbol Expression
     | Parenthesis Expression
-    | UnaryOp Symbol Expression
+    | UnaryOp UnarySymbol Expression
     | Value (ValueType VariableType)
     deriving (Eq, Show)
 
@@ -153,13 +153,13 @@ instance Codegen Expression where
     codegen = \case
         BinaryOp left symbol' right -> mconcat <$> sequence
             [ codegen left
-            , pure $ emit $ binarySymbolToText Map.! symbol'
+            , emitM $ binarySymbolToText Map.! symbol'
             , codegen right
             ]
         Parenthesis expression -> mconcat <$> sequence
-            [ pure $ emit "("
+            [ emitM "("
             , codegen expression
-            , pure $ emit ")"
+            , emitM ")"
             ]
         UnaryOp symbol' expression -> mconcat <$> sequence
             [ pure $ emit $ unarySymbolToText Map.! symbol'
@@ -173,37 +173,30 @@ instance Codegen Expression where
                 IntegerTy i -> emit $ show i
                 TextTy t -> emit "\"" <> emit t <> emit "\""
 
-data Arity = Unary | Binary deriving (Eq, Show)
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 type Precedence = Int
 
 data Operator = Operator
-    { arity         :: !Arity
-    , associativity :: !Associativity
+    { associativity :: !Associativity
     , precedence    :: !Precedence
-    , symbol        :: !Symbol
     } deriving (Eq, Show)
 
 -- Reference:
 -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
-symbolToOperator :: Symbol -> Operator
-symbolToOperator = \case
-    Add          -> Operator Binary LeftAssoc  14 Add
-    Divide       -> Operator Binary LeftAssoc  15 Divide
-    Multiply     -> Operator Binary LeftAssoc  15 Multiply
-    Negate       -> Operator Unary  RightAssoc 17 Negate
-    Subtract     -> Operator Binary LeftAssoc  14 Subtract
-
-    Different    -> Operator Binary LeftAssoc  11 Different
-    Equal        -> Operator Binary LeftAssoc  11 Equal
-    Greater      -> Operator Binary LeftAssoc  12 Greater
-    GreaterEqual -> Operator Binary LeftAssoc  12 GreaterEqual
-    Less         -> Operator Binary LeftAssoc  12 Less
-    LessEqual    -> Operator Binary LeftAssoc  12 LessEqual
-
-    And          -> Operator Binary LeftAssoc   6 And
-    Not          -> Operator Unary  RightAssoc 17 Not
-    Or           -> Operator Binary LeftAssoc   5 Or
+binarySymbolToOperator :: BinarySymbol -> Operator
+binarySymbolToOperator = \case
+    Add          -> Operator LeftAssoc 14
+    Divide       -> Operator LeftAssoc 15
+    Multiply     -> Operator LeftAssoc 15
+    Subtract     -> Operator LeftAssoc 14
+    Different    -> Operator LeftAssoc 11
+    Equal        -> Operator LeftAssoc 11
+    Greater      -> Operator LeftAssoc 12
+    GreaterEqual -> Operator LeftAssoc 12
+    Less         -> Operator LeftAssoc 12
+    LessEqual    -> Operator LeftAssoc 12
+    And          -> Operator LeftAssoc  6
+    Or           -> Operator LeftAssoc  5
 
 parseExpression :: Text -> Either Text Expression
 parseExpression = first toText . parseOnly expression0
@@ -219,14 +212,14 @@ expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
     loop lhs' op
         | precedence op >= minPrecedence = do
             skipSpace
-            void $ symbolToOperator <$> binaryOperator
+            symbol <- binaryOperator
             rhs <- nonBinary
             lookaheadMaybe <- peek
             case lookaheadMaybe of
-                Nothing -> pure $ BinaryOp lhs' (symbol op) rhs
+                Nothing -> pure $ BinaryOp lhs' symbol rhs
                 Just lookahead -> do
                     (rhs', lookaheadMaybe') <- loop' rhs op lookahead
-                    let result = BinaryOp lhs' (symbol op) rhs'
+                    let result = BinaryOp lhs' symbol rhs'
                     maybe (pure result) (loop result) lookaheadMaybe'
         | otherwise = pure lhs'
 
@@ -239,7 +232,7 @@ expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
             maybe (pure (rhs', Nothing)) (loop' rhs' op) lookaheadMaybe
         | otherwise = pure (rhs, Just lookahead)
 
-    peek = optional $ lookAhead $ symbolToOperator <$> binaryOperator
+    peek = optional $ lookAhead $ binarySymbolToOperator <$> binaryOperator
 
 unary :: Parser Expression
 unary = do
@@ -289,7 +282,7 @@ variableName = do
     tail' <- takeWhile (\c -> isAlphaNum c || c == '_')
     pure $ cons head' tail'
 
-unaryOperator :: Parser Symbol
+unaryOperator :: Parser UnarySymbol
 unaryOperator = do
     symbol' <- choice (string <$> Map.elems unarySymbolToText)
     case Map.lookup symbol' unaryTextToSymbol of
@@ -300,7 +293,7 @@ unaryOperator = do
             <> "Please report it."
         Just op -> pure op
 
-binaryOperator :: Parser Symbol
+binaryOperator :: Parser BinarySymbol
 binaryOperator = do
     symbol' <- choice (string <$> Map.elems binarySymbolToText)
     case Map.lookup symbol' binaryTextToSymbol of
@@ -311,17 +304,19 @@ binaryOperator = do
             <> "Please report it."
         Just op -> pure op
 
-unarySymbolToText :: Map Symbol Text
+biject :: (Ord v) => Map k v -> Map v k
+biject m = Map.fromList $ zip (Map.elems m) (Map.keys m)
+
+unarySymbolToText :: Map UnarySymbol Text
 unarySymbolToText = Map.fromList
     [ (Negate, "-"  )
     , (Not   , "not")
     ]
 
-unaryTextToSymbol :: Map Text Symbol
-unaryTextToSymbol = Map.fromAscList $
-    zip (Map.elems unarySymbolToText) (Map.keys unarySymbolToText)
+unaryTextToSymbol :: Map Text UnarySymbol
+unaryTextToSymbol = biject unarySymbolToText
 
-binarySymbolToText :: Map Symbol Text
+binarySymbolToText :: Map BinarySymbol Text
 binarySymbolToText = Map.fromList
     [ (Add         , "+"  )
     , (Divide      , "/"  )
@@ -337,6 +332,5 @@ binarySymbolToText = Map.fromList
     , (Or          , "or" )
     ]
 
-binaryTextToSymbol :: Map Text Symbol
-binaryTextToSymbol = Map.fromAscList $
-   zip (Map.elems binarySymbolToText) (Map.keys binarySymbolToText)
+binaryTextToSymbol :: Map Text BinarySymbol
+binaryTextToSymbol = biject binarySymbolToText

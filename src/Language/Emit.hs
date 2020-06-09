@@ -12,3 +12,11 @@ instance Emit [Char] where
 
 instance Emit Text where
     emit = id
+
+emitA :: (Applicative f, Emit gen) => Text -> f gen
+emitA = pure . emit
+{-# INLINE emitA #-}
+
+emitM :: (Monad m, Emit gen) => Text -> m gen
+emitM = emitA
+{-# INLINE emitM #-}

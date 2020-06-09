@@ -50,7 +50,7 @@ defaultGeneratorState = JSGeneratorState 0 defaultOptions S.empty
 
 indentCompact :: (Emit gen) => JavaScriptCodegen gen
 indentCompact = do
-    compactCode' <- compactCode . options <$> get
+    compactCode' <- gets (compactCode . options)
     if compactCode' then
         pure $ emit ""
     else
@@ -67,12 +67,12 @@ printVariableTy = emit . \case
 
 nl :: (Emit gen) => JavaScriptCodegen gen
 nl = do
-    compactCode' <- compactCode . options <$> get
+    compactCode' <- gets (compactCode . options)
     pure $ emit $ if compactCode' then "" else "\n"
 
 space :: (Emit gen) => JavaScriptCodegen gen
 space = do
-    compactCode' <- compactCode . options <$> get
+    compactCode' <- gets (compactCode . options)
     pure $ emit $ if compactCode' then "" else " "
 
 genBlock
@@ -80,10 +80,10 @@ genBlock
     => [AST]
     -> JavaScriptCodegen gen
 genBlock asts = do
-    bracesOnNewLine' <- bracesOnNewLine . options <$> get
+    bracesOnNewLine' <- gets (bracesOnNewLine . options)
     indent' <- indentCompact
     nl' <- nl
-    codes <- genLines $ fmap (withIndent . javaScriptCodegenInternal) asts
+    codes <- genLines asts
     space' <- space
     pure $ mconcat
         [ if bracesOnNewLine' then nl' <> indent' else space'
@@ -95,11 +95,8 @@ genBlock asts = do
         , nl'
         ]
   where
-    genLines [] = pure $ emit mempty
-    genLines (code : codes) = do
-        code' <- code
-        codes' <- genLines codes
-        pure $ code' <> codes'
+    genLines :: (Emit gen, Monoid gen) => [AST] -> JavaScriptCodegen gen
+    genLines = fmap mconcat . traverse (withIndent . javaScriptCodegenInternal)
 
 genFunction
     :: (Emit gen, Monoid gen)
@@ -139,22 +136,17 @@ genAssignmentOrDeclaration
     -> Text
     -> Expression
     -> JavaScriptCodegen gen
-genAssignmentOrDeclaration isAssignment name expression = do
-    indent' <- indentCompact
-    nl' <- nl
-    space' <- space
-    expression' <- genExpression expression
-    pure $ mconcat
-        [ indent'
-        , emit $ if isAssignment then "" else "let "
-        , emit name
-        , space'
-        , emit "="
-        , space'
-        , expression'
-        , emit ";"
-        , nl'
-        ]
+genAssignmentOrDeclaration isAssignment name expression = mconcat <$> sequence
+    [ indentCompact
+    , emitM $ if isAssignment then "" else "let "
+    , emitM name
+    , space
+    , emitM "="
+    , space
+    , genExpression expression
+    , emitM ";"
+    , nl
+    ]
 
 undefinedVariableError :: Text -> JavaScriptCodegen gen
 undefinedVariableError name =
@@ -173,7 +165,7 @@ genVariable
     :: (Emit gen)
     => ValueType JSType
     -> JavaScriptCodegen gen
-genVariable (Variable v) = checkVariable v *> (pure $ emit v)
+genVariable (Variable v) = checkVariable v *> emitM v
 genVariable (Constant c) = pure $ printVariableTy c
 
 genExpression
@@ -181,47 +173,32 @@ genExpression
     => Expression
     -> JavaScriptCodegen gen
 genExpression = \case
-    Call name args -> do
-        indent' <- indentCompact
-        nl' <- nl
-        args' <- genArgs $ fmap genExpression args
-        pure $ mconcat
-            [ indent'
-            , emit name
-            , emit "("
-            , args'
-            , emit ");"
-            , nl'
-            ]
-    BinaryOp left op right -> do
-        left' <- genExpression left
-        right' <- genExpression right
-        pure $ mconcat
-            [ left'
-            , emit $ symbolToText op
-            , right'
-            ]
-    Parenthesis expr -> do
-        expr' <- genExpression expr
-        pure $ mconcat
-            [ emit "("
-            , expr'
-            , emit ")"
-            ]
-    UnaryOp op expr -> do
-        expr' <- genExpression expr
-        pure $ mconcat
-            [ emit $ symbolToText op
-            , expr'
-            ]
+    Call name args -> mconcat <$> sequence
+        [ indentCompact
+        , emitM name
+        , emitM "("
+        , genArgs args
+        , emitM ");"
+        , nl
+        ]
+    BinaryOp left op right -> mconcat <$> sequence
+        [ genExpression left
+        , emitM $ binarySymbolToText op
+        , genExpression right
+        ]
+    Parenthesis expr -> mconcat <$> sequence
+        [ emitM "("
+        , genExpression expr
+        , emitM ")"
+        ]
+    UnaryOp op expr -> mconcat <$> sequence
+        [ emitM $ unarySymbolToText op
+        , genExpression expr
+        ]
     Value value -> genVariable value
   where
-    genArgs [] = pure mempty
-    genArgs [a] = fmap emit a
-    genArgs (a : as) = do
-        a' <- a
-        as' <- genArgs as
-        pure $ emit a' <> emit ", " <> as'
+    genArgs :: (Emit gen, Monoid gen) => [Expression] -> JavaScriptCodegen gen
+    genArgs = fmap (mconcat . fmap emit . intersperse ", ") . traverse genExpression
 
 javaScriptCodegen
     :: (Emit gen, Monoid gen)
@@ -247,7 +224,7 @@ javaScriptCodegenInternal = \case
         space' <- space
         trueBranch <- go t
         falseBranch <- case f of
-            Nothing -> pure $ emit ""
+            Nothing -> emitM mempty
             Just f' -> do
                 falseBranch <- go f'
                 pure $ mconcat [indent', emit "else", falseBranch]
@@ -266,19 +243,14 @@ javaScriptCodegenInternal = \case
     Var name expression -> do
         modify $ \st -> st { symbols = S.insert name (symbols st) }
         genAssignmentOrDeclaration False name expression
-    While expression body -> do
-        indent' <- indentCompact
-        space' <- space
-        expression' <- genExpression expression
-        body' <- go body
-        pure $ mconcat
-            [ indent'
-            , emit "while"
-            , space'
-            , emit "("
-            , expression'
-            , emit ")"
-            , body'
-            ]
+    While expression body -> mconcat <$> sequence
+        [ indentCompact
+        , pure $ emit "while"
+        , space
+        , pure $ emit "("
+        , genExpression expression
+        , pure $ emit ")"
+        , go body
+        ]
   where
     go = javaScriptCodegenInternal

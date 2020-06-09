@@ -5,7 +5,8 @@ module Language.JavaScript.AST
     , sameType
     , AST (..)
     , Expression (..)
-    , symbolToText
+    , binarySymbolToText
+    , unarySymbolToText
     , reservedNames
     , isValidName
     ) where
@@ -48,9 +49,9 @@ data AST
 
 data Expression
     = Call Text [Expression]
-    | BinaryOp Expression Symbol Expression
+    | BinaryOp Expression BinarySymbol Expression
     | Parenthesis Expression
-    | UnaryOp Symbol Expression
+    | UnaryOp UnarySymbol Expression
     | Value (ValueType JSType)
 
 -- Reference:
@@ -68,24 +69,25 @@ reservedNames =
     , "void", "volatile", "while", "with", "yield"
     ]
 
-symbolToText :: Symbol -> Text
-symbolToText = \case
+binarySymbolToText :: BinarySymbol -> Text
+binarySymbolToText = \case
     Add          -> "+"
     Divide       -> "/"
     Multiply     -> "*"
-    Negate       -> "-"
     Subtract     -> "-"
-
     Different    -> "!=="
     Equal        -> "==="
     Greater      -> ">"
     GreaterEqual -> ">="
     Less         -> "<"
     LessEqual    -> "<="
-
     And          -> "&&"
-    Not          -> "!"
     Or           -> "||"
+
+unarySymbolToText  :: UnarySymbol -> Text
+unarySymbolToText = \case
+    Negate       -> "-"
+    Not          -> "!"
 
 isValidName :: Text -> Bool
 isValidName name =

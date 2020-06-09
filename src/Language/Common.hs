@@ -25,12 +25,11 @@ instance (ToJSON varType) => ToJSON (ValueType varType) where
     toJSON (Variable text) = object [ "variable" .= String text ]
     toJSON (Constant var ) = object [ "constant" .= toJSON var  ]
 
-data Symbol
+data BinarySymbol
     -- Arithmetic
     = Add
     | Divide
     | Multiply
-    | Negate
     | Subtract
 
     -- Comparison
@@ -43,18 +42,16 @@ data Symbol
 
     -- Logical
     | And
-    | Not
     | Or
     deriving (Eq, Ord, Show)
 
-instance FromJSON Symbol where
-    parseJSON = withObject "Symbol" $ \o -> toSymbol <$> o .: "symbol"
+instance FromJSON BinarySymbol where
+    parseJSON = withObject "BinarySymbol" $ \o -> toSymbol <$> o .: "symbol"
       where
         toSymbol = \case
             "Add"          -> Add
             "Divide"       -> Divide
             "Multiply"     -> Multiply
-            "Negate"       -> Negate
             "Subtract"     -> Subtract
             "Different"    -> Different
             "Equal"        -> Equal
@@ -63,9 +60,33 @@ instance FromJSON Symbol where
             "Less"         -> Less
             "LessEqual"    -> LessEqual
             "And"          -> And
-            "Not"          -> Not
             "Or"           -> Or
             other          -> error $ "Unknown symbol '" <> other <> "'."
 
-instance ToJSON Symbol where
+-- TODO: Perhaps change from object to text?
+instance ToJSON BinarySymbol where
     toJSON symbol = object [ "symbol" .= String (show symbol) ]
+
+data UnarySymbol
+    -- Arithmetic
+    = Negate
+
+    -- Logical
+    | Not
+    deriving (Eq, Ord, Show)
+
+instance FromJSON UnarySymbol where
+    parseJSON = withObject "UnarySymbol" $ \o -> toSymbol <$> o .: "symbol"
+      where
+        toSymbol = \case
+            "Negate"       -> Negate
+            "Not"          -> Not
+            other          -> error $ "Unknown symbol '" <> other <> "'."
+
+instance ToJSON UnarySymbol where
+    toJSON symbol = object [ "symbol" .= String (show symbol) ]
+
+data Symbol
+    = UnarySymbol !UnarySymbol
+    | BinarySymbol !BinarySymbol
+    deriving (Eq, Show)
