@@ -85,8 +85,3 @@ instance FromJSON UnarySymbol where
 
 instance ToJSON UnarySymbol where
     toJSON symbol = object [ "symbol" .= String (show symbol) ]
-
-data Symbol
-    = UnarySymbol !UnarySymbol
-    | BinarySymbol !BinarySymbol
-    deriving (Eq, Show)

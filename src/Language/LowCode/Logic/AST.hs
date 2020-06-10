@@ -9,6 +9,7 @@ module Language.LowCode.Logic.AST
 import           Universum hiding (bool, map, take, takeWhile)
 import qualified Universum.Unsafe as Unsafe
 
+import           Control.Monad.Trans.Except (throwE)
 import           Data.Aeson
 import           Data.Attoparsec.Combinator
 import           Data.Attoparsec.Text
@@ -153,7 +154,7 @@ instance Codegen Expression where
     codegen = \case
         BinaryOp left symbol' right -> mconcat <$> sequence
             [ codegen left
-            , emitM $ binarySymbolToText Map.! symbol'
+            , tryBinaryText symbol'
             , codegen right
             ]
         Parenthesis expression -> mconcat <$> sequence
@@ -162,7 +163,7 @@ instance Codegen Expression where
             , emitM ")"
             ]
         UnaryOp symbol' expression -> mconcat <$> sequence
-            [ pure $ emit $ unarySymbolToText Map.! symbol'
+            [ tryUnaryText symbol'
             , codegen expression
             ]
         Value value' -> pure $ case value' of
@@ -172,6 +173,12 @@ instance Codegen Expression where
                 DoubleTy d -> emit $ show d
                 IntegerTy i -> emit $ show i
                 TextTy t -> emit "\"" <> emit t <> emit "\""
+      where
+        tryText map' sym =
+            maybe (lift $ throwE $ errorUnaryNotFound $ show sym) emitM $
+                Map.lookup sym map'
+        tryUnaryText = tryText unarySymbolToText
+        tryBinaryText = tryText binarySymbolToText
 
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 type Precedence = Int
@@ -282,27 +289,29 @@ variableName = do
     tail' <- takeWhile (\c -> isAlphaNum c || c == '_')
     pure $ cons head' tail'
 
+errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
+errorUnaryNotFound symbol' =
+    "Undefined unary operator '"
+    <> symbol'
+    <> "'. This error should not appear and is likely a bug. "
+    <> "Please report it."
+
+errorBinaryNotFound :: (IsString s, Semigroup s) => s -> s
+errorBinaryNotFound symbol' =
+    "Undefined binary operator '"
+    <> symbol'
+    <> "'. This error should not appear and is likely a bug. "
+    <> "Please report it."
+
 unaryOperator :: Parser UnarySymbol
 unaryOperator = do
     symbol' <- choice (string <$> Map.elems unarySymbolToText)
-    case Map.lookup symbol' unaryTextToSymbol of
-        Nothing -> fail $
-            "Undefined unary operator '"
-            <> toString symbol'
-            <> "'. This error should not appear and is likely a bug. "
-            <> "Please report it."
-        Just op -> pure op
+    maybe (fail $ errorUnaryNotFound $ toString symbol') pure $ Map.lookup symbol' unaryTextToSymbol
 
 binaryOperator :: Parser BinarySymbol
 binaryOperator = do
     symbol' <- choice (string <$> Map.elems binarySymbolToText)
-    case Map.lookup symbol' binaryTextToSymbol of
-        Nothing -> fail $
-            "Undefined binary operator '"
-            <> toString symbol'
-            <> "'. This error should not appear and is likely a bug. "
-            <> "Please report it."
-        Just op -> pure op
+    maybe (fail $ errorBinaryNotFound $ toString symbol') pure $ Map.lookup symbol' binaryTextToSymbol
 
 biject :: (Ord v) => Map k v -> Map v k
 biject m = Map.fromList $ zip (Map.elems m) (Map.keys m)
