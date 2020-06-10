@@ -43,25 +43,15 @@ data BinarySymbol
     -- Logical
     | And
     | Or
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Read, Show)
+
+unknownSymbol :: (IsString s, Monoid s) => s -> s
+unknownSymbol symbol = mconcat ["Unknown symbol '", symbol, "'."]
 
 instance FromJSON BinarySymbol where
-    parseJSON = withObject "BinarySymbol" $ \o -> toSymbol <$> o .: "symbol"
+    parseJSON = withObject "BinarySymbol" $ \o -> toSymbol =<< o .: "symbol"
       where
-        toSymbol = \case
-            "Add"          -> Add
-            "Divide"       -> Divide
-            "Multiply"     -> Multiply
-            "Subtract"     -> Subtract
-            "Different"    -> Different
-            "Equal"        -> Equal
-            "Greater"      -> Greater
-            "GreaterEqual" -> GreaterEqual
-            "Less"         -> Less
-            "LessEqual"    -> LessEqual
-            "And"          -> And
-            "Or"           -> Or
-            other          -> error $ "Unknown symbol '" <> other <> "'."
+        toSymbol sym = maybe (fail $ unknownSymbol sym) pure (readMaybe sym)
 
 -- TODO: Perhaps change from object to text?
 instance ToJSON BinarySymbol where
@@ -73,15 +63,12 @@ data UnarySymbol
 
     -- Logical
     | Not
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Read, Show)
 
 instance FromJSON UnarySymbol where
-    parseJSON = withObject "UnarySymbol" $ \o -> toSymbol <$> o .: "symbol"
+    parseJSON = withObject "UnarySymbol" $ \o -> toSymbol =<< o .: "symbol"
       where
-        toSymbol = \case
-            "Negate"       -> Negate
-            "Not"          -> Not
-            other          -> error $ "Unknown symbol '" <> other <> "'."
+        toSymbol sym = maybe (fail $ unknownSymbol sym) pure (readMaybe sym)
 
 instance ToJSON UnarySymbol where
     toJSON symbol = object [ "symbol" .= String (show symbol) ]
