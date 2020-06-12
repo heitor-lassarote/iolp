@@ -23,7 +23,7 @@ text :: Text -> AST
 text = Text
 
 instance FromJSON AST where
-    parseJSON = withObject "html-ast" $ \o -> do
+    parseJSON = withObject "html-ast" \o -> do
         tagMaybe  <- o .:? "tag"
         textMaybe <- o .:? "text"
         case (tagMaybe, textMaybe) of

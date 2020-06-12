@@ -68,12 +68,12 @@ printVariableTy = emit . \case
 nl :: (Emit gen) => JavaScriptCodegen gen
 nl = do
     compactCode' <- gets (compactCode . options)
-    pure $ emit $ if compactCode' then "" else "\n"
+    pure $ emit if compactCode' then "" else "\n"
 
 space :: (Emit gen) => JavaScriptCodegen gen
 space = do
     compactCode' <- gets (compactCode . options)
-    pure $ emit $ if compactCode' then "" else " "
+    pure $ emit if compactCode' then "" else " "
 
 genBlock
     :: (Emit gen, Monoid gen)
@@ -138,7 +138,7 @@ genAssignmentOrDeclaration
     -> JavaScriptCodegen gen
 genAssignmentOrDeclaration isAssignment name expression = mconcat <$> sequence
     [ indentCompact
-    , emitM $ if isAssignment then "" else "let "
+    , emitM if isAssignment then "" else "let "
     , emitM name
     , space
     , emitM "="
@@ -206,7 +206,7 @@ javaScriptCodegen
     -> JavaScriptCodegen gen
 javaScriptCodegen ast = do
     strict' <- strict . options <$> get
-    let useStrict = emit $ if strict' then "\"use strict\";\n" else ""
+    let useStrict = emit if strict' then "\"use strict\";\n" else ""
     body <- javaScriptCodegenInternal ast
     pure $ useStrict <> body
 
@@ -241,7 +241,7 @@ javaScriptCodegenInternal = \case
             , falseBranch
             ]
     Var name expression -> do
-        modify $ \st -> st { symbols = S.insert name (symbols st) }
+        modify \st -> st { symbols = S.insert name (symbols st) }
         genAssignmentOrDeclaration False name expression
     While expression body -> mconcat <$> sequence
         [ indentCompact

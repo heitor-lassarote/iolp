@@ -4,6 +4,8 @@ module Language.LowCode.Logic.JavaScriptConverter where
 
 import Universum
 
+import qualified Data.Text as Text
+
 import qualified Language.JavaScript.AST    as JS
 import           Language.LanguageConverter
 import qualified Language.LowCode.Logic.AST as L
@@ -44,7 +46,8 @@ instance LanguageConverter L.Expression JS.Expression where
         L.Value variable -> JS.Value (logicTyToJsTy <$> variable)
 
 logicTyToJsTy :: L.VariableType -> JS.JSType
-logicTyToJsTy (L.BoolTy x) = JS.Boolean x
-logicTyToJsTy (L.DoubleTy x) = JS.Number x
-logicTyToJsTy (L.IntegerTy x) = JS.Number $ fromInteger x
-logicTyToJsTy (L.TextTy x) = JS.Text x
+logicTyToJsTy (L.BoolTy    b) = JS.Boolean b
+logicTyToJsTy (L.CharTy    c) = JS.Text $! Text.singleton c
+logicTyToJsTy (L.DoubleTy  d) = JS.Number d
+logicTyToJsTy (L.IntegerTy i) = JS.Number $! fromInteger i
+logicTyToJsTy (L.TextTy    t) = JS.Text t

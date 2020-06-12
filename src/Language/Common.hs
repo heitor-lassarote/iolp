@@ -45,6 +45,30 @@ data BinarySymbol
     | Or
     deriving (Eq, Ord, Read, Show)
 
+isArithmetic :: BinarySymbol -> Bool
+isArithmetic = \case
+    Add -> True
+    Divide -> True
+    Multiply -> True
+    Subtract -> True
+    _ -> False
+
+isComparison :: BinarySymbol -> Bool
+isComparison = \case
+    Different -> True
+    Equal -> True
+    Greater -> True
+    GreaterEqual -> True
+    Less -> True
+    LessEqual -> True
+    _ -> False
+
+isLogical :: BinarySymbol -> Bool
+isLogical = \case
+    And -> True
+    Or -> True
+    _ -> False
+
 unknownSymbol :: (IsString s, Monoid s) => s -> s
 unknownSymbol symbol = mconcat ["Unknown symbol '", symbol, "'."]
 

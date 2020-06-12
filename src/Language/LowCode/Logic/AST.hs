@@ -1,22 +1,26 @@
 module Language.LowCode.Logic.AST
     ( module Language.Common
     , VariableType (..)
+    , VariableIndex (..)
+    , vtIx
+    , interactsWithUnary
+    , interactsWithBinary
     , AST (..)
     , Expression (..)
     , parseExpression
     ) where
 
-import           Universum hiding (bool, map, take, takeWhile)
+import           Universum hiding (bool, take, takeWhile)
 import qualified Universum.Unsafe as Unsafe
 
 import           Control.Monad.Trans.Except (throwE)
 import           Data.Aeson
 import           Data.Attoparsec.Combinator
 import           Data.Attoparsec.Text
-import           Data.Char (isAlphaNum, toLower)
+import           Data.Char (isAlphaNum)
 import           Data.Data
 import qualified Data.Map.Strict as Map
-import           Data.Text (cons, map)
+import qualified Data.Text as Text
 
 import Language.Codegen
 import Language.Common
@@ -24,40 +28,62 @@ import Language.Emit
 
 data VariableType
     = BoolTy Bool
+    | CharTy Char
     | DoubleTy Double
     | IntegerTy Integer
     | TextTy Text
     deriving (Data, Eq, Show, Typeable)
 
---data VariableIndex
---    = BoolIx
---    | DoubleIx
---    | IntegerIx
---    | TextIx
+data VariableIndex
+    = BoolIx
+    | CharIx
+    | DoubleIx
+    | IntegerIx
+    | TextIx
+    deriving (Eq, Show)
 
---vtIx :: VariableType -> VariableIndex
---vtIx = \case
---    BoolTy _ = BoolIx
---    DoubleTy _ = DoubleIx
---    IntegerTy = IntegerIx
---    TextTy = TextIx
+isNumeric :: VariableIndex -> Bool
+isNumeric = \case
+    DoubleIx  -> True
+    IntegerIx -> True
+    _         -> False
 
---interactsWithUnary :: UnarySymbol -> VariableIndex -> Bool
---interactsWithUnary Negate = \case
---    DoubleIx  = True
---    IntegerIx = True
---    _         = False
---interactsWithUnary Not = \case
---    BoolIx    = True
---    IntegerIx = True
---    _         = False
+vtIx :: VariableType -> VariableIndex
+vtIx = \case
+    BoolTy _    -> BoolIx
+    CharTy _    -> CharIx
+    DoubleTy _  -> DoubleIx
+    IntegerTy _ -> IntegerIx
+    TextTy _    -> TextIx
+
+interactsWithUnary :: UnarySymbol -> VariableIndex -> Maybe VariableIndex
+interactsWithUnary Negate = \case
+    DoubleIx  -> Just DoubleIx
+    IntegerIx -> Just IntegerIx
+    _         -> Nothing
+interactsWithUnary Not = \case
+    BoolIx    -> Just BoolIx
+    IntegerIx -> Just IntegerIx
+    _         -> Nothing
+
+interactsWithBinary :: VariableIndex -> BinarySymbol -> VariableIndex -> Maybe VariableIndex
+interactsWithBinary TextIx Add TextIx = Just TextIx  -- Concatenate strings.
+interactsWithBinary BoolIx s BoolIx
+    | isLogical s = Just BoolIx  -- Logical operators only interact with logical variables.
+    | otherwise   = Nothing
+interactsWithBinary l s r
+    | l /= r                        = Nothing  -- Different types never interact.
+    | isArithmetic s && isNumeric l = Just l  -- Numeric types interact with all arithmetic operators.
+    | isComparison s                = Just BoolIx  -- Comparisons always return booleans.
+    | otherwise                     = Nothing
 
 instance FromJSON VariableType where
-    parseJSON = withObject "variable" $ \o -> do
+    parseJSON = withObject "variable" \o -> do
         tag    <- o .: "type"
         value' <- o .: "value"
         case tag of
             "bool"    -> BoolTy    <$> parseJSON value'
+            "char"    -> CharTy    <$> parseJSON value'
             "double"  -> DoubleTy  <$> parseJSON value'
             "integer" -> IntegerTy <$> parseJSON value'
             "text"    -> TextTy    <$> parseJSON value'
@@ -65,6 +91,7 @@ instance FromJSON VariableType where
 
 instance ToJSON VariableType where
     toJSON (BoolTy    b) = object [ "bool"    .= toJSON b ]
+    toJSON (CharTy    c) = object [ "char"    .= toJSON c ]
     toJSON (DoubleTy  d) = object [ "double"  .= toJSON d ]
     toJSON (IntegerTy i) = object [ "integer" .= toJSON i ]
     toJSON (TextTy    t) = object [ "text"    .= toJSON t ]
@@ -92,7 +119,7 @@ data AST
     deriving (Eq, Show)
 
 instance FromJSON AST where
-    parseJSON = withObject "logic ast" $ \o -> o .: "tag" >>= \case
+    parseJSON = withObject "logic ast" \o -> o .: "tag" >>= \case
         "assign" -> Assign <$> o .:  "variable"
                            <*> o .:  "expression"
                            <*> o .:  "next-ast"
@@ -196,10 +223,11 @@ instance Codegen Expression where
             [ tryUnaryText symbol'
             , codegen expression
             ]
-        Value value' -> pure $ case value' of
-            Variable v -> emit v
-            Constant c -> case c of
+        Value value' -> pure case value' of
+            Variable variable -> emit variable
+            Constant constant -> case constant of
                 BoolTy b -> emit $ show b
+                CharTy c -> emit "'" <> emit (Text.singleton c) <> emit "'"
                 DoubleTy d -> emit $ show d
                 IntegerTy i -> emit $ show i
                 TextTy t -> emit "\"" <> emit t <> emit "\""
@@ -293,7 +321,8 @@ value = Value <$> (constant <|> variable)
   where
     constant = Constant <$> (    (IntegerTy <$> (signed decimal))
                              <|> (DoubleTy  <$> double)
-                             <|> (BoolTy    <$> boolCI)
+                             <|> (CharTy    <$> char')
+                             <|> (BoolTy    <$> bool)
                              <|> (TextTy    <$> text))
     variable = Variable <$> variableName
 
@@ -304,20 +333,19 @@ between left middle right = left *> middle <* right
 parenthesis :: Parser Expression
 parenthesis = between (char '(') (Parenthesis <$> expression0) (char ')')
 
-boolCI :: Parser Bool
-boolCI = do
-    b <- asciiCI "false" <|> asciiCI "true"
-    let maybeB = toBool $ map toLower b
-    case maybeB of
-        Nothing -> fail $
+bool :: Parser Bool
+bool = do
+    b <- string "false" <|> string "true"
+    case b of
+        "false" -> pure False
+        "true" -> pure True
+        _ -> fail $
             "Could not read '"
             <> toString b
             <> "'. Perhaps you meant 'false' or 'true'?"
-        Just b' -> pure b'
-  where
-    toBool "false" = Just False
-    toBool "true"  = Just True
-    toBool _       = Nothing
+
+char' :: Parser Char
+char' = between (char '\'') anyChar (char '\'')
 
 text :: Parser Text
 text = between (char '"') (takeWhile ((/=) '"')) (char '"')
@@ -326,7 +354,7 @@ variableName :: Parser Text
 variableName = do
     head' <- letter <|> char '_'
     tail' <- takeWhile (\c -> isAlphaNum c || c == '_')
-    pure $ cons head' tail'
+    pure $ Text.cons head' tail'
 
 errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorUnaryNotFound symbol' =

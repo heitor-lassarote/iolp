@@ -85,7 +85,7 @@ htmlCodegen = \case
             , emit "</"
             , emit name
             , emit ">"
-            , emit $ if null asts then "" else "\n"
+            , emit if null asts then "" else "\n"
             ]
     Text str -> do
         indent' <- indent

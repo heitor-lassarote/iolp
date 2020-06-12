@@ -19,7 +19,7 @@ data Class
     deriving (Eq, Show)
 
 instance FromJSON Class where
-    parseJSON = withObject "class" $ \o ->
+    parseJSON = withObject "class" \o ->
         Class <$> o .: "class-name"
               <*> o .: "attributes"
 

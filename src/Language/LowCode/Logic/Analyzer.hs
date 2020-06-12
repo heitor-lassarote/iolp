@@ -10,7 +10,6 @@ module Language.LowCode.Logic.Analyzer
 import Universum
 
 import           Control.Monad.Trans.Except (throwE)
-import           Data.Data (Constr, toConstr)
 import qualified Data.Map.Strict as Map
 
 import Language.LowCode.Logic.AST
@@ -21,7 +20,7 @@ import Language.LowCode.Logic.AST
 data Error
     = IncompatibleTypes Expression Expression
     | ShadowedVariable Text
-    | TypeMismatch Text Constr Constr
+    | TypeMismatch Text VariableIndex VariableIndex
     | UndefinedVariable Text
     deriving (Eq, Show)
 
@@ -31,7 +30,7 @@ data Warning
 
 data VariableInfo = VariableInfo
     { unused  :: Bool
-    , varType :: Constr
+    , varType :: VariableIndex
     } deriving (Show)
 
 data AnalyzerState = AnalyzerState
@@ -60,7 +59,7 @@ withScope action = do
     ret <- action
     newSymbols <- flip Map.difference symbols <$> gets analyzerSymbols
     warnings' <- gets warnings
-    modify $ \st -> st
+    modify \st -> st
         { analyzerSymbols = symbols
         , warnings = Map.foldrWithKey appendUnused warnings' newSymbols
         }
@@ -70,10 +69,10 @@ withScope action = do
         if unused info then UnusedVariable var : acc else acc
 
 addError :: Error -> LogicAnalyzerT ()
-addError e = modify $ \st -> st { errors = e : errors st }
+addError e = modify \st -> st { errors = e : errors st }
 
 --addWarning :: Warning -> LogicAnalyzerT ()
---addWarning w = modify $ \st -> st { warnings = w : warnings st }
+--addWarning w = modify \st -> st { warnings = w : warnings st }
 
 --tryMapVariable :: (VariableInfo -> VariableInfo) -> Text -> LogicAnalyzerT ()
 --tryMapVariable f var = do
@@ -87,7 +86,7 @@ addError e = modify $ \st -> st { errors = e : errors st }
 --                pure $ Just $ f val)
 --        var
 --        symbols
---    modify $ \st -> st { analyzerSymbols = newSymbols }
+--    modify \st -> st { analyzerSymbols = newSymbols }
 
 --variableCheck :: Text -> LogicAnalyzerT ()
 --variableCheck = tryMapVariable id
@@ -104,7 +103,7 @@ analyzeAssign var expr = do
         Just info ->
             if varType info == constr
             then let info' = info { varType = constr }
-                  in modify $ \st -> st { analyzerSymbols = Map.insert var info' symbols }
+                  in modify \st -> st { analyzerSymbols = Map.insert var info' symbols }
             else addError $ TypeMismatch var (varType info) constr
 
 analyzeVar :: Text -> Expression -> LogicAnalyzerT ()
@@ -115,9 +114,9 @@ analyzeVar var expr = do
     then addError $ ShadowedVariable var  -- TODO: Change type?
     else
         let info = VariableInfo { unused = True, varType = constr }
-         in modify $ \st -> st { analyzerSymbols = Map.insert var info symbols }
+         in modify \st -> st { analyzerSymbols = Map.insert var info symbols }
 
-analyzeExprTypes :: Constr -> Expression -> LogicAnalyzerT ()
+analyzeExprTypes :: VariableIndex -> Expression -> LogicAnalyzerT ()
 analyzeExprTypes expectedType expr = do
     constr <- analyzeExpr expr
     if expectedType == constr
@@ -134,7 +133,7 @@ analyzeImpl = \case
         analyzeImpl next
     End _ -> pure ()  -- TODO: Implement this!
     If expr false true next -> do
-        analyzeExprTypes expectedBool expr
+        analyzeExprTypes BoolIx expr
         void $ withScope $ analyzeImpl false
         void $ withScope $ analyzeImpl true
         analyzeImpl next
@@ -145,20 +144,17 @@ analyzeImpl = \case
         analyzeVar var expr
         analyzeImpl next
     While expr body next -> do
-        analyzeExprTypes expectedBool expr
+        analyzeExprTypes BoolIx expr
         void $ withScope $ analyzeImpl body
         analyzeImpl next
-  where
-    expectedBool = toConstr $ BoolTy False
 
-analyzeExpr :: Expression -> LogicAnalyzerT Constr
+analyzeExpr :: Expression -> LogicAnalyzerT VariableIndex
 analyzeExpr = \case
-    BinaryOp left _ right -> do
+    BinaryOp left symbol' right -> do
         typeL <- analyzeExpr left
         typeR <- analyzeExpr right
-        if typeL == typeR
-        then pure typeL
-        else lift $ throwE $ IncompatibleTypes left right
+        let ret = interactsWithBinary typeL symbol' typeR
+        maybe (lift $ throwE $ IncompatibleTypes left right) pure ret
     Call _ _ -> error "Not implemented yet."
     Parenthesis expr -> analyzeExpr expr
     UnaryOp _ expr -> analyzeExpr expr
@@ -166,8 +162,8 @@ analyzeExpr = \case
         Variable v -> do
             (infoMaybe, symbols) <- gets $
                 Map.updateLookupWithKey markUsed v . analyzerSymbols
-            modify $ \st -> st { analyzerSymbols = symbols }
+            modify \st -> st { analyzerSymbols = symbols }
             maybe (lift $ throwE $ UndefinedVariable v) (pure . varType) infoMaybe
-        Constant c -> pure $ toConstr c
+        Constant c -> pure $ vtIx c
   where
     markUsed _ info = Just info { unused = False }
