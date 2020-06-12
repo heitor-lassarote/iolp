@@ -15,7 +15,7 @@ main :: IO ()
 main = do
     dbConfig <- execParser opts
     --runStdoutLoggingT $ migrateDB $ connectionString dbConfig
-    runStderrLoggingT $ withPostgresqlPool (connectionString dbConfig) (dbConnections dbConfig) $ \pool -> liftIO $ do
+    runStderrLoggingT $ withPostgresqlPool (connectionString dbConfig) (dbConnections dbConfig) \pool -> liftIO do
         runSqlPool (runMigration migrateAll) pool
         warp 3000 $ LowCode pool
   where

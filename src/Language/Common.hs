@@ -12,7 +12,7 @@ data ValueType varType
     deriving (Eq, Functor, Show)
 
 instance (FromJSON varType) => FromJSON (ValueType varType) where
-    parseJSON = withObject "value type" $ \o -> do
+    parseJSON = withObject "value type" \o -> do
         variable <- o .:? "variable"
         constant <- o .:? "constant"
         case (variable, constant) of
@@ -49,7 +49,7 @@ unknownSymbol :: (IsString s, Monoid s) => s -> s
 unknownSymbol symbol = mconcat ["Unknown symbol '", symbol, "'."]
 
 instance FromJSON BinarySymbol where
-    parseJSON = withObject "BinarySymbol" $ \o -> toSymbol =<< o .: "symbol"
+    parseJSON = withObject "BinarySymbol" \o -> toSymbol =<< o .: "symbol"
       where
         toSymbol sym = maybe (fail $ unknownSymbol sym) pure (readMaybe sym)
 
@@ -66,7 +66,7 @@ data UnarySymbol
     deriving (Eq, Ord, Read, Show)
 
 instance FromJSON UnarySymbol where
-    parseJSON = withObject "UnarySymbol" $ \o -> toSymbol =<< o .: "symbol"
+    parseJSON = withObject "UnarySymbol" \o -> toSymbol =<< o .: "symbol"
       where
         toSymbol sym = maybe (fail $ unknownSymbol sym) pure (readMaybe sym)
 

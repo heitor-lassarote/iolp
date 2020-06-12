@@ -38,7 +38,7 @@ data EditorPOST = EditorPOST
     }
 
 instance FromJSON EditorPOST where
-    parseJSON = withObject "EditorPOST" $ \o ->
+    parseJSON = withObject "EditorPOST" \o ->
         EditorPOST <$> o .: "name"
                    <*> o .: "ast"
 
@@ -48,7 +48,7 @@ data UserPOST = UserPOST
     }
 
 instance FromJSON UserPOST where
-    parseJSON = withObject "UserPOST" $ \o ->
+    parseJSON = withObject "UserPOST" \o ->
         UserPOST <$> o .: "email"
                  <*> o .: "password"
 
@@ -77,7 +77,7 @@ instance ToJSON UserGET where
 authenticate :: Handler UserId
 authenticate = maybe notAuthenticated validate' =<< lookupBasicAuth
   where
-    validate' (email, password) = runDB $ do
+    validate' (email, password) = runDB do
         user <- getBy404 $ UniqueUserEmail email
         let pwd = encodeUtf8 password :: ByteString
             hash = userPassword $ entityVal user
@@ -106,7 +106,7 @@ putProjectR pid = do
 deleteProjectR :: ProjectId -> Handler ()
 deleteProjectR pid = do
     userId <- authenticate
-    runDB $ delete $ from $ \project ->
+    runDB $ delete $ from \project ->
         where_ (project ^. ProjectUserId ==. val userId &&. project ^. ProjectId ==. val pid)
     sendResponse ("OK" :: Text)
 
@@ -124,7 +124,7 @@ getBuildR _ = sendResponseStatus notImplemented501 ("Building is not implemented
 --getBuildR :: ProjectId -> Handler Value
 --getBuildR pid = do
 --    userId <- authenticate
---    [build] <- runDB $ select $ from $ \project -> do
+--    [build] <- runDB $ select $ from \project -> do
 --        where_ (project ^. ProjectUserId ==. val userId &&. project ^. ProjectId ==. val pid)
 --        pure project
 --    let ast = eitherDecode $ decodeUtf8 $ projectAst $ entityVal build :: Either String BundleCssLogicUi
@@ -140,7 +140,7 @@ getBuildR _ = sendResponseStatus notImplemented501 ("Building is not implemented
 -- We don't know yet if we'll need it. You're Not Gonna Need It?
 --getUserR :: Handler [UserGET]
 --getUserR = do
---    users <- runDB $ select $ from $ \(user, project) -> do
+--    users <- runDB $ select $ from \(user, project) -> do
 --        where_ (user ^. UserId ==. project ^. ProjectUserId)
 --        pure (user, project)
 --    let users' = fmap (fst . entityVal) users

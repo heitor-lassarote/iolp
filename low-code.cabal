@@ -22,7 +22,8 @@ library
     , transformers          >=0 && <1
     , universum             >=1 && <2
   default-extensions:
-      DeriveDataTypeable
+      BlockArguments
+    , DeriveDataTypeable
     , DeriveFunctor
     , DeriveGeneric
     , FlexibleInstances
@@ -79,7 +80,8 @@ executable LowCode
     , yesod-persistent      >=1 && <2
 --    , zip                   >=1 && <2
   default-extensions:
-      DeriveAnyClass
+      BlockArguments
+    , DeriveAnyClass
     , DeriveGeneric
     , DerivingStrategies
     , FlexibleContexts
