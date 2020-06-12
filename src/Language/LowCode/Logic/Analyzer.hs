@@ -72,8 +72,8 @@ withScope action = do
 addError :: Error -> LogicAnalyzerT ()
 addError e = modify $ \st -> st { errors = e : errors st }
 
-addWarning :: Warning -> LogicAnalyzerT ()
-addWarning w = modify $ \st -> st { warnings = w : warnings st }
+--addWarning :: Warning -> LogicAnalyzerT ()
+--addWarning w = modify $ \st -> st { warnings = w : warnings st }
 
 --tryMapVariable :: (VariableInfo -> VariableInfo) -> Text -> LogicAnalyzerT ()
 --tryMapVariable f var = do
@@ -159,6 +159,7 @@ analyzeExpr = \case
         if typeL == typeR
         then pure typeL
         else lift $ throwE $ IncompatibleTypes left right
+    Call _ _ -> error "Not implemented yet."
     Parenthesis expr -> analyzeExpr expr
     UnaryOp _ expr -> analyzeExpr expr
     Value value -> case value of

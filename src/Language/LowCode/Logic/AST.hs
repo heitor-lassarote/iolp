@@ -29,6 +29,29 @@ data VariableType
     | TextTy Text
     deriving (Data, Eq, Show, Typeable)
 
+--data VariableIndex
+--    = BoolIx
+--    | DoubleIx
+--    | IntegerIx
+--    | TextIx
+
+--vtIx :: VariableType -> VariableIndex
+--vtIx = \case
+--    BoolTy _ = BoolIx
+--    DoubleTy _ = DoubleIx
+--    IntegerTy = IntegerIx
+--    TextTy = TextIx
+
+--interactsWithUnary :: UnarySymbol -> VariableIndex -> Bool
+--interactsWithUnary Negate = \case
+--    DoubleIx  = True
+--    IntegerIx = True
+--    _         = False
+--interactsWithUnary Not = \case
+--    BoolIx    = True
+--    IntegerIx = True
+--    _         = False
+
 instance FromJSON VariableType where
     parseJSON = withObject "variable" $ \o -> do
         tag    <- o .: "type"
@@ -98,45 +121,46 @@ instance ToJSON AST where
         Assign variable expression ast -> object
             [ "tag"              .= String "assign"
             , "variable"         .= String variable
-            , "expression"       .= toJSON expression
-            , "next-ast"         .= toJSON ast
+            , "expression"       .= expression
+            , "next-ast"         .= ast
             ]
         End ast -> object
             [ "tag"              .= String "end"
-            , "next-ast"         .= toJSON ast
+            , "next-ast"         .= ast
             ]
         If expression true false ast -> object
             [ "tag"              .= String "if"
-            , "expression"       .= toJSON expression
-            , "true-branch-ast"  .= toJSON true
-            , "false-branch-ast" .= toJSON false
-            , "next-ast"         .= toJSON ast
+            , "expression"       .= expression
+            , "true-branch-ast"  .= true
+            , "false-branch-ast" .= false
+            , "next-ast"         .= ast
             ]
         Print expression ast -> object
             [ "tag"              .= String "print"
-            , "expression"       .= toJSON expression
-            , "next-ast"         .= toJSON ast
+            , "expression"       .= expression
+            , "next-ast"         .= ast
             ]
         Start name ast -> object
             [ "tag"              .= String "start"
             , "name"             .= String name
-            , "next-ast"         .= toJSON ast
+            , "next-ast"         .= ast
             ]
         Var variable expression ast -> object
             [ "tag"              .= String "var"
             , "variable"         .= String variable
-            , "expression"       .= toJSON expression
-            , "next-ast"         .= toJSON ast
+            , "expression"       .= expression
+            , "next-ast"         .= ast
             ]
         While expression body ast -> object
             [ "tag"              .= String "while"
-            , "expression"       .= toJSON expression
-            , "while-ast"        .= toJSON body
-            , "next-ast"         .= toJSON ast
+            , "expression"       .= expression
+            , "while-ast"        .= body
+            , "next-ast"         .= ast
             ]
 
 data Expression
     = BinaryOp Expression BinarySymbol Expression
+    | Call Text [Expression]
     | Parenthesis Expression
     | UnaryOp UnarySymbol Expression
     | Value (ValueType VariableType)
@@ -156,6 +180,12 @@ instance Codegen Expression where
             [ codegen left
             , tryBinaryText symbol'
             , codegen right
+            ]
+        Call name exprs -> mconcat <$> sequence
+            [ emitM name
+            , emitM "("
+            , mconcat . fmap emit . intersperse "," <$> traverse codegen exprs
+            , emitM ")"
             ]
         Parenthesis expression -> mconcat <$> sequence
             [ emitM "("
@@ -206,7 +236,7 @@ binarySymbolToOperator = \case
     Or           -> Operator LeftAssoc  5
 
 parseExpression :: Text -> Either Text Expression
-parseExpression = first toText . parseOnly expression0
+parseExpression = first toText . parseOnly (expression0 <* endOfInput)
 
 -- Reference:
 -- https://en.wikipedia.org/wiki/Operator-precedence_parser#Precedence_climbing_method
@@ -241,6 +271,14 @@ expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
 
     peek = optional $ lookAhead $ binarySymbolToOperator <$> binaryOperator
 
+call :: Parser Expression
+call = do
+    -- TODO: Should we support higher-order?
+    name <- variableName
+    skipSpace
+    exprs <- between (char '(') (expression0 `sepBy'` char ',') (skipSpace *> char ')')
+    pure $ Call name exprs
+
 unary :: Parser Expression
 unary = do
     op <- unaryOperator
@@ -248,7 +286,7 @@ unary = do
     pure $ UnaryOp op expr
 
 nonBinary :: Parser Expression
-nonBinary = skipSpace *> choice [parenthesis, unary, value] <* skipSpace
+nonBinary = skipSpace *> choice [parenthesis, unary, call, value] <* skipSpace
 
 value :: Parser Expression
 value = Value <$> (constant <|> variable)
@@ -261,6 +299,7 @@ value = Value <$> (constant <|> variable)
 
 between :: (Applicative f) => f left -> f middle -> f right -> f middle
 between left middle right = left *> middle <* right
+{-# INLINE between #-}
 
 parenthesis :: Parser Expression
 parenthesis = between (char '(') (Parenthesis <$> expression0) (char ')')
@@ -314,12 +353,12 @@ binaryOperator = do
     maybe (fail $ errorBinaryNotFound $ toString symbol') pure $ Map.lookup symbol' binaryTextToSymbol
 
 biject :: (Ord v) => Map k v -> Map v k
-biject m = Map.fromList $ zip (Map.elems m) (Map.keys m)
+biject = Map.fromList . fmap swap . Map.toList
 
 unarySymbolToText :: Map UnarySymbol Text
 unarySymbolToText = Map.fromList
-    [ (Negate, "-"  )
-    , (Not   , "not")
+    [ (Negate, "-")
+    , (Not   , "!")
     ]
 
 unaryTextToSymbol :: Map Text UnarySymbol

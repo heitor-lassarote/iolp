@@ -13,34 +13,35 @@ instance LanguageConverter L.AST JS.AST where
       where
         convert' = \case
             L.Assign name expression next ->
-                JS.Assign name (convertExpression expression) : convert' next
+                JS.Assign name (convert expression) : convert' next
             L.End Nothing ->
                 []
             L.End (Just name) ->
                 (JS.Expression $ JS.Call name []) : []
             L.If expression true false next ->
-                JS.If (convertExpression expression)
+                JS.If (convert expression)
                       (JS.Block $ convert' true)
                       (tryElse false) : convert' next
             L.Print text next ->
-                (JS.Expression $ JS.Call "console.log" [convertExpression text]) : convert' next
+                (JS.Expression $ JS.Call "console.log" [convert text]) : convert' next
             L.Start name next ->
                 JS.Function (Just name) [] (JS.Block $ convert' next) : [JS.Expression $ JS.Call name []]
             L.Var name expression next ->
-                JS.Var name (convertExpression expression) : convert' next
+                JS.Var name (convert expression) : convert' next
             L.While expression body next ->
-                JS.While (convertExpression expression)
+                JS.While (convert expression)
                          (JS.Block $ convert' body) : convert' next
 
         tryElse (L.End Nothing) = Nothing
         tryElse ast             = Just $ JS.Block $ convert' ast
 
-convertExpression :: L.Expression -> JS.Expression
-convertExpression = \case
-    L.BinaryOp left op right -> JS.BinaryOp (convertExpression left) op (convertExpression right)
-    L.Parenthesis expr -> JS.Parenthesis $ convertExpression expr
-    L.UnaryOp op expr -> JS.UnaryOp op (convertExpression expr)
-    L.Value variable -> JS.Value $ fmap logicTyToJsTy variable
+instance LanguageConverter L.Expression JS.Expression where
+    convert = \case
+        L.BinaryOp left op right -> JS.BinaryOp (convert left) op (convert right)
+        L.Call name exprs -> JS.Call name (convert <$> exprs)
+        L.Parenthesis expr -> JS.Parenthesis $ convert expr
+        L.UnaryOp op expr -> JS.UnaryOp op (convert expr)
+        L.Value variable -> JS.Value (logicTyToJsTy <$> variable)
 
 logicTyToJsTy :: L.VariableType -> JS.JSType
 logicTyToJsTy (L.BoolTy x) = JS.Boolean x
