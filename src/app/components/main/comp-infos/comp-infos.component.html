@@ -1,0 +1,100 @@
+<form [formGroup]="infosForm" (ngSubmit)="apply()">
+    <div id="smarttab">
+        <ul class="nav">
+            <li>
+                <a class="nav-link" href="#tab-1">
+                    Informações
+                </a>
+            </li>
+            <li>
+                <a class="nav-link" href="#tab-2">
+                    Estilo
+                </a>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            <div id="tab-1" class="tab-pane" role="tabpanel">
+                <h3>Tipo: {{infosForm.get("type").value}}</h3>
+                <div class="col-12">
+                    <div class="row m-b-sm">
+                        <div class="col-3 m-auto">
+                            <h5>Nome:</h5>
+                        </div>
+                        <div class="col-9">
+                            <input type="text" class="form-control" formControlName="name" />
+                        </div>
+                    </div>
+                    <div class="row m-b-sm">
+                        <div class="col-3 m-auto">
+                            <h5>Texto:</h5>
+                        </div>
+                        <div class="col-9">
+                            <input type="text" class="form-control" formControlName="text" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="tab-2" class="tab-pane" role="tabpanel">
+                <div class="col-12">
+                    <div class="row m-b-sm">
+                        <div class="col-3 m-auto">
+                            <h5>Altura:</h5>
+                        </div>
+                        <div class="col-7">
+                            <input type="number" class="form-control" formControlName="height"
+                                min="1"/>
+                        </div>
+                        <div class="col-2 m-auto">
+                            <h5>px</h5>
+                        </div>
+                    </div>
+                    <div class="row m-b-sm">
+                        <div class="col-3 m-auto">
+                            <h5>Largura:</h5>
+                        </div>
+                        <div class="col-7">
+                            <input type="number" class="form-control" formControlName="width"
+                                min="1"/>
+                        </div>
+                        <div class="col-2 m-auto">
+                            <h5>px</h5>
+                        </div>
+                    </div>
+                    <h4 class="m-b-sm">Centralização</h4>
+                    <div class="row m-b-sm">
+                        <div class="col-3">
+                            <button type="button" class="btn btn-default btn-align"
+                                (click)="alignText('left')" [disabled]="!haveComponent">
+                                <i class="fa fa-align-left"></i>
+                            </button>
+                        </div>
+                        <div class="col-3">
+                            <button type="button" class="btn btn-default btn-align"
+                                (click)="alignText('center')" [disabled]="!haveComponent">
+                                <i class="fa fa-align-center"></i>
+                            </button>
+                        </div>
+                        <div class="col-3">
+                            <button type="button" class="btn btn-default btn-align"
+                                (click)="alignText('right')" [disabled]="!haveComponent">
+                                <i class="fa fa-align-right"></i>
+                            </button>
+                        </div>
+                        <div class="col-3">
+                            <button type="button" class="btn btn-default btn-align"
+                                (click)="alignText('justify')" [disabled]="!haveComponent">
+                                <i class="fa fa-align-justify"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 text-right m-t-sm">
+        <button type="submit" [disabled]="infosForm.invalid || !haveComponent" class="btn btn-info">
+            Aplicar
+        </button>
+    </div>
+</form>

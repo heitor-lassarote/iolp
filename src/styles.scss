@@ -3,6 +3,7 @@
 @import "~font-awesome/css/font-awesome.css";
 @import "~ngx-toastr/toastr.css";
 @import "~animate.css/animate.min.css";
+@import "~jquery-smarttab/dist/css/smart_tab_all.min.css";
 @import "assets/css/style.css";
 
 @-webkit-keyframes fadeInRight {
@@ -34,4 +35,7 @@
 .navbar-default.navbar-static-side,
 #page-wrapper {
     transition: all 0.4s;
+}
+.btn:disabled {
+    cursor: not-allowed;
 }

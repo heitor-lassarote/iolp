@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
-import { Subject } from 'rxjs';
+import { Component, OnInit } from "@angular/core";
+import { Subject } from "rxjs";
 
 @Component({
-    selector: 'app-main',
-    templateUrl: './main-layout.component.html',
+    selector: "app-main",
+    templateUrl: "./main-layout.component.html",
+    styleUrls: ["./main-layout.component.scss"],
 })
 export class MainLayoutComponent implements OnInit {
     unsub$ = new Subject();

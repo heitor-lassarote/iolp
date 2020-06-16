@@ -3,18 +3,21 @@
         <app-side-navigation></app-side-navigation>
         <div class="gray-bg dashbard-1" id="page-wrapper">
             <app-top-navbar></app-top-navbar>
-            <div class="row">
-                <div class="col-lg-12">
+            <div class="row" style="height: 92.5vh;">
+                <div class="col-lg-9">
                     <div class="wrapper wrapper-content animated fadeInRight">
                         <router-outlet></router-outlet>
                     </div>
+                </div>
+                <div class="col-lg-3 white-bg">
+                    <app-comp-infos></app-comp-infos>
                 </div>
             </div>
         </div>
     </div>
 </ng-container>
 
-<!-- <ngx-spinner name="loadingSpinner" bdOpacity=1 bdColor="rgba(0,0,0,0.5)" size="default"
+<ngx-spinner name="loadingSpinner" bdOpacity=1 bdColor="rgba(0,0,0,0.5)" size="default"
     color="#ff0000" type="pacman" [fullScreen]="true">
     <p style="color: rgba(0,0,0,0.5)" > Carregando... </p>
-</ngx-spinner> -->
+</ngx-spinner>

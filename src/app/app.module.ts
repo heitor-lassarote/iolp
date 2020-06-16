@@ -1,14 +1,16 @@
-import { MainModule } from './components/main/main.module';
-import { BrowserModule } from '@angular/platform-browser';
-import { NgModule } from '@angular/core';
+import { MainModule } from "./components/main/main.module";
+import { BrowserModule } from "@angular/platform-browser";
+import { NgModule } from "@angular/core";
 
-import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
-import { LocationStrategy, HashLocationStrategy } from '@angular/common';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { HttpClientModule } from '@angular/common/http';
-import { ToastrModule } from 'ngx-toastr';
-import { NgxSpinnerModule } from 'ngx-spinner';
+import { AppRoutingModule } from "./app-routing.module";
+import { AppComponent } from "./app.component";
+import { LocationStrategy, HashLocationStrategy } from "@angular/common";
+import { BrowserAnimationsModule } from "@angular/platform-browser/animations";
+import { HttpClientModule } from "@angular/common/http";
+import { ToastrModule } from "ngx-toastr";
+import { NgxSpinnerModule } from "ngx-spinner";
+import { TranslateResponseService } from "./services/translate/translate.service";
+import { TranslateKeysService } from "./services/translate/translate-keys.service";
 
 @NgModule({
     declarations: [AppComponent],
@@ -19,9 +21,13 @@ import { NgxSpinnerModule } from 'ngx-spinner';
         HttpClientModule,
         MainModule,
         ToastrModule.forRoot(),
-        // NgxSpinnerModule,
+        NgxSpinnerModule,
     ],
-    providers: [{ provide: LocationStrategy, useClass: HashLocationStrategy }],
+    providers: [
+        { provide: LocationStrategy, useClass: HashLocationStrategy },
+        TranslateResponseService,
+        TranslateKeysService,
+    ],
     bootstrap: [AppComponent],
 })
 export class AppModule {}

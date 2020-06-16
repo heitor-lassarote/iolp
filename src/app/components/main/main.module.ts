@@ -7,19 +7,28 @@ import { TopNavbarComponent } from './menu/top-navbar/top-navbar.component';
 import { CanvasComponent } from './canvas/canvas.component';
 import { DragDropModule } from '@angular/cdk/drag-drop';
 import { ResizableModule } from 'angular-resizable-element';
+import { CompInfosComponent } from './comp-infos/comp-infos.component';
+import { NgxSpinnerModule } from 'ngx-spinner';
+import { ReactiveFormsModule } from '@angular/forms';
+import { SpawnComponentService } from 'src/app/services/spawn/spawn-component.service';
+import { ShowComponentInfoService } from 'src/app/services/show-component-info/show-component-info.service';
 
 @NgModule({
     declarations: [
         MainLayoutComponent,
         SideNavigationComponent,
         TopNavbarComponent,
-        CanvasComponent
+        CanvasComponent,
+        CompInfosComponent,
     ],
     imports: [
         CommonModule,
         MainRoutingModule,
         DragDropModule,
-        ResizableModule
+        ResizableModule,
+        NgxSpinnerModule,
+        ReactiveFormsModule,
     ],
+    providers: [SpawnComponentService, ShowComponentInfoService],
 })
 export class MainModule {}

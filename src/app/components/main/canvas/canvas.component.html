@@ -1,8 +1,22 @@
-<div class="screen" mwlResizable [enableGhostResize]="true"
+<div class="screen" mwlResizable [enableGhostResize]="true" [ngStyle]="style"
+    [validateResize]="validate" id="canvas"
     [resizeEdges]="{ bottom: true, right: true, top: true, left: true }"
     (resizeEnd)="onResizeEnd($event)">
-    <div style="width: 50px; height: 50px; border: solid;"
-        id="container1" class="draggable" cdkDragBoundary=".screen" cdkDrag>
-        Teste
+    <div *ngFor="let e of elements; let i = index">
+        <div *ngIf="e.type === 'container'"
+        [ngStyle]="{width: e.width, height: e.height, 'position': 'absolut', 'border': 'solid'}"
+        mwlResizable [enableGhostResize]="true" [validateResize]="validate"
+        [resizeEdges]="{ bottom: true, right: true, top: true, left: true }"
+        (resizeEnd)="onResizeEnd($event)" (click)="click($event, $event.target)"
+        id="component{{i}}" class="draggable" cdkDragBoundary=".screen" cdkDrag>
+        </div>
+        <button *ngIf="e.type === 'button'" class="btn btn-default draggable"
+        id="component{{i}}" cdkDragBoundary=".screen" cdkDrag (click)="click($event, $event.target)">
+            Botão
+        </button>
+        <p *ngIf="e.type === 'label'" class="draggable"
+        id="component{{i}}" cdkDragBoundary=".screen" cdkDrag (click)="click($event, $event.target)">
+            Novo Label
+        </p>
     </div>
 </div>
