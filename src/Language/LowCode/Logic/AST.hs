@@ -1,11 +1,5 @@
 module Language.LowCode.Logic.AST
-    ( module Language.Common
-    , VariableType (..)
-    , VariableIndex (..)
-    , vtIx
-    , interactsWithUnary
-    , interactsWithBinary
-    , AST (..)
+    ( AST (..)
     , Expression (..)
     , parseExpression
     ) where
@@ -18,101 +12,33 @@ import           Data.Aeson
 import           Data.Attoparsec.Combinator
 import           Data.Attoparsec.Text
 import           Data.Char (isAlphaNum)
-import           Data.Data
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 
-import Language.Codegen
-import Language.Common
-import Language.Emit
-
-data VariableType
-    = BoolTy Bool
-    | CharTy Char
-    | DoubleTy Double
-    | IntegerTy Integer
-    | TextTy Text
-    deriving (Data, Eq, Show, Typeable)
-
-data VariableIndex
-    = BoolIx
-    | CharIx
-    | DoubleIx
-    | IntegerIx
-    | TextIx
-    deriving (Eq, Show)
-
-isNumeric :: VariableIndex -> Bool
-isNumeric = \case
-    DoubleIx  -> True
-    IntegerIx -> True
-    _         -> False
-
-vtIx :: VariableType -> VariableIndex
-vtIx = \case
-    BoolTy _    -> BoolIx
-    CharTy _    -> CharIx
-    DoubleTy _  -> DoubleIx
-    IntegerTy _ -> IntegerIx
-    TextTy _    -> TextIx
-
-interactsWithUnary :: UnarySymbol -> VariableIndex -> Maybe VariableIndex
-interactsWithUnary Negate = \case
-    DoubleIx  -> Just DoubleIx
-    IntegerIx -> Just IntegerIx
-    _         -> Nothing
-interactsWithUnary Not = \case
-    BoolIx    -> Just BoolIx
-    IntegerIx -> Just IntegerIx
-    _         -> Nothing
-
-interactsWithBinary :: VariableIndex -> BinarySymbol -> VariableIndex -> Maybe VariableIndex
-interactsWithBinary TextIx Add TextIx = Just TextIx  -- Concatenate strings.
-interactsWithBinary BoolIx s BoolIx
-    | isLogical s = Just BoolIx  -- Logical operators only interact with logical variables.
-    | otherwise   = Nothing
-interactsWithBinary l s r
-    | l /= r                        = Nothing  -- Different types never interact.
-    | isArithmetic s && isNumeric l = Just l  -- Numeric types interact with all arithmetic operators.
-    | isComparison s                = Just BoolIx  -- Comparisons always return booleans.
-    | otherwise                     = Nothing
-
-instance FromJSON VariableType where
-    parseJSON = withObject "variable" \o -> do
-        tag    <- o .: "type"
-        value' <- o .: "value"
-        case tag of
-            "bool"    -> BoolTy    <$> parseJSON value'
-            "char"    -> CharTy    <$> parseJSON value'
-            "double"  -> DoubleTy  <$> parseJSON value'
-            "integer" -> IntegerTy <$> parseJSON value'
-            "text"    -> TextTy    <$> parseJSON value'
-            other     -> fail $ "Expected 'bool', 'double', 'integer' or 'text', but got '" <> other <> "'."
-
-instance ToJSON VariableType where
-    toJSON (BoolTy    b) = object [ "bool"    .= toJSON b ]
-    toJSON (CharTy    c) = object [ "char"    .= toJSON c ]
-    toJSON (DoubleTy  d) = object [ "double"  .= toJSON d ]
-    toJSON (IntegerTy i) = object [ "integer" .= toJSON i ]
-    toJSON (TextTy    t) = object [ "text"    .= toJSON t ]
+import           Language.Codegen
+import           Language.Common
+import           Language.Emit
+import qualified Language.LowCode.Logic.Types as L
 
 data AST
     -- | Assigns a new value to the variable with the specified name and type
     -- and what follows after.
-    = Assign Text Expression AST
-    -- | Represents the end of a cycle, and optionally goes to a 'Start' node
-    -- with the specified name.
-    | End (Maybe Text)
+    = Assign Name Expression AST
+    -- | Represents the end of a cycle.
+    | End
+    -- | Executes a raw expression. Useful for Call.
+    | Expression Expression AST
     -- | Allows a condition to be tested, and contains the true branch, false
     -- branch and what follows after the branches.
     | If Expression AST AST AST
-    -- | Logs a message to the terminal, followed by the remainder of the cycle.
-    | Print Expression AST
-    -- | Represents the start of a cycle with a given name.
-    | Start Text AST
+    -- | Exits the function, optionally returning a value.
+    | Return (Maybe Expression)
+    -- | Represents the start of a cycle with a given name and a list of
+    -- parameters.
+    | Start Name L.VariableType [Name] AST
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var Text Expression AST
+    | Var Name L.VariableType Expression AST
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
     | While Expression AST AST
@@ -120,39 +46,44 @@ data AST
 
 instance FromJSON AST where
     parseJSON = withObject "logic ast" \o -> o .: "tag" >>= \case
-        "assign" -> Assign <$> o .:  "variable"
-                           <*> o .:  "expression"
-                           <*> o .:  "next-ast"
-        "end"    -> End    <$> o .:? "next-ast"
-        "if"     -> If     <$> o .:  "expression"
-                           <*> o .:  "true-branch-ast"
-                           <*> o .:  "false-branch-ast"
-                           <*> o .:  "next-ast"
-        "print"  -> Print  <$> o .:  "expression"
-                           <*> o .:  "next-ast"
-        "start"  -> Start  <$> o .:  "name"
-                           <*> o .:  "next-ast"
-        "var"    -> Var    <$> o .:  "variable"
-                           <*> o .:  "expression"
-                           <*> o .:  "next-ast"
-        "while"  -> While  <$> o .:  "expression"
-                           <*> o .:  "while-ast"
-                           <*> o .:  "next-ast"
-        other    -> fail $ "Unknown tag '"
-                           <> other
-                           <> "'. Available tags are: 'assign', 'end', 'if'"
-                           <> ", 'print', 'var' and 'while'."
+        "assign"      -> Assign     <$> o .:  "name"
+                                    <*> o .:  "expression"
+                                    <*> o .:? "next-ast"         .!= End
+        "expression"  -> Expression <$> o .:  "expression"
+                                    <*> o .:? "next-ast"         .!= End
+        "if"          -> If         <$> o .:  "expression"
+                                    <*> o .:  "true-branch-ast"
+                                    <*> o .:? "false-branch-ast" .!= End
+                                    <*> o .:? "next-ast"         .!= End
+        "return"      -> Return     <$> o .:? "expression"
+        "start"       -> Start      <$> o .:  "name"
+                                    <*> o .:  "return-type"
+                                    <*> o .:  "arguments"
+                                    <*> o .:? "next-ast"         .!= End
+        "var"         -> Var        <$> o .:  "name"
+                                    <*> o .:  "type"
+                                    <*> o .:  "expression"
+                                    <*> o .:? "next-ast"         .!= End
+        "while"       -> While      <$> o .:  "expression"
+                                    <*> o .:  "while-ast"
+                                    <*> o .:? "next-ast"         .!= End
+        other         -> fail $ "Unknown tag '"
+                            <> other
+                            <> "'. Available tags are: 'assign', 'expression'"
+                            <> ", 'if', 'return', 'start', 'var' and 'while'."
 
 instance ToJSON AST where
     toJSON = \case
-        Assign variable expression ast -> object
+        Assign name expression ast -> object
             [ "tag"              .= String "assign"
-            , "variable"         .= String variable
+            , "name"             .= String name
             , "expression"       .= expression
             , "next-ast"         .= ast
             ]
-        End ast -> object
-            [ "tag"              .= String "end"
+        End -> Null
+        Expression expression ast -> object
+            [ "tag"              .= String "expression"
+            , "expression"       .= expression
             , "next-ast"         .= ast
             ]
         If expression true false ast -> object
@@ -162,19 +93,21 @@ instance ToJSON AST where
             , "false-branch-ast" .= false
             , "next-ast"         .= ast
             ]
-        Print expression ast -> object
-            [ "tag"              .= String "print"
+        Return expression -> object
+            [ "tag"              .= String "return"
             , "expression"       .= expression
-            , "next-ast"         .= ast
             ]
-        Start name ast -> object
+        Start name returnType arguments ast -> object
             [ "tag"              .= String "start"
             , "name"             .= String name
+            , "return-type"      .= returnType
+            , "arguments"        .= arguments
             , "next-ast"         .= ast
             ]
-        Var variable expression ast -> object
+        Var name type' expression ast -> object
             [ "tag"              .= String "var"
-            , "variable"         .= String variable
+            , "name"             .= String name
+            , "type"             .= type'
             , "expression"       .= expression
             , "next-ast"         .= ast
             ]
@@ -187,10 +120,10 @@ instance ToJSON AST where
 
 data Expression
     = BinaryOp Expression BinarySymbol Expression
-    | Call Text [Expression]
+    | Call Expression [Expression]
     | Parenthesis Expression
     | UnaryOp UnarySymbol Expression
-    | Value (ValueType VariableType)
+    | Value (ValueType L.Variable)
     deriving (Eq, Show)
 
 instance FromJSON Expression where
@@ -208,8 +141,8 @@ instance Codegen Expression where
             , tryBinaryText symbol'
             , codegen right
             ]
-        Call name exprs -> mconcat <$> sequence
-            [ emitM name
+        Call expr exprs -> mconcat <$> sequence
+            [ codegen expr
             , emitM "("
             , mconcat . fmap emit . intersperse "," <$> traverse codegen exprs
             , emitM ")"
@@ -224,13 +157,14 @@ instance Codegen Expression where
             , codegen expression
             ]
         Value value' -> pure case value' of
-            Variable variable -> emit variable
-            Constant constant -> case constant of
-                BoolTy b -> emit $ show b
-                CharTy c -> emit "'" <> emit (Text.singleton c) <> emit "'"
-                DoubleTy d -> emit $ show d
-                IntegerTy i -> emit $ show i
-                TextTy t -> emit "\"" <> emit t <> emit "\""
+            Variable variable' -> emit variable'
+            Constant constant' -> case constant' of
+                L.Bool b -> emit $ show b
+                L.Char c -> emit "'" <> emit (Text.singleton c) <> emit "'"
+                L.Double d -> emit $ show d
+                L.Integer i -> emit $ show i
+                L.Text t -> emit "\"" <> emit t <> emit "\""
+                L.Unit -> emit "()"
       where
         tryText map' sym =
             maybe (lift $ throwE $ errorUnaryNotFound $ show sym) emitM $
@@ -299,13 +233,15 @@ expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
 
     peek = optional $ lookAhead $ binarySymbolToOperator <$> binaryOperator
 
-call :: Parser Expression
-call = do
-    -- TODO: Should we support higher-order?
-    name <- variableName
+nonBinary :: Parser Expression
+nonBinary = do
     skipSpace
-    exprs <- between (char '(') (expression0 `sepBy'` char ',') (skipSpace *> char ')')
-    pure $ Call name exprs
+    lhs <- choice [unary, parenthesis, value]
+    exprs <- many' do
+        skipSpace
+        between (char '(') (expression0 `sepBy'` char ',') (skipSpace *> char ')')
+    skipSpace
+    pure $ foldl' Call lhs exprs
 
 unary :: Parser Expression
 unary = do
@@ -313,18 +249,30 @@ unary = do
     expr <- nonBinary
     pure $ UnaryOp op expr
 
-nonBinary :: Parser Expression
-nonBinary = skipSpace *> choice [parenthesis, unary, call, value] <* skipSpace
+integer :: Parser Integer
+integer = do
+    num <- decimal
+    nextMaybe <- peekChar
+    case nextMaybe of
+        Nothing -> pure num
+        Just next
+            | next == '.' || next == 'e' -> fail "Not an integer."
+            | otherwise                  -> pure num
 
 value :: Parser Expression
-value = Value <$> (constant <|> variable)
-  where
-    constant = Constant <$> (    (IntegerTy <$> (signed decimal))
-                             <|> (DoubleTy  <$> double)
-                             <|> (CharTy    <$> char')
-                             <|> (BoolTy    <$> bool)
-                             <|> (TextTy    <$> text))
-    variable = Variable <$> variableName
+value = constant <|> variable
+
+constant :: Parser Expression
+constant = Value . Constant <$> choice
+    [ L.Integer <$> integer
+    , L.Double  <$> double
+    , L.Char    <$> char'
+    , L.Bool    <$> bool
+    , L.Text    <$> text
+    ]
+
+variable :: Parser Expression
+variable = Value . Variable <$> variableName
 
 between :: (Applicative f) => f left -> f middle -> f right -> f middle
 between left middle right = left *> middle <* right

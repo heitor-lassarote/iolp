@@ -9,19 +9,26 @@ module Language.LowCode.Logic.Analyzer
 
 import Universum
 
-import           Control.Monad.Trans.Except (throwE)
+import           Control.Monad.Trans.Except (Except, throwE)
 import qualified Data.Map.Strict as Map
 
-import Language.LowCode.Logic.AST
+import           Language.Common
+import           Language.LowCode.Logic.AST
+import           Language.LowCode.Logic.Prim
+import qualified Language.LowCode.Logic.Types as L
 
 -- TODO: Should IncompatibleTypes and TypeMismatch really have these signatures?
 -- Or even better: Should TypeMismatch instead have info about the node instead
 -- of simply a Text?
 data Error
-    = IncompatibleTypes Expression Expression
-    | ShadowedVariable Text
-    | TypeMismatch Text VariableIndex VariableIndex
-    | UndefinedVariable Text
+    = IncompatibleSignatures Name Int Int
+    | IncompatibleTypes1 UnarySymbol Expression
+    | IncompatibleTypes2 Expression BinarySymbol Expression
+    | NotAFunction Name
+    | StartIsNotFirstSymbol
+    | ShadowedVariable Name
+    | TypeMismatch Text L.VariableType L.VariableType
+    | UndefinedVariable Name
     deriving (Eq, Show)
 
 data Warning
@@ -29,9 +36,13 @@ data Warning
     deriving (Eq, Show)
 
 data VariableInfo = VariableInfo
-    { unused  :: Bool
-    , varType :: VariableIndex
+    { varName :: Name
+    , unused  :: Bool
+    , varType :: L.VariableType
     } deriving (Show)
+
+mkInfo :: Name -> L.VariableType -> VariableInfo
+mkInfo name type' = VariableInfo name True type'
 
 data AnalyzerState = AnalyzerState
     { analyzerSymbols :: Map Text VariableInfo
@@ -45,7 +56,7 @@ data AnalyzerState = AnalyzerState
 -- some must stop (and possibly be caught), because the error means that the
 -- entire expression is malformed. For example, in case a variable is undefined
 -- in an Expression, or it doesn't typecheck.
-type LogicAnalyzerT = StateT AnalyzerState (ExceptT Error Identity)
+type LogicAnalyzerT = StateT AnalyzerState (Except Error)
 
 emptyState :: AnalyzerState
 emptyState = AnalyzerState Map.empty [] []
@@ -97,73 +108,142 @@ addError e = modify \st -> st { errors = e : errors st }
 analyzeAssign :: Text -> Expression -> LogicAnalyzerT ()
 analyzeAssign var expr = do
     symbols <- gets analyzerSymbols
-    constr <- analyzeExpr expr
     case Map.lookup var symbols of
         Nothing -> addError $ UndefinedVariable var
-        Just info ->
-            if varType info == constr
-            then let info' = info { varType = constr }
-                  in modify \st -> st { analyzerSymbols = Map.insert var info' symbols }
-            else addError $ TypeMismatch var (varType info) constr
+        Just info -> whenJustM (analyzeExpr expr) \exprType ->
+            if varType info == exprType
+            then let info' = info { varType = exprType }
+                 in
+                 modify \st ->
+                    st { analyzerSymbols = Map.insert var info' symbols }
+            else addError $ TypeMismatch var (varType info) exprType
 
-analyzeVar :: Text -> Expression -> LogicAnalyzerT ()
-analyzeVar var expr = do
+analyzeVar :: Text -> L.VariableType -> Expression -> LogicAnalyzerT ()
+analyzeVar var type' expr = do
     symbols <- gets analyzerSymbols
-    constr <- analyzeExpr expr
-    if (Map.member var symbols)
-    then addError $ ShadowedVariable var  -- TODO: Change type?
-    else
-        let info = VariableInfo { unused = True, varType = constr }
-         in modify \st -> st { analyzerSymbols = Map.insert var info symbols }
+    if Map.member var symbols
+    then addError $ ShadowedVariable var
+    else do
+        analyzeExprTypes var type' expr
+        let info = mkInfo var type'
+        modify \st -> st { analyzerSymbols = Map.insert var info symbols }
 
-analyzeExprTypes :: VariableIndex -> Expression -> LogicAnalyzerT ()
-analyzeExprTypes expectedType expr = do
-    constr <- analyzeExpr expr
-    if expectedType == constr
-    then pure ()
-    else addError $ TypeMismatch "while" expectedType constr
+checkTypes :: Text -> L.VariableType -> L.VariableType -> LogicAnalyzerT ()
+checkTypes name expectedType actualType
+    | expectedType == actualType = pure ()
+    | otherwise = addError $ TypeMismatch name expectedType actualType
 
-analyze :: AST -> LogicAnalyzerT ()
-analyze ast = withScope $ analyzeImpl ast
+analyzeExprTypes :: Text -> L.VariableType -> Expression -> LogicAnalyzerT ()
+analyzeExprTypes exprName expectedType expr =
+    whenJustM (analyzeExpr expr) (checkTypes exprName expectedType)
 
-analyzeImpl :: AST -> LogicAnalyzerT ()
+-- In case Call has a name instead of expr:
+--checkApply :: Name -> L.VariableType -> [Expression] -> LogicAnalyzerT (Maybe L.VariableType)
+--checkApply name (L.FunctionType argTypes ret) arguments = do
+--    let nArgs = length arguments
+--        nTypes = length argTypes
+--    when (nArgs /= nTypes) $
+--        addError $ IncompatibleSignatures name nArgs nTypes
+--    traverse_ (uncurry (analyzeExprTypes name)) $ zip argTypes arguments
+--    pure $ Just ret
+--checkApply name _ _ = addError (NotAFunction name) *> pure Nothing
+
+-- TODO: Generate more descriptive names!
+checkApply :: L.VariableType -> [Expression] -> LogicAnalyzerT (Maybe L.VariableType)
+checkApply (L.FunctionType argTypes ret) arguments = do
+    let nArgs = length arguments
+        nTypes = length argTypes
+    when (nArgs /= nTypes) $
+        addError $ IncompatibleSignatures "function" nArgs nTypes
+    traverse_ (uncurry (analyzeExprTypes "function")) $ zip argTypes arguments
+    pure $ Just ret
+checkApply _ _ = addError (NotAFunction "not function lol") *> pure Nothing
+
+analyze :: L.Metadata -> AST -> LogicAnalyzerT ()
+analyze metadata (Start name (L.FunctionType argTypes ret) arguments next) = do
+    let nArgs = length arguments
+        nTypes = length argTypes
+    when (nArgs /= nTypes) $
+        addError $ IncompatibleSignatures name nArgs nTypes
+    mkSymbols
+    whenJustM (withScope $ analyzeImpl next) $ checkTypes name ret
+  where
+    mkSymbols =
+        -- TODO: Someday check whether functions and externs are used.
+        let retInfo = Map.singleton name (mkInfo name ret)
+            --argsInfo = Map.fromList $ fmap (\(n, t) -> (n, VariableInfo n False t)) arguments
+            argsInfo = Map.fromList $ zipWith (\n t -> (n, mkInfo n t)) arguments argTypes
+            externsInfo = Map.mapWithKey mkInfo (L.externs metadata)
+        in
+        modify \st ->
+            st { analyzerSymbols = Map.unions [argsInfo, retInfo, externsInfo, analyzerSymbols st] }
+analyze _ (Start _ _ _ _) = lift $ throwE StartIsNotFirstSymbol
+analyze _ _ = lift $ throwE StartIsNotFirstSymbol
+
+analyzeImpl :: AST -> LogicAnalyzerT (Maybe L.VariableType)
 analyzeImpl = \case
     Assign var expr next -> do
         analyzeAssign var expr
         analyzeImpl next
-    End _ -> pure ()  -- TODO: Implement this!
+    End -> pure $ Just L.UnitType
+    Expression expr next -> do
+        void $ analyzeExpr expr
+        analyzeImpl next
     If expr false true next -> do
-        analyzeExprTypes BoolIx expr
+        analyzeExprTypes "if" L.BoolType expr
         void $ withScope $ analyzeImpl false
         void $ withScope $ analyzeImpl true
         analyzeImpl next
-    Print _ next -> do
-        analyzeImpl next
-    Start _ next -> analyzeImpl next
-    Var var expr next -> do
-        analyzeVar var expr
+    Return expr -> maybe (pure $ Just L.UnitType) analyzeExpr expr
+    Start _ _ _ _ -> lift $ throwE StartIsNotFirstSymbol
+    Var var type' expr next -> do
+        analyzeVar var type' expr
         analyzeImpl next
     While expr body next -> do
-        analyzeExprTypes BoolIx expr
+        analyzeExprTypes "while" L.BoolType expr
         void $ withScope $ analyzeImpl body
         analyzeImpl next
 
-analyzeExpr :: Expression -> LogicAnalyzerT VariableIndex
+analyzeExpr :: Expression -> LogicAnalyzerT (Maybe L.VariableType)
 analyzeExpr = \case
     BinaryOp left symbol' right -> do
         typeL <- analyzeExpr left
         typeR <- analyzeExpr right
-        let ret = interactsWithBinary typeL symbol' typeR
-        maybe (lift $ throwE $ IncompatibleTypes left right) pure ret
-    Call _ _ -> error "Not implemented yet."
+        let ret = do typeL' <- typeL
+                     typeR' <- typeR
+                     interactsWithBinary typeL' symbol' typeR'
+        maybe (addError (IncompatibleTypes2 left symbol' right) *> pure Nothing)
+              (pure . Just)
+              ret
+    Call expr arguments -> do
+        -- In case Call has a name instead of expr:
+        --(infoMaybe, symbols) <- gets $
+        --    Map.updateLookupWithKey markUsed name . analyzerSymbols
+        --modify \st -> st { analyzerSymbols = symbols }
+        --case infoMaybe of
+        --    Nothing -> addError (UndefinedVariable name) *> pure Nothing
+        --    Just (VariableInfo _ _ typeF) -> checkApply name typeF arguments
+        typeE <- analyzeExpr expr
+        case typeE of
+            Nothing -> pure Nothing
+            Just typeF -> checkApply typeF arguments
     Parenthesis expr -> analyzeExpr expr
-    UnaryOp _ expr -> analyzeExpr expr
+    UnaryOp symbol' expr -> do
+        typeE <- analyzeExpr expr
+        let ret = interactsWithUnary symbol' =<< typeE
+        maybe (addError (IncompatibleTypes1 symbol' expr) *> pure Nothing)
+              (pure . Just)
+              ret
     Value value -> case value of
-        Variable v -> do
-            (infoMaybe, symbols) <- gets $
-                Map.updateLookupWithKey markUsed v . analyzerSymbols
-            modify \st -> st { analyzerSymbols = symbols }
-            maybe (lift $ throwE $ UndefinedVariable v) (pure . varType) infoMaybe
-        Constant c -> pure $ vtIx c
+        Variable v -> analyzeVariable v
+        Constant c -> pure $ Just $ vtType c
   where
     markUsed _ info = Just info { unused = False }
+
+    analyzeVariable name = do
+        (infoMaybe, symbols) <- gets $
+            Map.updateLookupWithKey markUsed name . analyzerSymbols
+        modify \st -> st { analyzerSymbols = symbols }
+        maybe (addError (UndefinedVariable name) *> pure Nothing)
+              (pure . Just . varType)
+              infoMaybe

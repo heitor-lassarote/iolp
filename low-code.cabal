@@ -12,51 +12,9 @@ name:                low-code
 synopsis:            A low-code platform for generating builds and source codes.
 version:             0.1.0.0
 
-library
-  build-depends:
-      aeson                 >=1 && <2
-    , attoparsec            >=0 && <1
-    , base                  >=4 && <5
-    , containers            >=0 && <1
-    , text                  >=1 && <2
-    , transformers          >=0 && <1
-    , universum             >=1 && <2
-  default-extensions:
-      BlockArguments
-    , DeriveDataTypeable
-    , DeriveFunctor
-    , DeriveGeneric
-    , FlexibleInstances
-    , LambdaCase
-    , MultiParamTypeClasses
-    , NoImplicitPrelude
-    , OverloadedStrings
-    , TypeFamilies
-  default-language:     Haskell2010
-  exposed-modules:
-      Language.Bundles
-    , Language.Codegen
-    , Language.Common
-    , Language.CSS
-    , Language.CSS.AST
-    , Language.CSS.Codegen
-    , Language.Emit
-    , Language.HTML
-    , Language.HTML.AST
-    , Language.HTML.Codegen
-    , Language.JavaScript
-    , Language.JavaScript.AST
-    , Language.JavaScript.Codegen
-    , Language.LanguageConverter
-    , Language.LowCode.Logic
-    , Language.LowCode.Logic.Analyzer
-    , Language.LowCode.Logic.AST
-    , Language.LowCode.Logic.JavaScriptConverter
-    , Language.LowCode.UI
-    , Language.LowCode.UI.AST
-    , Language.LowCode.UI.HTMLConverter
-  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
-  hs-source-dirs:       src
+source-repository head
+  type: git
+  location: https://github.com/heitor-lassarote/low-code
 
 executable LowCode
   build-depends:
@@ -105,3 +63,61 @@ executable LowCode
   ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
   hs-source-dirs:       app
   main-is:              Main.hs
+
+library
+  build-depends:
+      aeson                 >=1 && <2
+    , attoparsec            >=0 && <1
+    , base                  >=4 && <5
+    , containers            >=0 && <1
+    , text                  >=1 && <2
+    , transformers          >=0 && <1
+    , universum             >=1 && <2
+  default-extensions:
+      BlockArguments
+    , DeriveDataTypeable
+    , DeriveFunctor
+    , DeriveGeneric
+    , FlexibleInstances
+    , LambdaCase
+    , MultiParamTypeClasses
+    , NoImplicitPrelude
+    , OverloadedStrings
+    , TypeFamilies
+  default-language:     Haskell2010
+  exposed-modules:
+      Language.Bundles
+    , Language.Codegen
+    , Language.Common
+    , Language.CSS
+    , Language.CSS.AST
+    , Language.CSS.Codegen
+    , Language.Emit
+    , Language.HTML
+    , Language.HTML.AST
+    , Language.HTML.Codegen
+    , Language.JavaScript
+    , Language.JavaScript.AST
+    , Language.JavaScript.Codegen
+    , Language.LanguageConverter
+    , Language.LowCode.Logic
+    , Language.LowCode.Logic.Analyzer
+    , Language.LowCode.Logic.AST
+    , Language.LowCode.Logic.Prim
+    , Language.LowCode.Logic.Types
+    , Language.LowCode.Logic.JavaScriptConverter
+    , Language.LowCode.UI
+    , Language.LowCode.UI.AST
+    , Language.LowCode.UI.HTMLConverter
+  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
+  hs-source-dirs:       src
+
+test-suite test
+  build-depends:
+      low-code              >=0 && <1
+    , universum             >=1 && <2
+  default-language:     Haskell2010
+  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
+  hs-source-dirs:       test
+  main-is:              Tests.hs
+  type:                 exitcode-stdio-1.0

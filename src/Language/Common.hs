@@ -4,10 +4,12 @@ import Universum
 
 import Data.Aeson
 
+type Name = Text
+
 type Variable varType = (Text, varType)
 
 data ValueType varType
-    = Variable Text
+    = Variable Name
     | Constant varType
     deriving (Eq, Functor, Show)
 

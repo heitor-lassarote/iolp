@@ -1,8 +1,6 @@
 module Language.JavaScript.AST
     ( module Language.Common
     , JSType (..)
-    , getName
-    , sameType
     , AST (..)
     , Expression (..)
     , binarySymbolToText
@@ -14,41 +12,31 @@ module Language.JavaScript.AST
 import Universum
 
 import           Data.Char (isAlphaNum, isLetter)
+import           Data.Set  as Set
 import qualified Data.Text as T
 
 import Language.Common
 
 data JSType
-    = Boolean                !Bool
-    | Number  {-# UNPACK #-} !Double
-    | Text                    Text
+    = Boolean !Bool
+    | Number  !Double
+    | Text     Text
+    | Void
     deriving (Eq, Show)
 
-getName :: JSType -> Text
-getName = \case
-    Boolean _ -> "Boolean"
-    Number _  -> "Number"
-    Text   _  -> "Text"
-
-sameType :: JSType -> JSType -> Bool
-sameType left right = case (left, right) of
-    (Boolean _, Boolean _) -> True
-    (Number  _, Number  _) -> True
-    (Text    _, Text    _) -> True
-    (        _,         _) -> False
-
--- Simplified version to be good enough to create the conversion.
+-- Simplified version good enough to create the conversion.
 data AST
     = Assign Text Expression
     | Block [AST]
     | Expression Expression
     | Function (Maybe Text) [Text] AST
     | If Expression AST (Maybe AST)
+    | Return (Maybe Expression)
     | Var Text Expression
     | While Expression AST
 
 data Expression
-    = Call Text [Expression]
+    = Call Expression [Expression]
     | BinaryOp Expression BinarySymbol Expression
     | Parenthesis Expression
     | UnaryOp UnarySymbol Expression
@@ -56,8 +44,8 @@ data Expression
 
 -- Reference:
 -- https://www.w3schools.com/js/js_reserved.asp
-reservedNames :: [Text]
-reservedNames =
+reservedNames :: Set Text
+reservedNames = Set.fromDistinctAscList
     [ "abstract", "arguments", "await", "boolean", "break", "byte", "case"
     , "catch", "char", "class", "const", "continue", "debugger", "default"
     , "delete", "do", "double", "else", "enum", "eval", "export", "extends"
@@ -94,6 +82,6 @@ isValidName name =
     not (T.null name)
     && isLetterUnderscoreOrDollar (T.head name)
     && all (\c -> isAlphaNum c || c == '_' || c == '$') name
-    && name `notElem` reservedNames
+    && name `Set.notMember` reservedNames
   where
     isLetterUnderscoreOrDollar c = isLetter c || c == '_' || c == '$'

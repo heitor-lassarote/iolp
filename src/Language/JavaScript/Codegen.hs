@@ -51,29 +51,27 @@ defaultGeneratorState = JSGeneratorState 0 defaultOptions S.empty
 indentCompact :: (Emit gen) => JavaScriptCodegen gen
 indentCompact = do
     compactCode' <- gets (compactCode . options)
-    if compactCode' then
-        pure $ emit ""
-    else
-        indent
+    if compactCode' then emitM "" else indent
 
-printVariableTy
+genConstant
     :: (Emit gen)
     => JSType
-    -> gen
-printVariableTy = emit . \case
-    Boolean x -> show x
-    Number x -> show x
-    Text x -> x
+    -> JavaScriptCodegen gen
+genConstant = \case
+    Boolean x -> emitM $ show x
+    Number x -> emitM $ show x
+    Text x -> emitM x
+    Void -> lift $ throwE "Cannot print variable of type 'Void'."
 
 nl :: (Emit gen) => JavaScriptCodegen gen
 nl = do
     compactCode' <- gets (compactCode . options)
-    pure $ emit if compactCode' then "" else "\n"
+    emitM if compactCode' then "" else "\n"
 
 space :: (Emit gen) => JavaScriptCodegen gen
 space = do
     compactCode' <- gets (compactCode . options)
-    pure $ emit if compactCode' then "" else " "
+    emitM if compactCode' then "" else " "
 
 genBlock
     :: (Emit gen, Monoid gen)
@@ -155,7 +153,7 @@ undefinedVariableError name =
 
 checkVariable :: Text -> JavaScriptCodegen ()
 checkVariable name = do
-    symbols' <- symbols <$> get
+    symbols' <- gets symbols
     if S.member name symbols' then
         pure ()
     else
@@ -166,16 +164,16 @@ genVariable
     => ValueType JSType
     -> JavaScriptCodegen gen
 genVariable (Variable v) = checkVariable v *> emitM v
-genVariable (Constant c) = pure $ printVariableTy c
+genVariable (Constant c) = genConstant c
 
 genExpression
     :: (Emit gen, Monoid gen)
     => Expression
     -> JavaScriptCodegen gen
 genExpression = \case
-    Call name args -> mconcat <$> sequence
+    Call expr args -> mconcat <$> sequence
         [ indentCompact
-        , emitM name
+        , genExpression expr
         , emitM "("
         , genArgs args
         , emitM ");"
@@ -205,7 +203,7 @@ javaScriptCodegen
     => AST
     -> JavaScriptCodegen gen
 javaScriptCodegen ast = do
-    strict' <- strict . options <$> get
+    strict' <- gets $ strict . options
     let useStrict = emit if strict' then "\"use strict\";\n" else ""
     body <- javaScriptCodegenInternal ast
     pure $ useStrict <> body
@@ -240,16 +238,26 @@ javaScriptCodegenInternal = \case
             , trueBranch
             , falseBranch
             ]
+    Return Nothing -> mconcat <$> sequence
+        [ indentCompact
+        , emitM "return;"
+        ]
+    Return (Just expression) -> mconcat <$> sequence
+        [ indentCompact
+        , emitM "return "
+        , genExpression expression
+        , emitM ";"
+        ]
     Var name expression -> do
         modify \st -> st { symbols = S.insert name (symbols st) }
         genAssignmentOrDeclaration False name expression
     While expression body -> mconcat <$> sequence
         [ indentCompact
-        , pure $ emit "while"
+        , emitM "while"
         , space
-        , pure $ emit "("
+        , emitM "("
         , genExpression expression
-        , pure $ emit ")"
+        , emitM ")"
         , go body
         ]
   where
