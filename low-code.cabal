@@ -67,9 +67,9 @@ executable LowCode
 library
   build-depends:
       aeson                 >=1 && <2
-    , attoparsec            >=0 && <1
     , base                  >=4 && <5
     , containers            >=0 && <1
+    , megaparsec            >=8 && <9
     , text                  >=1 && <2
     , transformers          >=0 && <1
     , universum             >=1 && <2

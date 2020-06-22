@@ -4,16 +4,17 @@ module Language.LowCode.Logic.AST
     , parseExpression
     ) where
 
-import           Universum hiding (bool, take, takeWhile)
+import           Universum hiding (bool, many, take, takeWhile, try)
 import qualified Universum.Unsafe as Unsafe
 
 import           Control.Monad.Trans.Except (throwE)
 import           Data.Aeson
-import           Data.Attoparsec.Combinator
-import           Data.Attoparsec.Text
 import           Data.Char (isAlphaNum)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as Lexer
 
 import           Language.Codegen
 import           Language.Common
@@ -197,8 +198,10 @@ binarySymbolToOperator = \case
     And          -> Operator LeftAssoc  6
     Or           -> Operator LeftAssoc  5
 
+type Parser = Parsec Void Text
+
 parseExpression :: Text -> Either Text Expression
-parseExpression = first toText . parseOnly (expression0 <* endOfInput)
+parseExpression = first (toText . errorBundlePretty) . parse (expression0 <* eof) ""
 
 -- Reference:
 -- https://en.wikipedia.org/wiki/Operator-precedence_parser#Precedence_climbing_method
@@ -210,7 +213,7 @@ expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
   where
     loop lhs' op
         | precedence op >= minPrecedence = do
-            skipSpace
+            space
             symbol <- binaryOperator
             rhs <- nonBinary
             lookaheadMaybe <- peek
@@ -226,7 +229,7 @@ expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
         | (precedence lookahead > precedence op)
             || (precedence lookahead == precedence op && associativity lookahead == RightAssoc) = do
             rhs' <- expression1 (precedence lookahead) rhs
-            skipSpace
+            space
             lookaheadMaybe <- peek
             maybe (pure (rhs', Nothing)) (loop' rhs' op) lookaheadMaybe
         | otherwise = pure (rhs, Just lookahead)
@@ -235,38 +238,27 @@ expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
 
 nonBinary :: Parser Expression
 nonBinary = do
-    skipSpace
+    space
     lhs <- choice [unary, parenthesis, value]
-    exprs <- many' do
-        skipSpace
-        between (char '(') (expression0 `sepBy'` char ',') (skipSpace *> char ')')
-    skipSpace
+    exprs <- many $
+        try $ (space *> between (char '(') (space *> char ')') (expression0 `sepBy` char ','))
+    space
     pure $ foldl' Call lhs exprs
 
 unary :: Parser Expression
-unary = do
-    op <- unaryOperator
-    expr <- nonBinary
-    pure $ UnaryOp op expr
+unary = UnaryOp <$> unaryOperator <*> nonBinary
 
 integer :: Parser Integer
-integer = do
-    num <- decimal
-    nextMaybe <- peekChar
-    case nextMaybe of
-        Nothing -> pure num
-        Just next
-            | next == '.' || next == 'e' -> fail "Not an integer."
-            | otherwise                  -> pure num
+integer = Lexer.decimal <* notFollowedBy (char 'e' <|> char '.')
 
 value :: Parser Expression
 value = constant <|> variable
 
 constant :: Parser Expression
 constant = Value . Constant <$> choice
-    [ L.Integer <$> integer
-    , L.Double  <$> double
-    , L.Char    <$> char'
+    [ L.Integer <$> try integer
+    , L.Double  <$> Lexer.float
+    , L.Char    <$> char''
     , L.Bool    <$> bool
     , L.Text    <$> text
     ]
@@ -274,12 +266,8 @@ constant = Value . Constant <$> choice
 variable :: Parser Expression
 variable = Value . Variable <$> variableName
 
-between :: (Applicative f) => f left -> f middle -> f right -> f middle
-between left middle right = left *> middle <* right
-{-# INLINE between #-}
-
 parenthesis :: Parser Expression
-parenthesis = between (char '(') (Parenthesis <$> expression0) (char ')')
+parenthesis = between (char '(') (char ')') (Parenthesis <$> expression0)
 
 bool :: Parser Bool
 bool = do
@@ -292,16 +280,16 @@ bool = do
             <> toString b
             <> "'. Perhaps you meant 'false' or 'true'?"
 
-char' :: Parser Char
-char' = between (char '\'') anyChar (char '\'')
+char'' :: Parser Char
+char'' = between (char '\'') (char '\'') Lexer.charLiteral
 
 text :: Parser Text
-text = between (char '"') (takeWhile ((/=) '"')) (char '"')
+text = toText <$> (char '"' *> manyTill Lexer.charLiteral (char '"'))
 
 variableName :: Parser Text
 variableName = do
-    head' <- letter <|> char '_'
-    tail' <- takeWhile (\c -> isAlphaNum c || c == '_')
+    head' <- letterChar <|> char '_'
+    tail' <- takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
     pure $ Text.cons head' tail'
 
 errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
