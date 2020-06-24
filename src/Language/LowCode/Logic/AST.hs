@@ -36,10 +36,10 @@ data AST
     | Return (Maybe Expression)
     -- | Represents the start of a cycle with a given name and a list of
     -- parameters.
-    | Start Name L.VariableType [Name] AST
+    | Start Name !L.VariableType [Name] AST
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var Name L.VariableType Expression AST
+    | Var Name !L.VariableType Expression AST
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
     | While Expression AST AST
@@ -120,10 +120,10 @@ instance ToJSON AST where
             ]
 
 data Expression
-    = BinaryOp Expression BinarySymbol Expression
+    = BinaryOp Expression !BinarySymbol Expression
     | Call Expression [Expression]
     | Parenthesis Expression
-    | UnaryOp UnarySymbol Expression
+    | UnaryOp !UnarySymbol Expression
     | Value (ValueType L.Variable)
     deriving (Eq, Show)
 
@@ -209,7 +209,7 @@ expression0 :: Parser Expression
 expression0 = expression1 0 =<< nonBinary
 
 expression1 :: Int -> Expression -> Parser Expression
-expression1 minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
+expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
   where
     loop lhs' op
         | precedence op >= minPrecedence = do

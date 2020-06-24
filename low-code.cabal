@@ -26,17 +26,17 @@ executable LowCode
     , low-code              >=0 && <1
     , monad-logger          >=0 && <1
     , optparse-applicative  >=0 && <1
---    , path                  >=0 && <1
+    , path                  >=0 && <1
     , persistent            >=2 && <3
     , persistent-postgresql >=2 && <3
     , persistent-template   >=2 && <3
---    , temporary             >=1 && <2
+    , temporary             >=1 && <2
     , text                  >=1 && <2
     , universum             >=1 && <2
     , unliftio-core         >=0 && <1
     , yesod                 >=1 && <2
     , yesod-persistent      >=1 && <2
---    , zip                   >=1 && <2
+    , zip                   >=1 && <2
   default-extensions:
       BlockArguments
     , DeriveAnyClass
@@ -74,7 +74,8 @@ library
     , transformers          >=0 && <1
     , universum             >=1 && <2
   default-extensions:
-      BlockArguments
+      BangPatterns
+    , BlockArguments
     , DeriveDataTypeable
     , DeriveFunctor
     , DeriveGeneric

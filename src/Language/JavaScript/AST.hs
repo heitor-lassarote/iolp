@@ -31,16 +31,19 @@ data AST
     | Expression Expression
     | Function (Maybe Text) [Text] AST
     | If Expression AST (Maybe AST)
+    | NonScopedBlock [AST]
     | Return (Maybe Expression)
     | Var Text Expression
     | While Expression AST
+    deriving (Eq, Show)
 
 data Expression
     = Call Expression [Expression]
-    | BinaryOp Expression BinarySymbol Expression
+    | BinaryOp Expression !BinarySymbol Expression
     | Parenthesis Expression
-    | UnaryOp UnarySymbol Expression
+    | UnaryOp !UnarySymbol Expression
     | Value (ValueType JSType)
+    deriving (Eq, Show)
 
 -- Reference:
 -- https://www.w3schools.com/js/js_reserved.asp

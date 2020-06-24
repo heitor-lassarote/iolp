@@ -12,7 +12,10 @@ import qualified Language.LowCode.Logic.AST   as L
 import qualified Language.LowCode.Logic.Types as L
 
 instance LanguageConverter L.AST JS.AST where
-    convert = JS.Block . convert'
+    convert ast = convert [ast]
+
+instance LanguageConverter [L.AST] JS.AST where
+    convert = JS.NonScopedBlock . concatMap convert'
       where
         convert' = \case
             L.Assign name expression next ->
@@ -44,12 +47,12 @@ instance LanguageConverter L.Expression JS.Expression where
         L.Call expr exprs -> JS.Call (convert expr) (convert <$> exprs)
         L.Parenthesis expr -> JS.Parenthesis $ convert expr
         L.UnaryOp op expr -> JS.UnaryOp op (convert expr)
-        L.Value variable -> JS.Value (logicTyToJs <$> variable)
+        L.Value variable -> JS.Value (convert <$> variable)
 
-logicTyToJs :: L.Variable -> JS.JSType
-logicTyToJs (L.Bool    b) = JS.Boolean b
-logicTyToJs (L.Char    c) = JS.Text $! Text.singleton c
-logicTyToJs (L.Double  d) = JS.Number d
-logicTyToJs (L.Integer i) = JS.Number $! fromInteger i
-logicTyToJs (L.Text    t) = JS.Text t
-logicTyToJs (L.Unit     ) = JS.Void
+instance LanguageConverter L.Variable JS.JSType where
+    convert (L.Bool    b) = JS.Boolean b
+    convert (L.Char    c) = JS.Text $! Text.singleton c
+    convert (L.Double  d) = JS.Number d
+    convert (L.Integer i) = JS.Number $! fromInteger i
+    convert (L.Text    t) = JS.Text t
+    convert (L.Unit     ) = JS.Void

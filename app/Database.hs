@@ -6,8 +6,9 @@ module Database where
 import Universum hiding ((^.))
 
 import           Database.Esqueleto
-import qualified Database.Persist.Postgresql as P
-import qualified Database.Persist.TH         as P
+import qualified Database.Persist.Postgresql      as P
+import qualified Database.Persist.Postgresql.JSON as P
+import qualified Database.Persist.TH              as P
 import           Options.Applicative
 
 data DBConfig = DBConfig
@@ -63,7 +64,7 @@ connectionString DBConfig {..} = mconcat $ encodeUtf8 <$>
 
 P.share [P.mkPersist P.sqlSettings, P.mkMigrate "migrateAll"] [P.persistLowerCase|
 Project sql=projects
-    ast       Text
+    ast       P.Value
     name      Text
     userId    UserId
 User sql=users

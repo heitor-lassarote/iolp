@@ -29,7 +29,7 @@ mkYesod "LowCode" [parseRoutes|
 /editor                  EditorR  POST
 /editor/#ProjectId       ProjectR GET PUT DELETE
 /editor/#ProjectId/build BuildR   GET
-/user                    UserR    POST
+/user                    UserR    GET POST
 |]
 
 data EditorPOST = EditorPOST
@@ -52,6 +52,15 @@ instance FromJSON UserPOST where
         UserPOST <$> o .: "email"
                  <*> o .: "password"
 
+newtype UserGET = UserGET
+    { userGETProjects :: [ProjectGET]
+    }
+
+instance ToJSON UserGET where
+    toJSON UserGET {..} = object
+        [ "projects" .= userGETProjects
+        ]
+
 data ProjectGET = ProjectGET
     { projectGETId   :: ProjectId
     , projectGETName :: Text
@@ -63,17 +72,6 @@ instance ToJSON ProjectGET where
         , "name" .= projectGETName
         ]
 
-data UserGET = UserGET
-    { userGETEmail    :: Text
-    , userGETProjects :: [Text]
-    }
-
-instance ToJSON UserGET where
-    toJSON UserGET {..} = object
-        [ "emai"     .= userGETEmail
-        , "projects" .= userGETProjects
-        ]
-
 authenticate :: Handler UserId
 authenticate = maybe notAuthenticated validate' =<< lookupBasicAuth
   where
@@ -83,23 +81,23 @@ authenticate = maybe notAuthenticated validate' =<< lookupBasicAuth
             hash = userPassword $ entityVal user
         if validatePassword pwd hash
         then pure $ entityKey user
-        else permissionDenied ("Invalid password." :: Text)
+        else notFound  -- We don't return permission denied to not leak available emails.
 
-postEditorR :: Handler ()
+postEditorR :: Handler Value
 postEditorR = do
     userId <- authenticate
     post <- requireCheckJsonBody :: Handler EditorPOST
-    let project = Project (decodeUtf8 $ encode $ editorPOSTAst post) (editorPOSTName post) userId
-    runDB $ insert400_ project
+    let project = Project (toJSON $ editorPOSTAst post) (editorPOSTName post) userId
+    runDB $ toJSON <$> insert400 project
 
-getProjectR :: ProjectId -> Handler Text
-getProjectR pid = authenticate *> runDB (projectAst <$> get404 pid)
+getProjectR :: ProjectId -> Handler Value
+getProjectR pid = authenticate *> runDB (toJSON . projectAst <$> get404 pid)
 
 putProjectR :: ProjectId -> Handler ()
 putProjectR pid = do
     userId <- authenticate
     post <- requireCheckJsonBody :: Handler EditorPOST
-    let project = Project (decodeUtf8 $ encode $ editorPOSTAst post) (editorPOSTName post) userId
+    let project = Project (toJSON $ editorPOSTAst post) (editorPOSTName post) userId
     runDB $ P.repsert pid project
     sendResponse ("OK" :: Text)
 
@@ -113,8 +111,7 @@ deleteProjectR pid = do
 getBuildR :: ProjectId -> Handler Value
 getBuildR _ = sendResponseStatus notImplemented501 ("Building is not implemented yet." :: Text)
 
--- Reason behind comment:
--- More work should be done to analyse how each component will be connected.
+-- TODO: More work should be done to analyse how each component will be connected.
 -- For example: should the backend apropriately adjust the AST so that everything
 -- is connected properly?
 -- Or should the backend automatically insert the appropriate values in the AST,
@@ -133,23 +130,25 @@ getBuildR _ = sendResponseStatus notImplemented501 ("Building is not implemented
 --    codegenBundle = do
 --        tempPath <- Temp.getCanonicalTemporaryDirectory
 --        let file = tempPath </> show pid <> ".zip"
---            css = 
---        Zip.createArchive file (Zip.addEntry Deflate 
+--            css =
+--        Zip.createArchive file (Zip.addEntry Deflate
 
--- Reason behind comment:
--- We don't know yet if we'll need it. You're Not Gonna Need It?
---getUserR :: Handler [UserGET]
---getUserR = do
---    users <- runDB $ select $ from \(user, project) -> do
---        where_ (user ^. UserId ==. project ^. ProjectUserId)
---        pure (user, project)
---    let users' = fmap (fst . entityVal) users
---        projects = fmap (snd . entityVal) users
---    pure $ map (\(User email _) -> UserGET email $ map snd projects) users'
+getUserR :: Handler Value
+getUserR = do
+    userId <- authenticate
+    projects <- runDB $ select $ from \project -> do
+        where_ (project ^. ProjectUserId ==. val userId)
+        pure project
+    returnJson $ UserGET $ map toGet projects
+  where
+    toGet project =
+        let projectKey = entityKey project
+            Project _ name _ = entityVal project
+         in ProjectGET projectKey name
 
-postUserR :: Handler ()
+postUserR :: Handler Value
 postUserR = do
     userPOST <- requireCheckJsonBody :: Handler UserPOST
-    pwd <- liftIO $ hashPassword 14 (encodeUtf8 $ userPOSTPassword userPOST :: ByteString)
+    pwd <- liftIO $ hashPassword 13 (encodeUtf8 $ userPOSTPassword userPOST :: ByteString)
     let user = User (userPOSTEmail userPOST) pwd
-    runDB $ insert400_ user
+    runDB $ toJSON <$> insert400 user

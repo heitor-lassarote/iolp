@@ -96,48 +96,49 @@ genBlock asts = do
     genLines :: (Emit gen, Monoid gen) => [AST] -> JavaScriptCodegen gen
     genLines = fmap mconcat . traverse (withIndent . javaScriptCodegenInternal)
 
+emitIfValid :: (Emit gen) => Name -> JavaScriptCodegen gen
+emitIfValid name
+    | isValidName name = emitM name
+    | otherwise        = lift $ throwE $ "Invalid identifier name '" <> name <> "'."
+
 genFunction
     :: (Emit gen, Monoid gen)
-    => Maybe Text
-    -> [Text]
+    => Maybe Name
+    -> [Name]
     -> AST
     -> JavaScriptCodegen gen
-genFunction name args body = do
-    indent' <- indentCompact
-    body' <- javaScriptCodegenInternal body
-    space' <- space
-    case name of
-        Just name' -> pure $ mconcat
-            [ indent'
-            , emit "function"
-            , space'
-            , emit name'
-            , emit "("
-            , mconcat $ map emit args
-            , emit ")"
-            , body'
-            ]
-        Nothing -> pure $ mconcat
-            [ indent'
-            , emit "("
-            , mconcat $ map emit args
-            , emit ")"
-            , space'
-            , emit "=>"
-            , space'
-            , body'
-            ]
+genFunction name args body = case name of
+    Just name' -> mconcat <$> sequence
+        [ indentCompact
+        , emitM "function"
+        , space
+        , emitIfValid name'
+        , emitM "("
+        , pure $ mconcat $ map emit args
+        , emitM ")"
+        , javaScriptCodegenInternal body
+        ]
+    Nothing -> mconcat <$> sequence
+        [ indentCompact
+        , emitM "("
+        , pure $ mconcat $ map emit args
+        , emitM ")"
+        , space
+        , emitM "=>"
+        , space
+        , javaScriptCodegenInternal body
+        ]
 
 genAssignmentOrDeclaration
     :: (Emit gen, Monoid gen)
     => Bool
-    -> Text
+    -> Name
     -> Expression
     -> JavaScriptCodegen gen
 genAssignmentOrDeclaration isAssignment name expression = mconcat <$> sequence
     [ indentCompact
     , emitM if isAssignment then "" else "let "
-    , emitM name
+    , emitIfValid name
     , space
     , emitM "="
     , space
@@ -146,12 +147,12 @@ genAssignmentOrDeclaration isAssignment name expression = mconcat <$> sequence
     , nl
     ]
 
-undefinedVariableError :: Text -> JavaScriptCodegen gen
+undefinedVariableError :: Name -> JavaScriptCodegen gen
 undefinedVariableError name =
     lift $ throwE $
         "Undefined symbol '" <> name <> "'. Maybe you forgot to declare it?"
 
-checkVariable :: Text -> JavaScriptCodegen ()
+checkVariable :: Name -> JavaScriptCodegen ()
 checkVariable name = do
     symbols' <- gets symbols
     if S.member name symbols' then
@@ -163,7 +164,7 @@ genVariable
     :: (Emit gen)
     => ValueType JSType
     -> JavaScriptCodegen gen
-genVariable (Variable v) = checkVariable v *> emitM v
+genVariable (Variable v) = checkVariable v *> emitIfValid v
 genVariable (Constant c) = genConstant c
 
 genExpression
@@ -238,6 +239,7 @@ javaScriptCodegenInternal = \case
             , trueBranch
             , falseBranch
             ]
+    NonScopedBlock asts -> mconcat <$> traverse javaScriptCodegenInternal asts
     Return Nothing -> mconcat <$> sequence
         [ indentCompact
         , emitM "return;"
