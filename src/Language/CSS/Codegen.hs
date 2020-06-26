@@ -1,8 +1,16 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Language.CSS.Codegen where
+module Language.CSS.Codegen
+    ( Options (..)
+    , defaultOptions
+    , CSSGeneratorState (..)
+    , defaultGeneratorState
+    , withOptions
+    ) where
 
 import Universum
+
+import Data.Aeson (FromJSON, ToJSON)
 
 import Language.Codegen
 import Language.CSS.AST
@@ -12,11 +20,15 @@ type CSSCodegen = CodegenT CSSGeneratorState
 
 instance Codegen AST where
     type GeneratorState AST = CSSGeneratorState
+
     codegen = cssCodegen
 
 data Options = Options
     { indentLevel :: Int
-    }
+    } deriving (Eq, Generic, Show)
+
+instance FromJSON Options
+instance ToJSON   Options
 
 defaultOptions :: Options
 defaultOptions = Options 4
@@ -24,10 +36,16 @@ defaultOptions = Options 4
 data CSSGeneratorState = CSSGeneratorState
     { currentIndentLevel :: Int
     , options :: Options
-    }
+    } deriving (Eq, Generic, Show)
+
+instance FromJSON CSSGeneratorState
+instance ToJSON   CSSGeneratorState
 
 defaultGeneratorState :: CSSGeneratorState
 defaultGeneratorState = CSSGeneratorState 0 defaultOptions
+
+withOptions :: Options -> CSSGeneratorState
+withOptions options' = defaultGeneratorState { options = options' }
 
 instance HasIndentation CSSGeneratorState where
     getIndentation = indentLevel . options

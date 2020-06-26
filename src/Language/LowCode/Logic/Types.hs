@@ -1,18 +1,9 @@
--- | This module is meant to be import qualified.
+-- | This module is meant to be imported qualified.
 module Language.LowCode.Logic.Types where
 
 import Universum
 
 import Data.Aeson hiding (Bool)
-
-import Language.Common (Name)
-
-newtype Metadata = Metadata
-    { externs :: Map Name VariableType
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON Metadata
-instance ToJSON   Metadata
 
 -- TODO: Add let ... in ... so that we can declare variables and functions?
 data Variable

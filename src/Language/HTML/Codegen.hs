@@ -3,11 +3,14 @@
 module Language.HTML.Codegen
     ( Options (..)
     , defaultOptions
-    , GeneratorState
+    , HTMLGeneratorState (..)
     , defaultGeneratorState
+    , withOptions
     ) where
 
 import Universum
+
+import Data.Aeson (FromJSON, ToJSON)
 
 import Language.Codegen
 import Language.Emit
@@ -22,7 +25,10 @@ instance Codegen AST where
 data Options = Options
     { compactCode     :: Bool
     , indentLevel     :: Int
-    } deriving (Eq, Show)
+    } deriving (Eq, Generic, Show)
+
+instance FromJSON Options
+instance ToJSON   Options
 
 defaultOptions :: Options
 defaultOptions = Options False 2
@@ -30,7 +36,10 @@ defaultOptions = Options False 2
 data HTMLGeneratorState = HTMLGeneratorState
     { currentIndentLevel :: Int
     , options            :: Options
-    } deriving (Eq, Show)
+    } deriving (Eq, Generic, Show)
+
+instance FromJSON HTMLGeneratorState
+instance ToJSON   HTMLGeneratorState
 
 instance HasIndentation HTMLGeneratorState where
     getIndentation = indentLevel . options
@@ -39,6 +48,9 @@ instance HasIndentation HTMLGeneratorState where
 
 defaultGeneratorState :: HTMLGeneratorState
 defaultGeneratorState = HTMLGeneratorState 0 defaultOptions
+
+withOptions :: Options -> HTMLGeneratorState
+withOptions options' = defaultGeneratorState { options = options' }
 
 genAttributes :: (Emit gen, Monoid gen) => Attributes -> HTMLCodegen gen
 genAttributes = \case

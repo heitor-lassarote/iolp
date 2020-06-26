@@ -3,7 +3,7 @@
 
 module Database where
 
-import Universum hiding ((^.))
+import Universum
 
 import           Database.Esqueleto
 import qualified Database.Persist.Postgresql      as P

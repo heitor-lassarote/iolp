@@ -33,12 +33,12 @@ execCodegenT st = runIdentity . runExceptT . flip execStateT st
 
 indent :: (Emit gen, HasIndentation state) => CodegenT state gen
 indent = do
-    indent' <- getCurrentIndentation <$> get
-    pure $ emit $ T.replicate indent' " "
+    indent' <- gets getCurrentIndentation
+    emitM $ T.replicate indent' " "
 
 withIndent :: (HasIndentation state) => CodegenT state gen -> CodegenT state gen
 withIndent action = do
-    indent' <- getIndentation <$> get
+    indent' <- gets getIndentation
     modify $ modifyCurrentIndentation (+ indent')
     result <- action
     modify $ modifyCurrentIndentation (subtract indent')

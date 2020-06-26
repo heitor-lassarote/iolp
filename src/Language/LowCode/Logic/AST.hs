@@ -1,5 +1,6 @@
 module Language.LowCode.Logic.AST
-    ( AST (..)
+    ( Metadata (..)
+    , AST (..)
     , Expression (..)
     , parseExpression
     ) where
@@ -20,6 +21,14 @@ import           Language.Codegen
 import           Language.Common
 import           Language.Emit
 import qualified Language.LowCode.Logic.Types as L
+
+newtype Metadata = Metadata
+    { externs :: Map Name L.VariableType
+    } deriving (Eq, Generic, Show)
+
+instance FromJSON Metadata
+instance ToJSON   Metadata
+
 
 data AST
     -- | Assigns a new value to the variable with the specified name and type

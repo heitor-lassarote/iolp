@@ -6,12 +6,14 @@ module Language.JavaScript.Codegen
     , defaultOptions
     , JSGeneratorState (..)
     , defaultGeneratorState
+    , withOptions
     , javaScriptCodegen
     ) where
 
 import Universum
 
 import           Control.Monad.Trans.Except (throwE)
+import           Data.Aeson (FromJSON, ToJSON)
 import qualified Data.Set  as S
 
 import Language.Codegen
@@ -29,7 +31,10 @@ data Options = Options
     , compactCode     :: Bool
     , indentLevel     :: Int
     , strict          :: Bool
-    } deriving (Eq, Show)
+    } deriving (Eq, Generic, Show)
+
+instance FromJSON Options
+instance ToJSON   Options
 
 defaultOptions :: Options
 defaultOptions = Options False False 4 True
@@ -38,7 +43,10 @@ data JSGeneratorState = JSGeneratorState
     { currentIndentLevel :: Int
     , options            :: Options
     , symbols            :: Set Text
-    } deriving (Eq, Show)
+    } deriving (Eq, Generic, Show)
+
+instance FromJSON JSGeneratorState
+instance ToJSON   JSGeneratorState
 
 instance HasIndentation JSGeneratorState where
     getIndentation = indentLevel . options
@@ -47,6 +55,9 @@ instance HasIndentation JSGeneratorState where
 
 defaultGeneratorState :: JSGeneratorState
 defaultGeneratorState = JSGeneratorState 0 defaultOptions S.empty
+
+withOptions :: Options -> JSGeneratorState
+withOptions options' = defaultGeneratorState { options = options' }
 
 indentCompact :: (Emit gen) => JavaScriptCodegen gen
 indentCompact = do
@@ -176,7 +187,7 @@ genExpression = \case
         [ indentCompact
         , genExpression expr
         , emitM "("
-        , genArgs args
+        , fmap (mconcat . fmap emit . intersperse ", ") $ traverse genExpression args
         , emitM ");"
         , nl
         ]
@@ -195,9 +206,6 @@ genExpression = \case
         , genExpression expr
         ]
     Value value -> genVariable value
-  where
-    genArgs :: (Emit gen, Monoid gen) => [Expression] -> JavaScriptCodegen gen
-    genArgs = fmap (mconcat . fmap emit . intersperse ", ") . traverse genExpression
 
 javaScriptCodegen
     :: (Emit gen, Monoid gen)

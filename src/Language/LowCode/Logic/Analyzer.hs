@@ -3,13 +3,13 @@ module Language.LowCode.Logic.Analyzer
     , LogicAnalyzerT
     , emptyState
     , execAnalyzerT
+    , analyzeMany
     , analyze
     , analyzeExpr
     ) where
 
 import Universum
 
-import           Control.Monad.Trans.Except (Except, throwE)
 import qualified Data.Map.Strict as Map
 
 import           Language.Common
@@ -50,19 +50,13 @@ data AnalyzerState = AnalyzerState
     , warnings        :: [Warning]
     } deriving (Show)
 
--- It should be explained why there is an error accumulator in the state, as
--- well as an error in the transformer itself: some errors don't prevent the
--- analyzer from checking for more problems (like an undefined variable), but
--- some must stop (and possibly be caught), because the error means that the
--- entire expression is malformed. For example, in case a variable is undefined
--- in an Expression, or it doesn't typecheck.
-type LogicAnalyzerT = StateT AnalyzerState (Except Error)
+type LogicAnalyzerT = State AnalyzerState
 
 emptyState :: AnalyzerState
 emptyState = AnalyzerState Map.empty [] []
 
-execAnalyzerT :: AnalyzerState -> LogicAnalyzerT a -> Either Error AnalyzerState
-execAnalyzerT st = runIdentity . runExceptT . flip execStateT st
+execAnalyzerT :: AnalyzerState -> LogicAnalyzerT a -> AnalyzerState
+execAnalyzerT st = runIdentity . flip execStateT st
 
 withScope :: LogicAnalyzerT a -> LogicAnalyzerT a
 withScope action = do
@@ -159,26 +153,38 @@ checkApply (L.FunctionType argTypes ret) arguments = do
     pure $ Just ret
 checkApply _ _ = addError (NotAFunction "not function lol") *> pure Nothing
 
-analyze :: L.Metadata -> AST -> LogicAnalyzerT ()
-analyze metadata (Start name (L.FunctionType argTypes ret) arguments next) = do
+collectSymbols :: Metadata -> [AST] -> Map Name VariableInfo
+collectSymbols metadata = foldr mkSymbol externsInfo
+  where
+    externsInfo = Map.mapWithKey mkInfo (externs metadata)
+
+    mkSymbol (Start name ret@(L.FunctionType _ _) _ _) acc =
+        Map.insert name (mkInfo name ret) acc
+    mkSymbol _ acc = acc
+
+analyzeMany :: Metadata -> [AST] -> LogicAnalyzerT ()
+analyzeMany metadata asts = do
+    let functions = collectSymbols metadata asts
+    modify \st -> st { analyzerSymbols = functions }
+    traverse_ analyzeStart asts
+
+analyze :: Metadata -> AST -> LogicAnalyzerT ()
+analyze metadata ast = analyzeMany metadata [ast]
+{-# INLINE analyze #-}
+
+analyzeStart :: AST -> LogicAnalyzerT ()
+analyzeStart (Start name (L.FunctionType argTypes ret) arguments next) = do
     let nArgs = length arguments
         nTypes = length argTypes
-    when (nArgs /= nTypes) $
-        addError $ IncompatibleSignatures name nArgs nTypes
-    mkSymbols
+    when (nArgs /= nTypes) $ addError $ IncompatibleSignatures name nArgs nTypes
+    let argsInfo = Map.fromList $ zipWith (\n t -> (n, mkInfo n t)) arguments argTypes
+    modify \st ->
+        st { analyzerSymbols = Map.union argsInfo (analyzerSymbols st) }
     whenJustM (withScope $ analyzeImpl next) $ checkTypes name ret
-  where
-    mkSymbols =
-        -- TODO: Someday check whether functions and externs are used.
-        let retInfo = Map.singleton name (mkInfo name ret)
-            --argsInfo = Map.fromList $ fmap (\(n, t) -> (n, VariableInfo n False t)) arguments
-            argsInfo = Map.fromList $ zipWith (\n t -> (n, mkInfo n t)) arguments argTypes
-            externsInfo = Map.mapWithKey mkInfo (L.externs metadata)
-        in
-        modify \st ->
-            st { analyzerSymbols = Map.unions [argsInfo, retInfo, externsInfo, analyzerSymbols st] }
-analyze _ (Start _ _ _ _) = lift $ throwE StartIsNotFirstSymbol
-analyze _ _ = lift $ throwE StartIsNotFirstSymbol
+analyzeStart (Start name _ _ next) =
+    addError (NotAFunction name) *> void (withScope $ analyzeImpl next)
+analyzeStart next =
+    addError StartIsNotFirstSymbol *> void (withScope $ analyzeImpl next)
 
 analyzeImpl :: AST -> LogicAnalyzerT (Maybe L.VariableType)
 analyzeImpl = \case
@@ -195,7 +201,7 @@ analyzeImpl = \case
         void $ withScope $ analyzeImpl true
         analyzeImpl next
     Return expr -> maybe (pure $ Just L.UnitType) analyzeExpr expr
-    Start _ _ _ _ -> lift $ throwE StartIsNotFirstSymbol
+    Start _ _ _ next -> addError StartIsNotFirstSymbol *> analyzeImpl next
     Var var type' expr next -> do
         analyzeVar var type' expr
         analyzeImpl next

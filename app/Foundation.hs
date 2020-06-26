@@ -1,14 +1,17 @@
 module Foundation where
 
-import Universum hiding (get, (^.))
+import Data.Foldable (traverse_)
+import Universum hiding (get, traverse_, (^.))
 
---import qualified Codec.Archive.Zip as Zip
+import qualified Codec.Archive.Zip as Zip
 import           Crypto.KDF.BCrypt
 import           Data.Aeson
 import           Database.Esqueleto hiding (Value)
 import qualified Database.Persist                 as P
 import           Network.HTTP.Types.Status
---import qualified System.IO.Temp as Temp
+import           System.Directory (createDirectoryIfMissing)
+import           System.FilePath
+import qualified System.IO.Temp as Temp
 import           Yesod hiding (delete, (==.))
 
 import Database
@@ -34,7 +37,7 @@ mkYesod "LowCode" [parseRoutes|
 
 data EditorPOST = EditorPOST
     { editorPOSTName :: Text
-    , editorPOSTAst  :: BundleCssLogicUi
+    , editorPOSTAst  :: BundleCssHtmlLogic
     }
 
 instance FromJSON EditorPOST where
@@ -109,29 +112,29 @@ deleteProjectR pid = do
     sendResponse ("OK" :: Text)
 
 getBuildR :: ProjectId -> Handler Value
-getBuildR _ = sendResponseStatus notImplemented501 ("Building is not implemented yet." :: Text)
-
--- TODO: More work should be done to analyse how each component will be connected.
--- For example: should the backend apropriately adjust the AST so that everything
--- is connected properly?
--- Or should the backend automatically insert the appropriate values in the AST,
--- after it has been generated (what is being done)?
--- My vote is for the former, since it will be easier to implement and doesn't
--- require assuming or analysing how the AST is currently built.
---getBuildR :: ProjectId -> Handler Value
---getBuildR pid = do
---    userId <- authenticate
---    [build] <- runDB $ select $ from \project -> do
---        where_ (project ^. ProjectUserId ==. val userId &&. project ^. ProjectId ==. val pid)
---        pure project
---    let ast = eitherDecode $ decodeUtf8 $ projectAst $ entityVal build :: Either String BundleCssLogicUi
---    either (sendResponseStatus status500) (pure . codegenBundle) ast
---  where
---    codegenBundle = do
---        tempPath <- Temp.getCanonicalTemporaryDirectory
---        let file = tempPath </> show pid <> ".zip"
---            css =
---        Zip.createArchive file (Zip.addEntry Deflate
+getBuildR pid = do
+    void authenticate
+    project <- runDB $ get404 pid
+    let bundle = fromJSON $ projectAst project :: Result BundleCssHtmlLogic
+    status <- case bundle of
+        Error err -> sendResponseStatus status500 err
+        Success bundle' -> pure $ generate bundle'
+    case status of
+        OK files -> mkBundleZip (toString $ projectName project) files
+        LogicError errors -> sendResponseStatus status500 $ toJSON errors
+        CodegenError errors -> sendResponseStatus status500 $ toJSON errors
+  where
+    mkBundleZip name files = do
+        -- FIXME (maybe): Creates a temporary folder with name SqlBackendKey {unSqlBackendKey = ?}
+        -- where ? is the actual PID.
+        tempPath <- liftIO $ (</> show pid) <$> Temp.getCanonicalTemporaryDirectory
+        liftIO $ createDirectoryIfMissing False tempPath
+        traverse_ (uncurry (writeFile . (tempPath </>))) files
+        selectors <- traverse (Zip.mkEntrySelector . fst) files
+        let entries = zip (encodeUtf8 . snd <$> files) selectors
+            file = tempPath </> name <> ".zip"
+        Zip.createArchive file (traverse_ (uncurry (Zip.addEntry Zip.Store)) entries)
+        sendFile "application/zip" file
 
 getUserR :: Handler Value
 getUserR = do

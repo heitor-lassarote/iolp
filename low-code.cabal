@@ -21,12 +21,13 @@ executable LowCode
       aeson                 >=1 && <2
     , base                  >=4 && <5
     , cryptonite            >=0 && <1
+    , directory             >=1 && <2
     , esqueleto             >=3 && <4
+    , filepath              >=1 && <2
     , http-types            >=0 && <1
     , low-code              >=0 && <1
     , monad-logger          >=0 && <1
     , optparse-applicative  >=0 && <1
-    , path                  >=0 && <1
     , persistent            >=2 && <3
     , persistent-postgresql >=2 && <3
     , persistent-template   >=2 && <3
@@ -84,6 +85,8 @@ library
     , MultiParamTypeClasses
     , NoImplicitPrelude
     , OverloadedStrings
+    , RecordWildCards
+    , TupleSections
     , TypeFamilies
   default-language:     Haskell2010
   exposed-modules:
