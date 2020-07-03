@@ -4,7 +4,7 @@ This serves as the backend for the [LowCode UI](https://github.com/BrunoCaputo/l
 ## Building
 You can use `stack build` to build this project. To use Stack, you can get the [Haskell Platform](https://www.haskell.org/platform/).
 
-You can run te project with `stack run -- --host HOST --port PORT --user DBUSER --dbname postgres --password PASSWORD --connections CONNECTION_POOL_COUNT`. A PostgreSQL database running in the background is needed. The database schema will automatically be created once the project is run for the first time (as defined in [Database.hs](https://github.com/heitor-lassarote/low-code/blob/master/app/Database.hs#L64#L74)).
+You can run the project with `stack run -- --host HOST --port PORT --user DBUSER --dbname postgres --password PASSWORD --connections CONNECTION_POOL_COUNT`. A PostgreSQL database running in the background is needed. The database schema will automatically be created once the project is run for the first time (as defined in [Database.hs](https://github.com/heitor-lassarote/low-code/blob/master/app/Database.hs#L64#L74)).
 
 Afterwards, navigate to the given host to use it.
 
