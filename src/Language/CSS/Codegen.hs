@@ -25,10 +25,7 @@ instance Codegen AST where
 
 data Options = Options
     { indentLevel :: Int
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON Options
-instance ToJSON   Options
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 defaultOptions :: Options
 defaultOptions = Options 4
@@ -36,10 +33,7 @@ defaultOptions = Options 4
 data CSSGeneratorState = CSSGeneratorState
     { currentIndentLevel :: Int
     , options :: Options
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON CSSGeneratorState
-instance ToJSON   CSSGeneratorState
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 defaultGeneratorState :: CSSGeneratorState
 defaultGeneratorState = CSSGeneratorState 0 defaultOptions

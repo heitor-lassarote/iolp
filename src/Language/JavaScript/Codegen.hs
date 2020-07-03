@@ -31,10 +31,7 @@ data Options = Options
     , compactCode     :: Bool
     , indentLevel     :: Int
     , strict          :: Bool
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON Options
-instance ToJSON   Options
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 defaultOptions :: Options
 defaultOptions = Options False False 4 True
@@ -43,10 +40,7 @@ data JSGeneratorState = JSGeneratorState
     { currentIndentLevel :: Int
     , options            :: Options
     , symbols            :: Set Text
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON JSGeneratorState
-instance ToJSON   JSGeneratorState
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 instance HasIndentation JSGeneratorState where
     getIndentation = indentLevel . options
@@ -69,6 +63,7 @@ genConstant
     => JSType
     -> JavaScriptCodegen gen
 genConstant = \case
+    Array x -> emitM $ show x
     Boolean x -> emitM $ show x
     Number x -> emitM $ show x
     Text x -> emitM x

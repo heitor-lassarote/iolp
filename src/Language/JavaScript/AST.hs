@@ -18,7 +18,8 @@ import qualified Data.Text as T
 import Language.Common
 
 data JSType
-    = Boolean !Bool
+    = Array    [Expression]
+    | Boolean !Bool
     | Number  !Double
     | Text     Text
     | Void

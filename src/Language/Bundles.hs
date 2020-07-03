@@ -1,5 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-
 module Language.Bundles where
 
 import Prelude (foldr)
@@ -31,18 +29,15 @@ data PageCssHtmlLogic = PageCssHtmlLogic
     , html  :: HTML.AST
     , logic :: [L.AST]
     , name  :: Name
-    } deriving (Generic)
-
-instance FromJSON PageCssHtmlLogic
-instance ToJSON   PageCssHtmlLogic
+    } deriving (Generic, FromJSON, ToJSON)
 
 data BundleCssHtmlLogic = BundleCssHtmlLogic
-    { cssOptions    :: CSS.Options
-    , htmlOptions   :: HTML.Options
-    , jsOptions     :: JS.Options
-    , logicMetadata :: L.Metadata
-    , pages         :: [PageCssHtmlLogic]
-    } deriving (Generic)
+    { cssOptions       :: CSS.Options
+    , htmlOptions      :: HTML.Options
+    , jsOptions        :: JS.Options
+    , logicEnvironment :: L.Environment
+    , pages            :: [PageCssHtmlLogic]
+    } deriving (Generic, ToJSON)
 
 instance Bundle BundleCssHtmlLogic where
     generate BundleCssHtmlLogic {..}
@@ -54,7 +49,7 @@ instance Bundle BundleCssHtmlLogic where
         csss     = mapWithName (evalCodegenT (CSS.withOptions cssOptions) . codegen . css) pages
         htmls    = mapWithName (evalCodegenT (HTML.withOptions htmlOptions) . codegen . html) pages
         jss      = mapWithName (evalCodegenT (JS.withOptions jsOptions) . codegen . L.lToJs . logic) pages
-        analysis = L.execAnalyzerT L.emptyState $ L.analyzeMany logicMetadata logics
+        analysis = L.execAnalyzerT L.emptyState $ L.analyzeMany logicEnvironment logics
         files    = [withExtension ".css" csss, withExtension ".html" htmls, withExtension ".js" jss]
         errors   = concatMap fst files
 
@@ -78,55 +73,9 @@ instance Bundle BundleCssHtmlLogic where
             mapFirst ((x, y) : rest) = (x <> e, y) : mapFirst rest
 
 instance FromJSON BundleCssHtmlLogic where
-    parseJSON = withObject "BundleCssLogicUi" \o ->
-        BundleCssHtmlLogic <$> o .:? "cssOptions"    .!= CSS.defaultOptions
-                           <*> o .:? "htmlOptions"   .!= HTML.defaultOptions
-                           <*> o .:? "jsOptions"     .!= JS.defaultOptions
-                           <*> o .:? "logicMetadata" .!= L.Metadata Map.empty
+    parseJSON = withObject "Language.Bundles.BundleCssLogicUi" \o ->
+        BundleCssHtmlLogic <$> o .:? "cssOptions"       .!= CSS.defaultOptions
+                           <*> o .:? "htmlOptions"      .!= HTML.defaultOptions
+                           <*> o .:? "jsOptions"        .!= JS.defaultOptions
+                           <*> o .:? "logicEnvironment" .!= L.Environment Map.empty
                            <*> o .:  "pages"
-
-instance ToJSON BundleCssHtmlLogic
-
---data BundleFile contents = BundleFile
---    { contents :: contents
---    , name     :: Name
---    } deriving (Functor, Generic)
-
--- instance (FromJSON ast) => FromJSON (BundleFile ast)
--- instance (ToJSON   ast) => ToJSON   (BundleFile ast)
-
---data BundleCssHtmlLogic = BundleCssHtmlLogic
---    { css           :: [BundleFile CSS.AST]
---    , cssOptions    :: CSS.Options
---    , html          :: [BundleFile HTML.AST]
---    , htmlOptions   :: HTML.Options
---    , logic         :: [BundleFile L.AST]
---    , logicMetadata :: L.Metadata
---    , jsOptions     :: JS.Options
---    } deriving (Generic)
-
---instance Bundle BundleCssHtmlLogic where
---    generate BundleCssHtmlLogic {..}
---        | null errors =
---            Right $ concatMap rights [withExtension ".css" csss, withExtension ".html" htmls, withExtension ".js" [js]]
---        | otherwise   = Left errors
---      where
---        csss     = map (evalCodegenT (CSS.withOptions cssOptions) . codegen . ast) css
---        htmls    = map (evalCodegenT (HTML.withOptions htmlOptions) . codegen . ast) html
---        analysis = L.execAnalyzerT L.emptyState $ L.analyzeMany logicMeta $ ast logic
---        js       = evalCodegenT (JS.withOptions jsOptions) $ codegen $ L.lToJs $ ast logic
---        errors   = (show <$> L.errors analysis) ++ concatMap lefts [csss, htmls, [js]]
-
---        withExtension e = (fmap . map) (,e)
-
---instance FromJSON BundleCssHtmlLogic where
---    parseJSON = withObject "BundleCssLogicUi" \o ->
---        BundleCssHtmlLogic <$> o .:  "css"
---                           <*> o .:? "cssOptions"  .!= CSS.defaultOptions
---                           <*> o .:  "html"
---                           <*> o .:? "htmlOptions" .!= HTML.defaultOptions
---                           <*> o .:  "logic"
---                           <*> o .:  "logicMetadata"
---                           <*> o .:? "jsOptions"   .!= JS.defaultOptions
-
---instance ToJSON BundleCssHtmlLogic

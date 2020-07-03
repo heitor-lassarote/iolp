@@ -2,10 +2,16 @@ module Language.LowCode.Logic.Analyzer
     ( AnalyzerState (..)
     , LogicAnalyzerT
     , emptyState
+    , evalAnalyzerT
     , execAnalyzerT
     , analyzeMany
     , analyze
     , analyzeExpr
+    , vtType
+    , isNumeric
+    , isText
+    , interactsWithUnary
+    , interactsWithBinary
     ) where
 
 import Universum
@@ -14,8 +20,6 @@ import qualified Data.Map.Strict as Map
 
 import           Language.Common
 import           Language.LowCode.Logic.AST
-import           Language.LowCode.Logic.Prim
-import qualified Language.LowCode.Logic.Types as L
 
 -- TODO: Should IncompatibleTypes and TypeMismatch really have these signatures?
 -- Or even better: Should TypeMismatch instead have info about the node instead
@@ -25,9 +29,9 @@ data Error
     | IncompatibleTypes1 UnarySymbol Expression
     | IncompatibleTypes2 Expression BinarySymbol Expression
     | NotAFunction Name
-    | StartIsNotFirstSymbol
     | ShadowedVariable Name
-    | TypeMismatch Text L.VariableType L.VariableType
+    | StartIsNotFirstSymbol
+    | TypeMismatch Text VariableType VariableType
     | UndefinedVariable Name
     deriving (Eq, Show)
 
@@ -38,10 +42,10 @@ data Warning
 data VariableInfo = VariableInfo
     { varName :: Name
     , unused  :: Bool
-    , varType :: L.VariableType
+    , varType :: VariableType
     } deriving (Show)
 
-mkInfo :: Name -> L.VariableType -> VariableInfo
+mkInfo :: Name -> VariableType -> VariableInfo
 mkInfo name type' = VariableInfo name True type'
 
 data AnalyzerState = AnalyzerState
@@ -54,6 +58,9 @@ type LogicAnalyzerT = State AnalyzerState
 
 emptyState :: AnalyzerState
 emptyState = AnalyzerState Map.empty [] []
+
+evalAnalyzerT :: AnalyzerState -> LogicAnalyzerT a -> a
+evalAnalyzerT st = runIdentity . flip evalStateT st
 
 execAnalyzerT :: AnalyzerState -> LogicAnalyzerT a -> AnalyzerState
 execAnalyzerT st = runIdentity . flip execStateT st
@@ -112,7 +119,7 @@ analyzeAssign var expr = do
                     st { analyzerSymbols = Map.insert var info' symbols }
             else addError $ TypeMismatch var (varType info) exprType
 
-analyzeVar :: Text -> L.VariableType -> Expression -> LogicAnalyzerT ()
+analyzeVar :: Text -> VariableType -> Expression -> LogicAnalyzerT ()
 analyzeVar var type' expr = do
     symbols <- gets analyzerSymbols
     if Map.member var symbols
@@ -122,18 +129,18 @@ analyzeVar var type' expr = do
         let info = mkInfo var type'
         modify \st -> st { analyzerSymbols = Map.insert var info symbols }
 
-checkTypes :: Text -> L.VariableType -> L.VariableType -> LogicAnalyzerT ()
+checkTypes :: Text -> VariableType -> VariableType -> LogicAnalyzerT ()
 checkTypes name expectedType actualType
     | expectedType == actualType = pure ()
     | otherwise = addError $ TypeMismatch name expectedType actualType
 
-analyzeExprTypes :: Text -> L.VariableType -> Expression -> LogicAnalyzerT ()
+analyzeExprTypes :: Text -> VariableType -> Expression -> LogicAnalyzerT ()
 analyzeExprTypes exprName expectedType expr =
     whenJustM (analyzeExpr expr) (checkTypes exprName expectedType)
 
 -- In case Call has a name instead of expr:
---checkApply :: Name -> L.VariableType -> [Expression] -> LogicAnalyzerT (Maybe L.VariableType)
---checkApply name (L.FunctionType argTypes ret) arguments = do
+--checkApply :: Name -> VariableType -> [Expression] -> LogicAnalyzerT (Maybe VariableType)
+--checkApply name (FunctionType argTypes ret) arguments = do
 --    let nArgs = length arguments
 --        nTypes = length argTypes
 --    when (nArgs /= nTypes) $
@@ -143,8 +150,8 @@ analyzeExprTypes exprName expectedType expr =
 --checkApply name _ _ = addError (NotAFunction name) *> pure Nothing
 
 -- TODO: Generate more descriptive names!
-checkApply :: L.VariableType -> [Expression] -> LogicAnalyzerT (Maybe L.VariableType)
-checkApply (L.FunctionType argTypes ret) arguments = do
+checkApply :: VariableType -> [Expression] -> LogicAnalyzerT (Maybe VariableType)
+checkApply (FunctionType argTypes ret) arguments = do
     let nArgs = length arguments
         nTypes = length argTypes
     when (nArgs /= nTypes) $
@@ -153,27 +160,27 @@ checkApply (L.FunctionType argTypes ret) arguments = do
     pure $ Just ret
 checkApply _ _ = addError (NotAFunction "not function lol") *> pure Nothing
 
-collectSymbols :: Metadata -> [AST] -> Map Name VariableInfo
-collectSymbols metadata = foldr mkSymbol externsInfo
+collectSymbols :: Environment -> [AST] -> Map Name VariableInfo
+collectSymbols env = foldr mkSymbol externsInfo
   where
-    externsInfo = Map.mapWithKey mkInfo (externs metadata)
+    externsInfo = Map.mapWithKey mkInfo (externs env)
 
-    mkSymbol (Start name ret@(L.FunctionType _ _) _ _) acc =
+    mkSymbol (Start _ name ret@(FunctionType _ _) _ _) acc =
         Map.insert name (mkInfo name ret) acc
     mkSymbol _ acc = acc
 
-analyzeMany :: Metadata -> [AST] -> LogicAnalyzerT ()
-analyzeMany metadata asts = do
-    let functions = collectSymbols metadata asts
+analyzeMany :: Environment -> [AST] -> LogicAnalyzerT ()
+analyzeMany env asts = do
+    let functions = collectSymbols env asts
     modify \st -> st { analyzerSymbols = functions }
     traverse_ analyzeStart asts
 
-analyze :: Metadata -> AST -> LogicAnalyzerT ()
-analyze metadata ast = analyzeMany metadata [ast]
+analyze :: Environment -> AST -> LogicAnalyzerT ()
+analyze env ast = analyzeMany env [ast]
 {-# INLINE analyze #-}
 
 analyzeStart :: AST -> LogicAnalyzerT ()
-analyzeStart (Start name (L.FunctionType argTypes ret) arguments next) = do
+analyzeStart (Start _ name (FunctionType argTypes ret) arguments next) = do
     let nArgs = length arguments
         nTypes = length argTypes
     when (nArgs /= nTypes) $ addError $ IncompatibleSignatures name nArgs nTypes
@@ -181,36 +188,36 @@ analyzeStart (Start name (L.FunctionType argTypes ret) arguments next) = do
     modify \st ->
         st { analyzerSymbols = Map.union argsInfo (analyzerSymbols st) }
     whenJustM (withScope $ analyzeImpl next) $ checkTypes name ret
-analyzeStart (Start name _ _ next) =
+analyzeStart (Start _ name _ _ next) =
     addError (NotAFunction name) *> void (withScope $ analyzeImpl next)
 analyzeStart next =
     addError StartIsNotFirstSymbol *> void (withScope $ analyzeImpl next)
 
-analyzeImpl :: AST -> LogicAnalyzerT (Maybe L.VariableType)
+analyzeImpl :: AST -> LogicAnalyzerT (Maybe VariableType)
 analyzeImpl = \case
-    Assign var expr next -> do
+    Assign _ var expr next -> do
         analyzeAssign var expr
         analyzeImpl next
-    End -> pure $ Just L.UnitType
-    Expression expr next -> do
+    End -> pure $ Just UnitType
+    Expression _ expr next -> do
         void $ analyzeExpr expr
         analyzeImpl next
-    If expr false true next -> do
-        analyzeExprTypes "if" L.BoolType expr
+    If _ expr false true next -> do
+        analyzeExprTypes "if" BoolType expr
         void $ withScope $ analyzeImpl false
         void $ withScope $ analyzeImpl true
         analyzeImpl next
-    Return expr -> maybe (pure $ Just L.UnitType) analyzeExpr expr
-    Start _ _ _ next -> addError StartIsNotFirstSymbol *> analyzeImpl next
-    Var var type' expr next -> do
+    Return _ expr -> maybe (pure $ Just UnitType) analyzeExpr expr
+    Start _ _ _ _ next -> addError StartIsNotFirstSymbol *> analyzeImpl next
+    Var _ var type' expr next -> do
         analyzeVar var type' expr
         analyzeImpl next
-    While expr body next -> do
-        analyzeExprTypes "while" L.BoolType expr
+    While _ expr body next -> do
+        analyzeExprTypes "while" BoolType expr
         void $ withScope $ analyzeImpl body
         analyzeImpl next
 
-analyzeExpr :: Expression -> LogicAnalyzerT (Maybe L.VariableType)
+analyzeExpr :: Expression -> LogicAnalyzerT (Maybe VariableType)
 analyzeExpr = \case
     BinaryOp left symbol' right -> do
         typeL <- analyzeExpr left
@@ -242,7 +249,7 @@ analyzeExpr = \case
               ret
     Value value -> case value of
         Variable v -> analyzeVariable v
-        Constant c -> pure $ Just $ vtType c
+        Constant c -> vtType c
   where
     markUsed _ info = Just info { unused = False }
 
@@ -253,3 +260,58 @@ analyzeExpr = \case
         maybe (addError (UndefinedVariable name) *> pure Nothing)
               (pure . Just . varType)
               infoMaybe
+
+analyzeArray :: [Expression] -> LogicAnalyzerT (Maybe VariableType)
+analyzeArray [] = pure $ Just UnitType  -- TODO: What's the correct type of an empty array?
+analyzeArray (x : xs) = do
+    xTypeMaybe <- analyzeExpr x
+    xsTypesMaybe <- traverse analyzeExpr xs
+    let yTypeMaybe = join $ find (/= xTypeMaybe) xsTypesMaybe
+    case (xTypeMaybe, yTypeMaybe) of
+        (Just xType, Just yType) -> addError (TypeMismatch "array" xType yType) *> pure xTypeMaybe
+        (Just _    , Nothing   ) -> pure xTypeMaybe  -- Everything is ok.
+        (Nothing   , Just _    ) -> pure yTypeMaybe  -- More than one thing failed.
+        (Nothing   , Nothing   ) -> pure xTypeMaybe  -- First failed.
+
+vtType :: Variable -> LogicAnalyzerT (Maybe VariableType)
+vtType = \case
+    Array es  -> ArrayType <<$>> analyzeArray es
+    Bool _    -> pure $ Just BoolType
+    Char _    -> pure $ Just CharType
+    Double _  -> pure $ Just DoubleType
+    Integer _ -> pure $ Just IntegerType
+    Text _    -> pure $ Just TextType
+    Unit      -> pure $ Just UnitType
+
+isNumeric :: VariableType -> Bool
+isNumeric = \case
+    DoubleType  -> True
+    IntegerType -> True
+    _           -> False
+
+isText :: VariableType -> Bool
+isText = \case
+    CharType -> True
+    TextType -> True
+    _        -> False
+
+interactsWithUnary :: UnarySymbol -> VariableType -> Maybe VariableType
+interactsWithUnary Negate = \case
+    DoubleType  -> Just DoubleType
+    IntegerType -> Just IntegerType
+    _           -> Nothing
+interactsWithUnary Not = \case
+    BoolType    -> Just BoolType
+    IntegerType -> Just IntegerType
+    _           -> Nothing
+
+interactsWithBinary :: VariableType -> BinarySymbol -> VariableType -> Maybe VariableType
+interactsWithBinary TextType Add TextType = Just TextType  -- Concatenate strings.
+interactsWithBinary BoolType s BoolType
+    | isLogical s = Just BoolType  -- Logical operators only interact with logical variables.
+    | otherwise   = Nothing
+interactsWithBinary l s r
+    | l /= r                        = Nothing  -- Different types never interact.
+    | isArithmetic s && isNumeric l = Just l  -- Numeric types interact with all arithmetic operators.
+    | isComparison s                = Just BoolType  -- Comparisons always return booleans.
+    | otherwise                     = Nothing

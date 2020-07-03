@@ -41,7 +41,7 @@ data EditorPOST = EditorPOST
     }
 
 instance FromJSON EditorPOST where
-    parseJSON = withObject "EditorPOST" \o ->
+    parseJSON = withObject "Foundation.EditorPOST" \o ->
         EditorPOST <$> o .: "name"
                    <*> o .: "ast"
 
@@ -51,7 +51,7 @@ data UserPOST = UserPOST
     }
 
 instance FromJSON UserPOST where
-    parseJSON = withObject "UserPOST" \o ->
+    parseJSON = withObject "Foundation.UserPOST" \o ->
         UserPOST <$> o .: "email"
                  <*> o .: "password"
 

@@ -25,10 +25,7 @@ instance Codegen AST where
 data Options = Options
     { compactCode     :: Bool
     , indentLevel     :: Int
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON Options
-instance ToJSON   Options
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 defaultOptions :: Options
 defaultOptions = Options False 2
@@ -36,10 +33,7 @@ defaultOptions = Options False 2
 data HTMLGeneratorState = HTMLGeneratorState
     { currentIndentLevel :: Int
     , options            :: Options
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON HTMLGeneratorState
-instance ToJSON   HTMLGeneratorState
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 instance HasIndentation HTMLGeneratorState where
     getIndentation = indentLevel . options

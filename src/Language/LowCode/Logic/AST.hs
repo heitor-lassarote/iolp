@@ -1,7 +1,10 @@
 module Language.LowCode.Logic.AST
-    ( Metadata (..)
+    ( Environment (..)
+    , Metadata (..)
     , AST (..)
     , Expression (..)
+    , Variable (..)
+    , VariableType (..)
     , parseExpression
     ) where
 
@@ -9,7 +12,7 @@ import           Universum hiding (bool, many, take, takeWhile, try)
 import qualified Universum.Unsafe as Unsafe
 
 import           Control.Monad.Trans.Except (throwE)
-import           Data.Aeson
+import           Data.Aeson hiding (Array, Bool)
 import           Data.Char (isAlphaNum)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
@@ -20,63 +23,69 @@ import qualified Text.Megaparsec.Char.Lexer as Lexer
 import           Language.Codegen
 import           Language.Common
 import           Language.Emit
-import qualified Language.LowCode.Logic.Types as L
+
+newtype Environment = Environment
+    { externs :: Map Name VariableType
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 newtype Metadata = Metadata
-    { externs :: Map Name L.VariableType
-    } deriving (Eq, Generic, Show)
-
-instance FromJSON Metadata
-instance ToJSON   Metadata
-
+    { position :: Double2
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 data AST
     -- | Assigns a new value to the variable with the specified name and type
     -- and what follows after.
-    = Assign Name Expression AST
+    = Assign Metadata Name Expression AST
     -- | Represents the end of a cycle.
     | End
     -- | Executes a raw expression. Useful for Call.
-    | Expression Expression AST
+    | Expression Metadata Expression AST
     -- | Allows a condition to be tested, and contains the true branch, false
     -- branch and what follows after the branches.
-    | If Expression AST AST AST
+    | If Metadata Expression AST AST AST
     -- | Exits the function, optionally returning a value.
-    | Return (Maybe Expression)
+    | Return Metadata (Maybe Expression)
     -- | Represents the start of a cycle with a given name and a list of
     -- parameters.
-    | Start Name !L.VariableType [Name] AST
+    | Start Metadata Name !VariableType [Name] AST
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var Name !L.VariableType Expression AST
+    | Var Metadata Name !VariableType Expression AST
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
-    | While Expression AST AST
+    | While Metadata Expression AST AST
     deriving (Eq, Show)
 
 instance FromJSON AST where
-    parseJSON = withObject "logic ast" \o -> o .: "tag" >>= \case
-        "assign"      -> Assign     <$> o .:  "name"
+    parseJSON = withObject "Language.LowCode.Logic.AST.AST" \o -> o .: "tag" >>= \case
+        "assign"      -> Assign     <$> o .:  "metadata"
+                                    <*> o .:  "name"
                                     <*> o .:  "expression"
-                                    <*> o .:? "next-ast"         .!= End
-        "expression"  -> Expression <$> o .:  "expression"
-                                    <*> o .:? "next-ast"         .!= End
-        "if"          -> If         <$> o .:  "expression"
-                                    <*> o .:  "true-branch-ast"
-                                    <*> o .:? "false-branch-ast" .!= End
-                                    <*> o .:? "next-ast"         .!= End
-        "return"      -> Return     <$> o .:? "expression"
-        "start"       -> Start      <$> o .:  "name"
-                                    <*> o .:  "return-type"
+                                    <*> o .:? "nextAst"         .!= End
+        "expression"  -> Expression <$> o .:  "metadata"
+                                    <*> o .:  "expression"
+                                    <*> o .:? "nextAst"         .!= End
+        "if"          -> If         <$> o .:  "metadata"
+                                    <*> o .:  "expression"
+                                    <*> o .:  "trueBranchAst"
+                                    <*> o .:? "falseBranchAst"  .!= End
+                                    <*> o .:? "nextAst"         .!= End
+        "return"      -> Return     <$> o .:  "metadata"
+                                    <*> o .:? "expression"
+        "start"       -> Start      <$> o .:  "metadata"
+                                    <*> o .:  "name"
+                                    <*> o .:  "returnType"
                                     <*> o .:  "arguments"
-                                    <*> o .:? "next-ast"         .!= End
-        "var"         -> Var        <$> o .:  "name"
+                                    <*> o .:? "nextAst"         .!= End
+        "var"         -> Var        <$> o .:  "metadata"
+                                    <*> o .:  "name"
                                     <*> o .:  "type"
                                     <*> o .:  "expression"
-                                    <*> o .:? "next-ast"         .!= End
-        "while"       -> While      <$> o .:  "expression"
-                                    <*> o .:  "while-ast"
-                                    <*> o .:? "next-ast"         .!= End
+                                    <*> o .:? "nextAst"         .!= End
+        "while"       -> While      <$> o .:  "metadata"
+                                    <*> o .:  "expression"
+                                    <*> o .:  "whileAst"
+                                    <*> o .:? "nextAst"         .!= End
         other         -> fail $ "Unknown tag '"
                             <> other
                             <> "'. Available tags are: 'assign', 'expression'"
@@ -84,48 +93,55 @@ instance FromJSON AST where
 
 instance ToJSON AST where
     toJSON = \case
-        Assign name expression ast -> object
-            [ "tag"              .= String "assign"
+        Assign metadata name expression ast -> object
+            [ "metadata"         .= metadata
+            , "tag"              .= String "assign"
             , "name"             .= String name
             , "expression"       .= expression
-            , "next-ast"         .= ast
+            , "nextAst"          .= ast
             ]
         End -> Null
-        Expression expression ast -> object
-            [ "tag"              .= String "expression"
+        Expression metadata expression ast -> object
+            [ "metadata"         .= metadata
+            , "tag"              .= String "expression"
             , "expression"       .= expression
-            , "next-ast"         .= ast
+            , "nextAst"          .= ast
             ]
-        If expression true false ast -> object
-            [ "tag"              .= String "if"
+        If metadata expression true false ast -> object
+            [ "metadata"         .= metadata
+            , "tag"              .= String "if"
             , "expression"       .= expression
-            , "true-branch-ast"  .= true
-            , "false-branch-ast" .= false
-            , "next-ast"         .= ast
+            , "trueBranchAst"    .= true
+            , "falseBranchAst"   .= false
+            , "nextAst"          .= ast
             ]
-        Return expression -> object
-            [ "tag"              .= String "return"
+        Return metadata expression -> object
+            [ "metadata"         .= metadata
+            , "tag"              .= String "return"
             , "expression"       .= expression
             ]
-        Start name returnType arguments ast -> object
-            [ "tag"              .= String "start"
+        Start metadata name returnType arguments ast -> object
+            [ "metadata"         .= metadata
+            , "tag"              .= String "start"
             , "name"             .= String name
-            , "return-type"      .= returnType
+            , "returnType"       .= returnType
             , "arguments"        .= arguments
-            , "next-ast"         .= ast
+            , "nextAst"          .= ast
             ]
-        Var name type' expression ast -> object
-            [ "tag"              .= String "var"
+        Var metadata name type' expression ast -> object
+            [ "metadata"         .= metadata
+            , "tag"              .= String "var"
             , "name"             .= String name
             , "type"             .= type'
             , "expression"       .= expression
-            , "next-ast"         .= ast
+            , "nextAst"          .= ast
             ]
-        While expression body ast -> object
-            [ "tag"              .= String "while"
+        While metadata expression body ast -> object
+            [ "metadata"         .= metadata
+            , "tag"              .= String "while"
             , "expression"       .= expression
-            , "while-ast"        .= body
-            , "next-ast"         .= ast
+            , "whileAst"         .= body
+            , "nextAst"          .= ast
             ]
 
 data Expression
@@ -133,7 +149,7 @@ data Expression
     | Call Expression [Expression]
     | Parenthesis Expression
     | UnaryOp !UnarySymbol Expression
-    | Value (ValueType L.Variable)
+    | Value (ValueType Variable)
     deriving (Eq, Show)
 
 instance FromJSON Expression where
@@ -169,18 +185,125 @@ instance Codegen Expression where
         Value value' -> pure case value' of
             Variable variable' -> emit variable'
             Constant constant' -> case constant' of
-                L.Bool b -> emit $ show b
-                L.Char c -> emit "'" <> emit (Text.singleton c) <> emit "'"
-                L.Double d -> emit $ show d
-                L.Integer i -> emit $ show i
-                L.Text t -> emit "\"" <> emit t <> emit "\""
-                L.Unit -> emit "()"
+                Array a -> emit $ show a
+                Bool b -> emit $ show b
+                Char c -> emit "'" <> emit (Text.singleton c) <> emit "'"
+                Double d -> emit $ show d
+                Integer i -> emit $ show i
+                Text t -> emit "\"" <> emit t <> emit "\""
+                Unit -> emit "()"
       where
-        tryText map' sym =
+        tryUnaryText sym =
             maybe (lift $ throwE $ errorUnaryNotFound $ show sym) emitM $
-                Map.lookup sym map'
-        tryUnaryText = tryText unarySymbolToText
-        tryBinaryText = tryText binarySymbolToText
+                Map.lookup sym unarySymbolToText
+        tryBinaryText sym =
+            maybe (lift $ throwE $ errorBinaryNotFound $ show sym) emitM $
+                Map.lookup sym binarySymbolToText
+
+-- TODO: Add let ... in ... so that we can declare variables and functions?
+data Variable
+    = Array [Expression]
+    | Bool Bool
+    | Char Char
+    | Double Double
+    | Integer Integer
+--    | Polymorphic
+    | Text Text
+    | Unit
+    deriving (Eq, Show)
+
+instance FromJSON Variable where
+    parseJSON = withObject "Language.LowCode.Logic.AST.Variable" \o -> do
+        tag <- o .: "type"
+        -- TODO: Should unit be encoded as ()?
+        if tag == "unit"
+        then pure Unit
+--        else if tag == "polymorphic"
+--        then pure Polymorphic
+        else do
+            value' <- o .: "value"
+            case tag of
+                "array"   -> Array   <$> parseJSON value'
+                "bool"    -> Bool    <$> parseJSON value'
+                "char"    -> Char    <$> parseJSON value'
+                "double"  -> Double  <$> parseJSON value'
+                "integer" -> Integer <$> parseJSON value'
+                "text"    -> Text    <$> parseJSON value'
+                other     -> fail $
+                               "Expected 'array', 'bool', 'char', 'double', 'function', 'integer'"
+                               <> ", 'polymorphic', 'text' or 'unit', but got '" <> other <> "'."
+
+instance ToJSON Variable where
+    toJSON (Array a) = object
+        [ "type"  .= String "array"
+        , "value" .= a
+        ]
+    toJSON (Bool b) = object
+        [ "type"  .= String "bool"
+        , "value" .= b
+        ]
+    toJSON (Char c) = object
+        [ "type"  .= String "char"
+        , "value" .= c
+        ]
+    toJSON (Double d) = object
+        [ "type"  .= String "double"
+        , "value" .= d
+        ]
+    toJSON (Integer i) = object
+        [ "type"  .= String "integer"
+        , "value" .= i
+        ]
+    toJSON (Text t) = object
+        [ "type"  .= String "text"
+        , "value" .= t
+        ]
+    toJSON Unit = object
+        [ "type"  .= String "unit"
+        ]
+
+data VariableType
+    = ArrayType VariableType
+    | BoolType
+    | CharType
+    | DoubleType
+    | FunctionType [VariableType] VariableType
+    | IntegerType
+    | TextType
+    | UnitType
+    deriving (Eq, Ord, Show)
+
+instance FromJSON VariableType where
+    parseJSON = withObject "Language.LowCode.Logic.AST.VariableType" \o -> o .: "type" >>= \case
+        "array"    -> ArrayType <$> o .: "elements"
+        "bool"     -> pure BoolType
+        "char"     -> pure CharType
+        "double"   -> pure DoubleType
+        "function" -> FunctionType <$> o .: "arguments" <*> o .: "return"
+        "integer"  -> pure IntegerType
+        "text"     -> pure TextType
+        "unit"     -> pure UnitType
+        other      -> fail $
+                       "Expected 'array', 'bool', 'char', 'double', 'function', 'integer', 'text' or"
+                       <> " 'unit', but got '" <> other <> "'."
+
+instance ToJSON VariableType where
+    toJSON (ArrayType elements) = object
+        [ "type"     .= String "array"
+        , "elements" .= elements
+        ]
+    toJSON BoolType    = object [ "type" .= String "bool"    ]
+    toJSON CharType    = object [ "type" .= String "char"    ]
+    toJSON DoubleType  = object [ "type" .= String "double"  ]
+    toJSON (FunctionType arguments return') = object
+        -- TODO: Should it have a type such as (Int -> Bool) -> [Int] -> Bool?
+        [ "type"      .= String "function"
+        , "arguments" .= arguments
+        , "return"    .= return'
+        ]
+    toJSON IntegerType = object [ "type" .= String "integer" ]
+    toJSON TextType    = object [ "type" .= String "text"    ]
+    toJSON UnitType    = object [ "type" .= String "unit"    ]
 
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 type Precedence = Int
@@ -250,26 +373,30 @@ nonBinary = do
     space
     lhs <- choice [unary, parenthesis, value]
     exprs <- many $
-        try $ (space *> between (char '(') (space *> char ')') (expression0 `sepBy` char ','))
+        try (space *> between (char '(') (space *> char ')') (expression0 `sepBy` char ','))
     space
     pure $ foldl' Call lhs exprs
 
+array :: Parser [Expression]
+array = between (char '[') (space *> char ']') (expression0 `sepBy` char ',')
+
 unary :: Parser Expression
-unary = UnaryOp <$> unaryOperator <*> nonBinary
+unary = liftA2 UnaryOp unaryOperator nonBinary
 
 integer :: Parser Integer
-integer = Lexer.decimal <* notFollowedBy (char 'e' <|> char '.')
+integer = try (Lexer.decimal <* notFollowedBy (char 'e' <|> char '.'))
 
 value :: Parser Expression
 value = constant <|> variable
 
 constant :: Parser Expression
 constant = Value . Constant <$> choice
-    [ L.Integer <$> try integer
-    , L.Double  <$> Lexer.float
-    , L.Char    <$> char''
-    , L.Bool    <$> bool
-    , L.Text    <$> text
+    [ Array   <$> array
+    , Bool    <$> bool
+    , Char    <$> char''
+    , Double  <$> try Lexer.float
+    , Integer <$> integer
+    , Text    <$> text
     ]
 
 variable :: Parser Expression
