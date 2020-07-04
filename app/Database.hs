@@ -13,45 +13,39 @@ import           Options.Applicative
 
 data DBConfig = DBConfig
     { dbHost        :: Text
-    , dbPort        :: Int
-    , dbUser        :: Text
     , dbName        :: Text
     , dbPassword    :: Text
-    , dbConnections :: Int
+    , dbPort        :: Int
+    , dbUser        :: Text
     }
 
 parseDBConfig :: Parser DBConfig
 parseDBConfig = DBConfig
     <$> strOption
-        (  long "host"
+        (  long "dbhost"
         <> short 'h'
         <> metavar "ADDRESS"
         <> help "Host address for the database" )
-    <*> option auto
-        (  long "port"
-        <> short 'p'
-        <> metavar "PORT"
-        <> help "Port to connect to the database" )
-    <*> strOption
-        (  long "user"
-        <> short 'u'
-        <> metavar "USERNAME"
-        <> help "The username to connect to the database" )
     <*> strOption
         (  long "dbname"
         <> short 'n'
-        <> metavar "DATABASENAME"
+        <> metavar "DB_NAME"
         <> help "The name of the database" )
     <*> strOption
-        (  long "password"
+        (  long "dbpassword"
         <> short 'w'
         <> metavar "PASSWORD"
         <> help "The password to connect to the database" )
     <*> option auto
-        (  long "connections"
-        <> short 'c'
-        <> metavar "CONNECTIONPOOLCOUNT"
-        <> help "Number of connections to keep open in the pool" )
+        (  long "dbport"
+        <> short 'd'
+        <> metavar "DB_PORT"
+        <> help "Port to connect to the database" )
+    <*> strOption
+        (  long "dbuser"
+        <> short 'u'
+        <> metavar "USERNAME"
+        <> help "The username to connect to the database" )
 
 connectionString :: DBConfig -> P.ConnectionString
 connectionString DBConfig {..} = mconcat $ encodeUtf8 <$>
