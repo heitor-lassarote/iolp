@@ -161,7 +161,7 @@ analyzeVar var type' expr = do
     else do
         analyzeExprTypes var type' expr
         let info = mkInfo var type'
-        modify \st -> st { analyzerSymbols = Map.insert var info symbols }
+        modify \st -> st { analyzerSymbols = Map.insert var info (analyzerSymbols st) }
 
 checkTypes :: Text -> VariableType -> VariableType -> LogicAnalyzer ()
 checkTypes name expectedType actualType
@@ -175,17 +175,6 @@ analyzeExprTypes exprName expectedType (Value (Constant (Array _))) =
     addError $ UnknownType exprName expectedType
 analyzeExprTypes exprName expectedType expr =
     whenJustM (analyzeExpr expr) (checkTypes exprName expectedType)
-
--- In case Call has a name instead of expr:
---checkApply :: Name -> VariableType -> [Expression] -> LogicAnalyzer (Maybe VariableType)
---checkApply name (FunctionType argTypes ret) arguments = do
---    let nArgs = length arguments
---        nTypes = length argTypes
---    when (nArgs /= nTypes) $
---        addError $ IncompatibleSignatures name nArgs nTypes
---    traverse_ (uncurry (analyzeExprTypes name)) $ zip argTypes arguments
---    pure $ Just ret
---checkApply name _ _ = addError (NotAFunction name) *> pure Nothing
 
 -- TODO: Generate more descriptive names!
 checkApply :: [Expression] -> VariableType -> LogicAnalyzer (Maybe VariableType)
@@ -212,7 +201,7 @@ analyzeMany :: Environment -> [AST] -> LogicAnalyzer ()
 analyzeMany env asts = do
     let functions = collectSymbols env asts
     modify \st -> st { analyzerSymbols = functions }
-    traverse_ analyzeStart asts
+    traverse_ (withScope . analyzeStart) asts
 
 analyze :: Environment -> AST -> LogicAnalyzer ()
 analyze env ast = analyzeMany env [ast]
@@ -226,11 +215,11 @@ analyzeStart (Start _ name (FunctionType argTypes ret) arguments next) = do
     let argsInfo = Map.fromList $ zipWith (\n t -> (n, mkInfo n t)) arguments argTypes
     modify \st ->
         st { analyzerSymbols = Map.union argsInfo (analyzerSymbols st) }
-    whenJustM (withScope $ analyzeImpl next) $ checkTypes name ret
+    whenJustM (analyzeImpl next) $ checkTypes name ret
 analyzeStart (Start _ name _ _ next) =
-    addError (NotAFunction name) *> void (withScope $ analyzeImpl next)
+    addError (NotAFunction name) *> void (analyzeImpl next)
 analyzeStart next =
-    addError StartIsNotFirstSymbol *> void (withScope $ analyzeImpl next)
+    addError StartIsNotFirstSymbol *> void (analyzeImpl next)
 
 analyzeImpl :: AST -> LogicAnalyzer (Maybe VariableType)
 analyzeImpl = \case
