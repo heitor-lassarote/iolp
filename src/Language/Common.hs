@@ -44,7 +44,7 @@ data BinarySymbol
     -- Logical
     | And
     | Or
-    deriving (Eq, Ord, Read, Show)
+    deriving (Enum, Eq, Ord, Read, Show)
 
 isArithmetic :: BinarySymbol -> Bool
 isArithmetic = \case
@@ -88,7 +88,7 @@ data UnarySymbol
 
     -- Logical
     | Not
-    deriving (Eq, Ord, Read, Show)
+    deriving (Enum, Eq, Ord, Read, Show)
 
 instance FromJSON UnarySymbol where
     parseJSON = withObject "Language.Common.UnarySymbol" \o -> toSymbol =<< o .: "symbol"

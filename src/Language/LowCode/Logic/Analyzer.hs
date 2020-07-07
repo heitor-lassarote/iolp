@@ -1,9 +1,13 @@
 module Language.LowCode.Logic.Analyzer
-    ( AnalyzerState (..)
-    , LogicAnalyzerT
+    ( Error (..)
+    , prettyError
+    , Warning (..)
+    , prettyWarning
+    , AnalyzerState (..)
+    , LogicAnalyzer
     , emptyState
-    , evalAnalyzerT
-    , execAnalyzerT
+    , evalAnalyzer
+    , execAnalyzer
     , analyzeMany
     , analyze
     , analyzeExpr
@@ -33,11 +37,41 @@ data Error
     | StartIsNotFirstSymbol
     | TypeMismatch Text VariableType VariableType
     | UndefinedVariable Name
+    | UnknownType Name VariableType
     deriving (Eq, Show)
 
+prettyError :: Error -> Text
+prettyError = \case
+    IncompatibleSignatures name args1 args2 ->
+        "'" <> name <> "' expects " <> show args1 <> " arguments, but " <> show args2 <> " were given."
+    IncompatibleTypes1 symbol expr ->
+        "Incompatible expression '" <> codegenE expr <> "' for unary operator '" <> unaryToText symbol <> "'."
+    IncompatibleTypes2 left symbol right ->
+        "Incompatible expressions '" <> codegenE left <> "' and '" <> codegenE right <> "' for unary operator '" <> binaryToText symbol <> "'."
+    NotAFunction name ->
+        -- TODO: Add types/expressions being applied? And maybe the inferred type?
+        "Can't use '" <> name <> "' as function."
+    ShadowedVariable name ->
+        -- TODO: Add where it was defined and what is the new value being assigned. Maybe old value too.
+        "'" <> name <> "' was shadowed."
+    StartIsNotFirstSymbol ->
+        "The Start symbol must appear iff it's the first symbol."
+    TypeMismatch name expected actual ->
+        "Type mismatch in '" <> name <> "'. Expected '" <> show expected <> "' but got '" <> show actual <> "'."
+    UndefinedVariable name ->
+        -- TODO: Scan for similarly named variables.
+        "'" <> name <> "' was used but it was not defined. Perhaps you forgot to declare it or made a typo?"
+    UnknownType location actual ->
+        "Could not deduce type '" <> show actual <> "' from its use in '" <> location <> "'."
+
 data Warning
-    = UnusedVariable Text
+    = UnusedVariable Name
     deriving (Eq, Show)
+
+prettyWarning :: Warning -> Text
+prettyWarning = \case
+    UnusedVariable name ->
+        "Declared but not used: '" <> name <> "'."
 
 data VariableInfo = VariableInfo
     { varName :: Name
@@ -54,18 +88,18 @@ data AnalyzerState = AnalyzerState
     , warnings        :: [Warning]
     } deriving (Show)
 
-type LogicAnalyzerT = State AnalyzerState
+type LogicAnalyzer = State AnalyzerState
 
 emptyState :: AnalyzerState
 emptyState = AnalyzerState Map.empty [] []
 
-evalAnalyzerT :: AnalyzerState -> LogicAnalyzerT a -> a
-evalAnalyzerT st = runIdentity . flip evalStateT st
+evalAnalyzer :: AnalyzerState -> LogicAnalyzer a -> a
+evalAnalyzer st = runIdentity . flip evalStateT st
 
-execAnalyzerT :: AnalyzerState -> LogicAnalyzerT a -> AnalyzerState
-execAnalyzerT st = runIdentity . flip execStateT st
+execAnalyzer :: AnalyzerState -> LogicAnalyzer a -> AnalyzerState
+execAnalyzer st = runIdentity . flip execStateT st
 
-withScope :: LogicAnalyzerT a -> LogicAnalyzerT a
+withScope :: LogicAnalyzer a -> LogicAnalyzer a
 withScope action = do
     symbols <- gets analyzerSymbols
     ret <- action
@@ -80,13 +114,13 @@ withScope action = do
     appendUnused var info acc =
         if unused info then UnusedVariable var : acc else acc
 
-addError :: Error -> LogicAnalyzerT ()
+addError :: Error -> LogicAnalyzer ()
 addError e = modify \st -> st { errors = e : errors st }
 
---addWarning :: Warning -> LogicAnalyzerT ()
+--addWarning :: Warning -> LogicAnalyzer ()
 --addWarning w = modify \st -> st { warnings = w : warnings st }
 
---tryMapVariable :: (VariableInfo -> VariableInfo) -> Text -> LogicAnalyzerT ()
+--tryMapVariable :: (VariableInfo -> VariableInfo) -> Text -> LogicAnalyzer ()
 --tryMapVariable f var = do
 --    symbols <- gets analyzerSymbols
 --    newSymbols <- Map.alterF
@@ -100,13 +134,13 @@ addError e = modify \st -> st { errors = e : errors st }
 --        symbols
 --    modify \st -> st { analyzerSymbols = newSymbols }
 
---variableCheck :: Text -> LogicAnalyzerT ()
+--variableCheck :: Text -> LogicAnalyzer ()
 --variableCheck = tryMapVariable id
 
---markUsed :: Text -> LogicAnalyzerT ()
+--markUsed :: Text -> LogicAnalyzer ()
 --markUsed = tryMapVariable (\info -> info { unused = False })
 
-analyzeAssign :: Text -> Expression -> LogicAnalyzerT ()
+analyzeAssign :: Text -> Expression -> LogicAnalyzer ()
 analyzeAssign var expr = do
     symbols <- gets analyzerSymbols
     case Map.lookup var symbols of
@@ -119,7 +153,7 @@ analyzeAssign var expr = do
                     st { analyzerSymbols = Map.insert var info' symbols }
             else addError $ TypeMismatch var (varType info) exprType
 
-analyzeVar :: Text -> VariableType -> Expression -> LogicAnalyzerT ()
+analyzeVar :: Text -> VariableType -> Expression -> LogicAnalyzer ()
 analyzeVar var type' expr = do
     symbols <- gets analyzerSymbols
     if Map.member var symbols
@@ -129,17 +163,21 @@ analyzeVar var type' expr = do
         let info = mkInfo var type'
         modify \st -> st { analyzerSymbols = Map.insert var info symbols }
 
-checkTypes :: Text -> VariableType -> VariableType -> LogicAnalyzerT ()
+checkTypes :: Text -> VariableType -> VariableType -> LogicAnalyzer ()
 checkTypes name expectedType actualType
     | expectedType == actualType = pure ()
     | otherwise = addError $ TypeMismatch name expectedType actualType
 
-analyzeExprTypes :: Text -> VariableType -> Expression -> LogicAnalyzerT ()
+analyzeExprTypes :: Text -> VariableType -> Expression -> LogicAnalyzer ()
+analyzeExprTypes exprName (ArrayType innerTypeA) (Value (Constant (Array xs))) =
+    traverse_ (analyzeExprTypes exprName innerTypeA) xs
+analyzeExprTypes exprName expectedType (Value (Constant (Array _))) =
+    addError $ UnknownType exprName expectedType
 analyzeExprTypes exprName expectedType expr =
     whenJustM (analyzeExpr expr) (checkTypes exprName expectedType)
 
 -- In case Call has a name instead of expr:
---checkApply :: Name -> VariableType -> [Expression] -> LogicAnalyzerT (Maybe VariableType)
+--checkApply :: Name -> VariableType -> [Expression] -> LogicAnalyzer (Maybe VariableType)
 --checkApply name (FunctionType argTypes ret) arguments = do
 --    let nArgs = length arguments
 --        nTypes = length argTypes
@@ -150,8 +188,8 @@ analyzeExprTypes exprName expectedType expr =
 --checkApply name _ _ = addError (NotAFunction name) *> pure Nothing
 
 -- TODO: Generate more descriptive names!
-checkApply :: VariableType -> [Expression] -> LogicAnalyzerT (Maybe VariableType)
-checkApply (FunctionType argTypes ret) arguments = do
+checkApply :: [Expression] -> VariableType -> LogicAnalyzer (Maybe VariableType)
+checkApply arguments (FunctionType argTypes ret) = do
     let nArgs = length arguments
         nTypes = length argTypes
     when (nArgs /= nTypes) $
@@ -165,21 +203,22 @@ collectSymbols env = foldr mkSymbol externsInfo
   where
     externsInfo = Map.mapWithKey mkInfo (externs env)
 
+    -- TODO: Should we collect all symbols?
     mkSymbol (Start _ name ret@(FunctionType _ _) _ _) acc =
         Map.insert name (mkInfo name ret) acc
     mkSymbol _ acc = acc
 
-analyzeMany :: Environment -> [AST] -> LogicAnalyzerT ()
+analyzeMany :: Environment -> [AST] -> LogicAnalyzer ()
 analyzeMany env asts = do
     let functions = collectSymbols env asts
     modify \st -> st { analyzerSymbols = functions }
     traverse_ analyzeStart asts
 
-analyze :: Environment -> AST -> LogicAnalyzerT ()
+analyze :: Environment -> AST -> LogicAnalyzer ()
 analyze env ast = analyzeMany env [ast]
 {-# INLINE analyze #-}
 
-analyzeStart :: AST -> LogicAnalyzerT ()
+analyzeStart :: AST -> LogicAnalyzer ()
 analyzeStart (Start _ name (FunctionType argTypes ret) arguments next) = do
     let nArgs = length arguments
         nTypes = length argTypes
@@ -193,7 +232,7 @@ analyzeStart (Start _ name _ _ next) =
 analyzeStart next =
     addError StartIsNotFirstSymbol *> void (withScope $ analyzeImpl next)
 
-analyzeImpl :: AST -> LogicAnalyzerT (Maybe VariableType)
+analyzeImpl :: AST -> LogicAnalyzer (Maybe VariableType)
 analyzeImpl = \case
     Assign _ var expr next -> do
         analyzeAssign var expr
@@ -217,7 +256,7 @@ analyzeImpl = \case
         void $ withScope $ analyzeImpl body
         analyzeImpl next
 
-analyzeExpr :: Expression -> LogicAnalyzerT (Maybe VariableType)
+analyzeExpr :: Expression -> LogicAnalyzer (Maybe VariableType)
 analyzeExpr = \case
     BinaryOp left symbol' right -> do
         typeL <- analyzeExpr left
@@ -236,10 +275,11 @@ analyzeExpr = \case
         --case infoMaybe of
         --    Nothing -> addError (UndefinedVariable name) *> pure Nothing
         --    Just (VariableInfo _ _ typeF) -> checkApply name typeF arguments
-        typeE <- analyzeExpr expr
-        case typeE of
+        typeFMaybe <- analyzeExpr expr
+        case typeFMaybe of
             Nothing -> pure Nothing
-            Just typeF -> checkApply typeF arguments
+            Just typeF -> do
+                checkApply arguments typeF
     Parenthesis expr -> analyzeExpr expr
     UnaryOp symbol' expr -> do
         typeE <- analyzeExpr expr
@@ -261,8 +301,8 @@ analyzeExpr = \case
               (pure . Just . varType)
               infoMaybe
 
-analyzeArray :: [Expression] -> LogicAnalyzerT (Maybe VariableType)
-analyzeArray [] = pure $ Just UnitType  -- TODO: What's the correct type of an empty array?
+analyzeArray :: [Expression] -> LogicAnalyzer (Maybe VariableType)
+analyzeArray [] = pure Nothing
 analyzeArray (x : xs) = do
     xTypeMaybe <- analyzeExpr x
     xsTypesMaybe <- traverse analyzeExpr xs
@@ -273,7 +313,7 @@ analyzeArray (x : xs) = do
         (Nothing   , Just _    ) -> pure yTypeMaybe  -- More than one thing failed.
         (Nothing   , Nothing   ) -> pure xTypeMaybe  -- First failed.
 
-vtType :: Variable -> LogicAnalyzerT (Maybe VariableType)
+vtType :: Variable -> LogicAnalyzer (Maybe VariableType)
 vtType = \case
     Array es  -> ArrayType <<$>> analyzeArray es
     Bool _    -> pure $ Just BoolType

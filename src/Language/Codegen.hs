@@ -2,7 +2,7 @@ module Language.Codegen where
 
 import Universum
 
-import Data.Text as T
+import qualified Data.Text as T
 
 import Language.Emit
 

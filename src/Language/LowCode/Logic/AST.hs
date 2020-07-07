@@ -3,17 +3,23 @@ module Language.LowCode.Logic.AST
     , Metadata (..)
     , AST (..)
     , Expression (..)
+    , codegenE
     , Variable (..)
     , VariableType (..)
     , parseExpression
+    , unaryToText
+    , mapUnaryToText
+    , mapTextToUnary
+    , binaryToText
+    , mapBinaryToText
+    , mapTextToBinary
     ) where
 
 import           Universum hiding (bool, many, take, takeWhile, try)
 import qualified Universum.Unsafe as Unsafe
 
-import           Control.Monad.Trans.Except (throwE)
 import           Data.Aeson hiding (Array, Bool)
-import           Data.Char (isAlphaNum)
+import           Data.Char (isAlphaNum, isPunctuation, isSymbol)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import           Text.Megaparsec
@@ -156,7 +162,11 @@ instance FromJSON Expression where
     parseJSON = withText "expression ast" (either (fail . toString) pure . parseExpression)
 
 instance ToJSON Expression where
-    toJSON = String . Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
+    toJSON = String . codegenE
+
+-- Codegen for expression never fails, so this function is safe.
+codegenE :: Expression -> Text
+codegenE = Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
 
 instance Codegen Expression where
     type GeneratorState Expression = ()
@@ -164,13 +174,13 @@ instance Codegen Expression where
     codegen = \case
         BinaryOp left symbol' right -> mconcat <$> sequence
             [ codegen left
-            , tryBinaryText symbol'
+            , emitM $ " " <> binaryToText symbol' <> " "
             , codegen right
             ]
         Call expr exprs -> mconcat <$> sequence
             [ codegen expr
             , emitM "("
-            , mconcat . fmap emit . intersperse "," <$> traverse codegen exprs
+            , mconcat . fmap emit . intersperse ", " <$> traverse codegen exprs
             , emitM ")"
             ]
         Parenthesis expression -> mconcat <$> sequence
@@ -179,7 +189,7 @@ instance Codegen Expression where
             , emitM ")"
             ]
         UnaryOp symbol' expression -> mconcat <$> sequence
-            [ tryUnaryText symbol'
+            [ emitM $ unaryToText symbol'
             , codegen expression
             ]
         Value value' -> pure case value' of
@@ -192,13 +202,6 @@ instance Codegen Expression where
                 Integer i -> emit $ show i
                 Text t -> emit "\"" <> emit t <> emit "\""
                 Unit -> emit "()"
-      where
-        tryUnaryText sym =
-            maybe (lift $ throwE $ errorUnaryNotFound $ show sym) emitM $
-                Map.lookup sym unarySymbolToText
-        tryBinaryText sym =
-            maybe (lift $ throwE $ errorBinaryNotFound $ show sym) emitM $
-                Map.lookup sym binarySymbolToText
 
 -- TODO: Add let ... in ... so that we can declare variables and functions?
 data Variable
@@ -207,7 +210,6 @@ data Variable
     | Char Char
     | Double Double
     | Integer Integer
---    | Polymorphic
     | Text Text
     | Unit
     deriving (Eq, Show)
@@ -218,8 +220,6 @@ instance FromJSON Variable where
         -- TODO: Should unit be encoded as ()?
         if tag == "unit"
         then pure Unit
---        else if tag == "polymorphic"
---        then pure Polymorphic
         else do
             value' <- o .: "value"
             case tag of
@@ -429,56 +429,55 @@ variableName = do
     pure $ Text.cons head' tail'
 
 errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
-errorUnaryNotFound symbol' =
-    "Undefined unary operator '"
-    <> symbol'
-    <> "'. This error should not appear and is likely a bug. "
-    <> "Please report it."
+errorUnaryNotFound symbol' = "Undefined unary operator '" <> symbol' <> "'."
 
 errorBinaryNotFound :: (IsString s, Semigroup s) => s -> s
-errorBinaryNotFound symbol' =
-    "Undefined binary operator '"
-    <> symbol'
-    <> "'. This error should not appear and is likely a bug. "
-    <> "Please report it."
+errorBinaryNotFound symbol' = "Undefined binary operator '" <> symbol' <> "'."
+
+isOperatorSymbol :: Char -> Bool
+isOperatorSymbol c = isPunctuation c || isSymbol c
 
 unaryOperator :: Parser UnarySymbol
 unaryOperator = do
-    symbol' <- choice (string <$> Map.elems unarySymbolToText)
-    maybe (fail $ errorUnaryNotFound $ toString symbol') pure $ Map.lookup symbol' unaryTextToSymbol
+    symbol' <- takeWhile1P (Just "unary symbol") isOperatorSymbol
+    maybe (fail $ errorUnaryNotFound $ toString symbol') pure $ Map.lookup symbol' mapTextToUnary
 
 binaryOperator :: Parser BinarySymbol
 binaryOperator = do
-    symbol' <- choice (string <$> Map.elems binarySymbolToText)
-    maybe (fail $ errorBinaryNotFound $ toString symbol') pure $ Map.lookup symbol' binaryTextToSymbol
+    symbol' <- takeWhile1P (Just "binary symbol") isOperatorSymbol
+    maybe (fail $ errorBinaryNotFound $ toString symbol') pure $ Map.lookup symbol' mapTextToBinary
 
 biject :: (Ord v) => Map k v -> Map v k
 biject = Map.fromList . fmap swap . Map.toList
 
-unarySymbolToText :: Map UnarySymbol Text
-unarySymbolToText = Map.fromList
-    [ (Negate, "-")
-    , (Not   , "!")
-    ]
+unaryToText :: UnarySymbol -> Text
+unaryToText = \case
+    Negate -> "-"
+    Not    -> "!"
 
-unaryTextToSymbol :: Map Text UnarySymbol
-unaryTextToSymbol = biject unarySymbolToText
+mapTextToUnary :: Map Text UnarySymbol
+mapTextToUnary = biject mapUnaryToText
 
-binarySymbolToText :: Map BinarySymbol Text
-binarySymbolToText = Map.fromList
-    [ (Add         , "+"  )
-    , (Divide      , "/"  )
-    , (Multiply    , "*"  )
-    , (Subtract    , "-"  )
-    , (Different   , "<>" )
-    , (Equal       , "="  )
-    , (Greater     , ">"  )
-    , (GreaterEqual, ">=" )
-    , (Less        , "<"  )
-    , (LessEqual   , "<=" )
-    , (And         , "and")
-    , (Or          , "or" )
-    ]
+mapUnaryToText :: Map UnarySymbol Text
+mapUnaryToText = Map.fromDistinctAscList $ map (id &&& unaryToText) [Negate .. Not]
 
-binaryTextToSymbol :: Map Text BinarySymbol
-binaryTextToSymbol = biject binarySymbolToText
+binaryToText :: BinarySymbol -> Text
+binaryToText = \case
+    Add          ->  "+"
+    Divide       ->  "/"
+    Multiply     ->  "*"
+    Subtract     ->  "-"
+    Different    ->  "<>"
+    Equal        ->  "="
+    Greater      ->  ">"
+    GreaterEqual ->  ">="
+    Less         ->  "<"
+    LessEqual    ->  "<="
+    And          ->  "and"
+    Or           ->  "or"
+
+mapTextToBinary :: Map Text BinarySymbol
+mapTextToBinary = biject mapBinaryToText
+
+mapBinaryToText :: Map BinarySymbol Text
+mapBinaryToText = Map.fromDistinctAscList $ map (id &&& binaryToText) [Add .. Or]

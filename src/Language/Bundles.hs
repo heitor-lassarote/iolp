@@ -17,6 +17,7 @@ import qualified Language.LowCode.Logic as L
 
 data Status gen
     = OK [(FilePath, gen)]
+    -- TODO: In the future, unify these two error types.
     | LogicError [Text]
     | CodegenError [(FilePath, Text)]
     deriving (Eq, Show)
@@ -43,13 +44,13 @@ instance Bundle BundleCssHtmlLogic where
     generate BundleCssHtmlLogic {..}
         | null (L.errors analysis) && null errors = OK $ concatMap snd files
         | null (L.errors analysis) = CodegenError errors
-        | otherwise = LogicError $ show <$> L.errors analysis
+        | otherwise = LogicError $ L.prettyError <$> L.errors analysis
       where
         --csss :: (Emit gen, Monoid gen) => ([(Name, Text)], [(Name, gen)])
         csss     = mapWithName (evalCodegenT (CSS.withOptions cssOptions) . codegen . css) pages
         htmls    = mapWithName (evalCodegenT (HTML.withOptions htmlOptions) . codegen . html) pages
         jss      = mapWithName (evalCodegenT (JS.withOptions jsOptions) . codegen . L.lToJs . logic) pages
-        analysis = L.execAnalyzerT L.emptyState $ L.analyzeMany logicEnvironment logics
+        analysis = L.execAnalyzer L.emptyState $ L.analyzeMany logicEnvironment logics
         files    = [withExtension ".css" csss, withExtension ".html" htmls, withExtension ".js" jss]
         errors   = concatMap fst files
 
