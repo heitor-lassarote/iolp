@@ -435,7 +435,10 @@ errorBinaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorBinaryNotFound symbol' = "Undefined binary operator '" <> symbol' <> "'."
 
 isOperatorSymbol :: Char -> Bool
-isOperatorSymbol c = isPunctuation c || isSymbol c
+isOperatorSymbol c = (c `notElem` forbidden) && (isPunctuation c || isSymbol c)
+  where
+    forbidden :: String
+    forbidden = ",()[]"
 
 unaryOperator :: Parser UnarySymbol
 unaryOperator = do
