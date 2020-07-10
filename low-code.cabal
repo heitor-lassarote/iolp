@@ -21,8 +21,10 @@ executable LowCode
       aeson                 >=1 && <2
     , base                  >=4 && <5
     , cryptonite            >=0 && <1
+    , data-default-class    >=0 && <1
     , directory             >=1 && <2
     , esqueleto             >=3 && <4
+    , fast-logger           >=3 && <4
     , filepath              >=1 && <2
     , http-types            >=0 && <1
     , low-code              >=0 && <1
@@ -31,11 +33,17 @@ executable LowCode
     , persistent            >=2 && <3
     , persistent-postgresql >=2 && <3
     , persistent-template   >=2 && <3
+    , template-haskell      >=2 && <3
     , temporary             >=1 && <2
     , text                  >=1 && <2
     , universum             >=1 && <2
     , unliftio-core         >=0 && <1
+    , wai                   >=3 && <4
+    , wai-cors              >=0 && <1
+    , wai-extra             >=3 && <4
+    , warp                  >=3 && <4
     , yesod                 >=1 && <2
+    , yesod-core            >=1 && <2
     , yesod-persistent      >=1 && <2
     , zip                   >=1 && <2
   default-extensions:
@@ -59,7 +67,8 @@ executable LowCode
   other-extensions:
       UndecidableInstances
   other-modules:
-      Database
+      Config
+    , Database
     , Foundation
   ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
   hs-source-dirs:       app
@@ -70,6 +79,7 @@ library
       aeson                 >=1 && <2
     , base                  >=4 && <5
     , containers            >=0 && <1
+    , data-default-class    >=0 && <1
     , megaparsec            >=8 && <9
     , text                  >=1 && <2
     , transformers          >=0 && <1

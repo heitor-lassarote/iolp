@@ -13,12 +13,17 @@ import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath
 import qualified System.IO.Temp as Temp
 import           Yesod hiding (delete, (==.))
+import           Yesod.Core.Types (Logger)
 
+import Config
 import Database
+
 import Language.Bundles
 
 data LowCode = LowCode
-    { connectionPool :: ConnectionPool
+    { appLogger      :: Logger
+    , connectionPool :: ConnectionPool
+    , serverConfig   :: ServerConfig
     }
 
 instance Yesod LowCode

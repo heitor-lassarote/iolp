@@ -9,43 +9,8 @@ import           Database.Esqueleto
 import qualified Database.Persist.Postgresql      as P
 import qualified Database.Persist.Postgresql.JSON as P
 import qualified Database.Persist.TH              as P
-import           Options.Applicative
 
-data DBConfig = DBConfig
-    { dbHost        :: Text
-    , dbName        :: Text
-    , dbPassword    :: Text
-    , dbPort        :: Int
-    , dbUser        :: Text
-    }
-
-parseDBConfig :: Parser DBConfig
-parseDBConfig = DBConfig
-    <$> strOption
-        (  long "dbhost"
-        <> short 'h'
-        <> metavar "ADDRESS"
-        <> help "Host address for the database" )
-    <*> strOption
-        (  long "dbname"
-        <> short 'n'
-        <> metavar "DB_NAME"
-        <> help "The name of the database" )
-    <*> strOption
-        (  long "dbpassword"
-        <> short 'w'
-        <> metavar "PASSWORD"
-        <> help "The password to connect to the database" )
-    <*> option auto
-        (  long "dbport"
-        <> short 'd'
-        <> metavar "DB_PORT"
-        <> help "Port to connect to the database" )
-    <*> strOption
-        (  long "dbuser"
-        <> short 'u'
-        <> metavar "USERNAME"
-        <> help "The username to connect to the database" )
+import Config
 
 connectionString :: DBConfig -> P.ConnectionString
 connectionString DBConfig {..} = mconcat $ encodeUtf8 <$>
