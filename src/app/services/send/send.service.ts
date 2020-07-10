@@ -12,9 +12,9 @@ export class SendService {
     private header: HttpHeaders;
 
     constructor(private http: HttpClient) {
-        this.header = new HttpHeaders();
-        this.header.set("email", "brunocaputo@gec.inatel.br");
-        this.header.set("password", "123456");
+        this.header = new HttpHeaders()
+            .set("Authorization", "Basic " + btoa("heitortoledo@gec.inatel.br:bunda"))
+            .set("Content-Type", "application/x-www-form-urlencoded");
     }
 
     getProject(id: any): Promise<any> {
@@ -26,7 +26,7 @@ export class SendService {
 
     postCode(ast: Output): Promise<any> {
         return this.http
-            .post<any>(this.postUrl, ast, { headers: this.header })
+            .post<any>(this.postUrl, ast, { headers: this.header, withCredentials: true })
             .toPromise();
     }
 }
