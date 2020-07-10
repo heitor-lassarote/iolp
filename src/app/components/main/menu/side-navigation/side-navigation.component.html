@@ -6,6 +6,29 @@
                 <div class="dropdown profile-element">
                     <!-- <img alt="image" class="logo"
                         src="assets/img/logo-flash.png"/> -->
+                    <a data-toggle="dropdown" class="dropdown-toggle" href="#">
+                        <span class="block m-t-xs font-bold text-overflow-ellipsis">
+                            {{username}} <b class="caret"></b>
+                        </span>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a (click)="logout()">
+                                    <i class="fa fa-user"></i>
+                                    Detalhes da conta
+                                </a>
+                                <a (click)="logout()">
+                                    <i class="fa fa-sign-out"></i>
+                                    Sair
+                                </a>
+                            </li>
+                        </ul>
+                    </a>
+                    <div class="text-center m-t-md">
+                        <button type="button" class="btn btn-default" data-toggle="modal" data-target="#exampleModalCenter">
+                            Detalhes do projeto
+                        </button>
+                    </div>
+                    
                 </div>
                 <div class="logo-element">LC</div>
             </li>
@@ -27,3 +50,71 @@
         </ul>
     </div>
 </nav>
+
+<div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="exampleModalCenterTitle">Detalhes do projeto</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form [formGroup]="projectDetailForm">
+                    <div id="project-detail-tabs">
+                        <ul class="nav">
+                            <li>
+                                <a class="nav-link" href="#tab-1">
+                                    Geral
+                                </a>
+                            </li>
+                            <li>
+                                <a class="nav-link" href="#tab-2">
+                                    Tab 2
+                                </a>
+                            </li>
+                            <li>
+                                <a class="nav-link" href="#tab-3">
+                                    Tab 3
+                                </a>
+                            </li>
+                            <li>
+                                <a class="nav-link" href="#tab-4">
+                                    Tab 4
+                                </a>
+                            </li>
+                        </ul>
+                        <div class="tab-content">
+                            <div id="tab-1" class="tab-pane" role="tabpanel">
+                                <div class="col-md-12">
+                                    <div class="row">
+                                        <div class="col-lg-3 col-md-4 m-b-xs m-auto">
+                                            Nome:
+                                        </div>
+                                        <div class="col-lg-9 col-md-8 m-b-xs">
+                                            <input type="text" class="form-control"
+                                                formControlName="project_name">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-2" class="tab-pane" role="tabpanel">
+                                Tab content
+                            </div>
+                            <div id="tab-3" class="tab-pane" role="tabpanel">
+                                Tab content
+                            </div>
+                            <div id="tab-4" class="tab-pane" role="tabpanel">
+                                Tab content
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

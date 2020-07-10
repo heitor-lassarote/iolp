@@ -66,13 +66,13 @@ export class CompInfosComponent implements OnInit {
 
     initTabs() {
         $("#smarttab").smartTab({
-            selected: 0, // Initial selected tab, 0 = first tab
-            theme: "bstabs", // theme for the tab, related css need to include for other than default theme
-            orientation: "horizontal", // Nav menu orientation. horizontal/vertical
-            enableURLhash: false, // Enable selection of the tab based on url hash
+            selected: 0,
+            theme: "brick",
+            orientation: "horizontal",
+            enableURLhash: false,
             transition: {
-                animation: "slide-horizontal", // Effect on navigation, none/fade/slide-horizontal/slide-vertical/slide-swing
-                speed: "400", // Transion animation speed
+                animation: "slide-horizontal",
+                speed: "400",
             },
             keyboardSettings: {
                 keyNavigation: false,

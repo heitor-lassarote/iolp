@@ -14,7 +14,7 @@
         </ul>
 
         <div class="tab-content">
-            <div id="tab-1" class="tab-pane" role="tabpanel">
+            <div id="tab-1" class="tab-pane col-md-12" role="tabpanel">
                 <h3>Tipo: {{infosForm.get("type").value}}</h3>
                 <div class="col-12">
                     <div class="row m-b-sm">
@@ -35,30 +35,38 @@
                     </div>
                 </div>
             </div>
-            <div id="tab-2" class="tab-pane" role="tabpanel">
+            <div id="tab-2" class="tab-pane col-md-12" role="tabpanel">
                 <div class="col-12">
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
                             <h5>Altura:</h5>
                         </div>
-                        <div class="col-7">
+                        <div class="col-5 size-input">
                             <input type="number" class="form-control" formControlName="height"
                                 min="1"/>
                         </div>
-                        <div class="col-2 m-auto">
-                            <h5>px</h5>
+                        <div class="col-4">
+                            <select id="css-unity-h" class="form-control">
+                                <option value="px">px</option>
+                                <option value="pct">%</option>
+                                <option value="rem">rem</option>
+                            </select>
                         </div>
                     </div>
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
                             <h5>Largura:</h5>
                         </div>
-                        <div class="col-7">
+                        <div class="col-5 size-input">
                             <input type="number" class="form-control" formControlName="width"
                                 min="1"/>
                         </div>
-                        <div class="col-2 m-auto">
-                            <h5>px</h5>
+                        <div class="col-4">
+                            <select id="css-unity-w" class="form-control">
+                                <option value="px">px</option>
+                                <option value="pct">%</option>
+                                <option value="rem">rem</option>
+                            </select>
                         </div>
                     </div>
                     <h4 class="m-b-sm">Centralização</h4>
