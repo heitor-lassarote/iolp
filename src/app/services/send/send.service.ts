@@ -14,7 +14,7 @@ export class SendService {
     constructor(private http: HttpClient) {
         this.header = new HttpHeaders()
             .set("Authorization", "Basic " + btoa("heitortoledo@gec.inatel.br:bunda"))
-            .set("Content-Type", "application/x-www-form-urlencoded");
+            .set("Content-Type", "application/json");
     }
 
     getProject(id: any): Promise<any> {
