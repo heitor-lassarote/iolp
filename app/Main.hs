@@ -19,8 +19,8 @@ import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Cors
     ( CorsResourcePolicy (..)
     , cors
-    , simpleCorsResourcePolicy
     , simpleCors
+    , simpleCorsResourcePolicy
     )
 import Network.Wai.Middleware.RequestLogger
     ( Destination (Logger)

@@ -61,7 +61,7 @@ parseServerConfig = ServerConfig
         <> short 'i'
         <> help "Get the IP address from the header when logging. Useful when sitting behind a reverse proxy." )
     <*> switch
-        (  long "detailed-requst-logging"
+        (  long "detailed-request-logging"
         <> short 'l'
         <> help "Use detailed request logging system." )
     <*> option auto
