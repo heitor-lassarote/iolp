@@ -3,9 +3,7 @@
 module Language.JavaScript.Codegen
     ( JavaScriptCodegen
     , Options (..)
-    , defaultOptions
     , JSGeneratorState (..)
-    , defaultGeneratorState
     , withOptions
     , javaScriptCodegen
     ) where
@@ -14,6 +12,7 @@ import Universum
 
 import           Control.Monad.Trans.Except (throwE)
 import           Data.Aeson (FromJSON, ToJSON)
+import           Data.Default.Class
 import qualified Data.Set  as S
 
 import Language.Codegen
@@ -24,7 +23,13 @@ type JavaScriptCodegen = CodegenT JSGeneratorState
 
 instance Codegen AST where
     type GeneratorState AST = JSGeneratorState
+
     codegen = javaScriptCodegen
+
+instance Codegen Expression where
+    type GeneratorState Expression = JSGeneratorState
+
+    codegen = genExpression
 
 data Options = Options
     { bracesOnNewLine :: Bool
@@ -33,8 +38,8 @@ data Options = Options
     , strict          :: Bool
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
-defaultOptions :: Options
-defaultOptions = Options False False 4 True
+instance Default Options where
+    def = Options False False 4 True
 
 data JSGeneratorState = JSGeneratorState
     { currentIndentLevel :: Int
@@ -47,11 +52,11 @@ instance HasIndentation JSGeneratorState where
     getCurrentIndentation = currentIndentLevel
     setCurrentIndentation l st = st { currentIndentLevel = l }
 
-defaultGeneratorState :: JSGeneratorState
-defaultGeneratorState = JSGeneratorState 0 defaultOptions S.empty
+instance Default JSGeneratorState where
+    def = JSGeneratorState 0 def S.empty
 
 withOptions :: Options -> JSGeneratorState
-withOptions options' = defaultGeneratorState { options = options' }
+withOptions options' = def { options = options' }
 
 indentCompact :: (Emit gen) => JavaScriptCodegen gen
 indentCompact = do
@@ -59,15 +64,31 @@ indentCompact = do
     if compactCode' then emitM "" else indent
 
 genConstant
-    :: (Emit gen)
-    => JSType
+    :: (Emit gen, Monoid gen)
+    => Variable
     -> JavaScriptCodegen gen
 genConstant = \case
-    Array x -> emitM $ show x
-    Boolean x -> emitM $ show x
+    Array xs -> mconcat <$> sequence
+        [ emitM "["
+        , mconcat . fmap emit . intersperse ", " <$> traverse genExpression xs
+        , emitM "]"
+        ]
+    Boolean x -> emitM if x then "true" else "false"
     Number x -> emitM $ show x
-    Text x -> emitM x
+    Record fs -> mconcat <$> sequence
+        [ emitM "{"
+        , mconcat . fmap emit . intersperse ", " <$> traverse (uncurry codegenField) fs
+        , emitM "}"
+        ]
+    Text x -> pure $ emit "\"" <> emit x <> emit "\""
     Void -> lift $ throwE "Cannot print variable of type 'Void'."
+  where
+    codegenField fieldName expr = mconcat <$> sequence
+        [ emitM fieldName
+        , emitM ":"
+        , space
+        , codegen expr
+        ]
 
 nl :: (Emit gen) => JavaScriptCodegen gen
 nl = do
@@ -167,8 +188,8 @@ checkVariable name = do
         undefinedVariableError name
 
 genVariable
-    :: (Emit gen)
-    => ValueType JSType
+    :: (Emit gen, Monoid gen)
+    => ValueType Variable
     -> JavaScriptCodegen gen
 genVariable (Variable v) = checkVariable v *> emitIfValid v
 genVariable (Constant c) = genConstant c

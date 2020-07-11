@@ -2,15 +2,14 @@
 
 module Language.HTML.Codegen
     ( Options (..)
-    , defaultOptions
     , HTMLGeneratorState (..)
-    , defaultGeneratorState
     , withOptions
     ) where
 
 import Universum
 
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Default.Class
 
 import Language.Codegen
 import Language.Emit
@@ -22,13 +21,17 @@ instance Codegen AST where
     type GeneratorState AST = HTMLGeneratorState
     codegen = htmlCodegen
 
+instance Codegen [AST] where
+    type GeneratorState [AST] = HTMLGeneratorState
+    codegen = fmap mconcat . traverse htmlCodegen
+
 data Options = Options
     { compactCode     :: Bool
     , indentLevel     :: Int
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
-defaultOptions :: Options
-defaultOptions = Options False 2
+instance Default Options where
+    def = Options False 2
 
 data HTMLGeneratorState = HTMLGeneratorState
     { currentIndentLevel :: Int
@@ -40,11 +43,11 @@ instance HasIndentation HTMLGeneratorState where
     getCurrentIndentation = currentIndentLevel
     setCurrentIndentation l st = st { currentIndentLevel = l }
 
-defaultGeneratorState :: HTMLGeneratorState
-defaultGeneratorState = HTMLGeneratorState 0 defaultOptions
+instance Default HTMLGeneratorState where
+    def = HTMLGeneratorState 0 def
 
 withOptions :: Options -> HTMLGeneratorState
-withOptions options' = defaultGeneratorState { options = options' }
+withOptions options' = def { options = options' }
 
 genAttributes :: (Emit gen, Monoid gen) => Attributes -> HTMLCodegen gen
 genAttributes = \case
@@ -91,7 +94,7 @@ htmlCodegen = \case
             , emit "</"
             , emit name
             , emit ">"
-            , emit if null asts then "" else "\n"
+            , emit "\n"
             ]
     Text str -> do
         indent' <- indent

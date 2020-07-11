@@ -53,11 +53,12 @@ instance LanguageConverter L.Expression JS.Expression where
         L.UnaryOp op expr -> JS.UnaryOp op (convert expr)
         L.Value variable -> JS.Value (convert <$> variable)
 
-instance LanguageConverter L.Variable JS.JSType where
-    convert (L.Array   a) = JS.Array (convert <$> a)
-    convert (L.Bool    b) = JS.Boolean b
-    convert (L.Char    c) = JS.Text $! Text.singleton c
-    convert (L.Double  d) = JS.Number d
+instance LanguageConverter L.Variable JS.Variable where
+    convert (L.Array a) = JS.Array (convert <$> a)
+    convert (L.Bool b) = JS.Boolean b
+    convert (L.Char c) = JS.Text $! Text.singleton c
+    convert (L.Double d) = JS.Number d
     convert (L.Integer i) = JS.Number $! fromInteger i
-    convert (L.Text    t) = JS.Text t
-    convert (L.Unit     ) = JS.Void
+    convert (L.Record _ fs) = JS.Record (second convert <$> fs)
+    convert (L.Text t) = JS.Text t
+    convert L.Unit = JS.Void

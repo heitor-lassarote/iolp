@@ -20,6 +20,7 @@ import qualified Universum.Unsafe as Unsafe
 
 import           Data.Aeson hiding (Array, Bool)
 import           Data.Char (isAlphaNum, isPunctuation, isSymbol)
+import           Data.Default.Class
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import           Text.Megaparsec
@@ -33,6 +34,9 @@ import           Language.Emit
 newtype Environment = Environment
     { externs :: Map Name VariableType
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
+
+instance Default Environment where
+    def = Environment Map.empty
 
 newtype Metadata = Metadata
     { position :: Double2
@@ -174,7 +178,9 @@ instance Codegen Expression where
     codegen = \case
         BinaryOp left symbol' right -> mconcat <$> sequence
             [ codegen left
-            , emitM $ " " <> binaryToText symbol' <> " "
+            , emitM " "
+            , emitM (binaryToText symbol')
+            , emitM " "
             , codegen right
             ]
         Call expr exprs -> mconcat <$> sequence
@@ -192,16 +198,36 @@ instance Codegen Expression where
             [ emitM $ unaryToText symbol'
             , codegen expression
             ]
-        Value value' -> pure case value' of
-            Variable variable' -> emit variable'
+        Value value' -> case value' of
+            Variable variable' -> emitM variable'
             Constant constant' -> case constant' of
-                Array a -> emit $ show a
-                Bool b -> emit $ show b
-                Char c -> emit "'" <> emit (Text.singleton c) <> emit "'"
-                Double d -> emit $ show d
-                Integer i -> emit $ show i
-                Text t -> emit "\"" <> emit t <> emit "\""
-                Unit -> emit "()"
+                Array a -> codegenArray a
+                Bool b -> emitM if b then "true" else "false"
+                Char c -> pure $ emit "'" <> emit (Text.singleton c) <> emit "'"
+                Double d -> emitM $ show d
+                Integer i -> emitM $ show i
+                Record r fs -> codegenRecord r fs
+                Text t -> pure $ emit "\"" <> emit t <> emit "\""
+                Unit -> emitM "()"
+      where
+        codegenArray exprs = mconcat <$> sequence
+            [ emitM "["
+            , mconcat . fmap emit . intersperse ", " <$> traverse codegen exprs
+            , emitM "]"
+            ]
+
+        codegenField fieldName expr = mconcat <$> sequence
+            [ emitM fieldName
+            , emitM " = "
+            , codegen expr
+            ]
+
+        codegenRecord recordName fields = mconcat <$> sequence
+            [ emitM recordName
+            , emitM " { "
+            , mconcat . fmap emit . intersperse ", " <$> traverse (uncurry codegenField) fields
+            , emitM " }"
+            ]
 
 -- TODO: Add let ... in ... so that we can declare variables and functions?
 data Variable
@@ -210,6 +236,7 @@ data Variable
     | Char Char
     | Double Double
     | Integer Integer
+    | Record Name [(Name, Expression)]
     | Text Text
     | Unit
     deriving (Eq, Show)
@@ -220,6 +247,8 @@ instance FromJSON Variable where
         -- TODO: Should unit be encoded as ()?
         if tag == "unit"
         then pure Unit
+        else if tag == "record"
+        then Record <$> o .: "name" <*> o .: "fields"
         else do
             value' <- o .: "value"
             case tag of
@@ -231,7 +260,7 @@ instance FromJSON Variable where
                 "text"    -> Text    <$> parseJSON value'
                 other     -> fail $
                                "Expected 'array', 'bool', 'char', 'double', 'function', 'integer'"
-                               <> ", 'polymorphic', 'text' or 'unit', but got '" <> other <> "'."
+                               <> ", 'record', 'text' or 'unit', but got '" <> other <> "'."
 
 instance ToJSON Variable where
     toJSON (Array a) = object
@@ -254,6 +283,11 @@ instance ToJSON Variable where
         [ "type"  .= String "integer"
         , "value" .= i
         ]
+    toJSON (Record recordName fields) = object
+        [ "type"   .= String "field"
+        , "name"   .= String recordName
+        , "fields" .= toJSON fields
+        ]
     toJSON (Text t) = object
         [ "type"  .= String "text"
         , "value" .= t
@@ -269,6 +303,7 @@ data VariableType
     | DoubleType
     | FunctionType [VariableType] VariableType
     | IntegerType
+    | RecordType [VariableType]
     | TextType
     | UnitType
     deriving (Eq, Ord, Show)
@@ -296,12 +331,15 @@ instance ToJSON VariableType where
     toJSON CharType    = object [ "type" .= String "char"    ]
     toJSON DoubleType  = object [ "type" .= String "double"  ]
     toJSON (FunctionType arguments return') = object
-        -- TODO: Should it have a type such as (Int -> Bool) -> [Int] -> Bool?
         [ "type"      .= String "function"
         , "arguments" .= arguments
         , "return"    .= return'
         ]
     toJSON IntegerType = object [ "type" .= String "integer" ]
+    toJSON (RecordType fieldsType) = object
+        [ "type"   .= String "record"
+        , "fields" .= fieldsType
+        ]
     toJSON TextType    = object [ "type" .= String "text"    ]
     toJSON UnitType    = object [ "type" .= String "unit"    ]
 
@@ -371,14 +409,14 @@ expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
 nonBinary :: Parser Expression
 nonBinary = do
     space
-    lhs <- choice [unary, parenthesis, value]
+    lhs <- choice [value, unary, parenthesis]
     exprs <- many $
         try (space *> between (char '(') (space *> char ')') (expression0 `sepBy` char ','))
     space
     pure $ foldl' Call lhs exprs
 
 array :: Parser [Expression]
-array = between (char '[') (space *> char ']') (expression0 `sepBy` char ',')
+array = between (char '[') (space *> char ']') (expression0 `sepEndBy` char ',')
 
 unary :: Parser Expression
 unary = liftA2 UnaryOp unaryOperator nonBinary
@@ -396,8 +434,13 @@ constant = Value . Constant <$> choice
     , Char    <$> char''
     , Double  <$> try Lexer.float
     , Integer <$> integer
+    , record' <$> try record
     , Text    <$> text
+    , unit'   <$> unit
     ]
+  where
+    record' = uncurry Record
+    unit' = const Unit
 
 variable :: Parser Expression
 variable = Value . Variable <$> variableName
@@ -428,6 +471,25 @@ variableName = do
     tail' <- takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
     pure $ Text.cons head' tail'
 
+record :: Parser (Name, [(Name, Expression)])
+record = do
+    recordName <- variableName
+    space
+    fields <- between (char '{') (char '}') $ flip sepBy (char ',') do
+        space
+        fieldName <- variableName
+        space
+        void $ char '='
+        space
+        expr <- expression0
+        space
+        pure (fieldName, expr)
+    space
+    pure (recordName, fields)
+
+unit :: Parser ()
+unit = void $ string "()"
+
 errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorUnaryNotFound symbol' = "Undefined unary operator '" <> symbol' <> "'."
 
@@ -438,7 +500,7 @@ isOperatorSymbol :: Char -> Bool
 isOperatorSymbol c = (c `notElem` forbidden) && (isPunctuation c || isSymbol c)
   where
     forbidden :: String
-    forbidden = ",()[]"
+    forbidden = ",()[]{}"
 
 unaryOperator :: Parser UnarySymbol
 unaryOperator = do

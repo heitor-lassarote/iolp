@@ -5,7 +5,6 @@ module Language.LowCode.Logic.Analyzer
     , prettyWarning
     , AnalyzerState (..)
     , LogicAnalyzer
-    , emptyState
     , evalAnalyzer
     , execAnalyzer
     , analyzeMany
@@ -20,6 +19,7 @@ module Language.LowCode.Logic.Analyzer
 
 import Universum
 
+import           Data.Default.Class
 import qualified Data.Map.Strict as Map
 
 import           Language.Common
@@ -29,7 +29,8 @@ import           Language.LowCode.Logic.AST
 -- Or even better: Should TypeMismatch instead have info about the node instead
 -- of simply a Text?
 data Error
-    = IncompatibleSignatures Name Int Int
+    = DuplicateRecord Name Name
+    | IncompatibleSignatures Name Int Int
     | IncompatibleTypes1 UnarySymbol Expression
     | IncompatibleTypes2 Expression BinarySymbol Expression
     | NotAFunction Name
@@ -42,6 +43,8 @@ data Error
 
 prettyError :: Error -> Text
 prettyError = \case
+    DuplicateRecord recordName fieldName ->
+        "Duplicate field '" <> fieldName <> "' on record '" <> recordName <> "'."
     IncompatibleSignatures name args1 args2 ->
         "'" <> name <> "' expects " <> show args1 <> " arguments, but " <> show args2 <> " were given."
     IncompatibleTypes1 symbol expr ->
@@ -90,8 +93,8 @@ data AnalyzerState = AnalyzerState
 
 type LogicAnalyzer = State AnalyzerState
 
-emptyState :: AnalyzerState
-emptyState = AnalyzerState Map.empty [] []
+instance Default AnalyzerState where
+    def = AnalyzerState Map.empty [] []
 
 evalAnalyzer :: AnalyzerState -> LogicAnalyzer a -> a
 evalAnalyzer st = runIdentity . flip evalStateT st
@@ -119,26 +122,6 @@ addError e = modify \st -> st { errors = e : errors st }
 
 --addWarning :: Warning -> LogicAnalyzer ()
 --addWarning w = modify \st -> st { warnings = w : warnings st }
-
---tryMapVariable :: (VariableInfo -> VariableInfo) -> Text -> LogicAnalyzer ()
---tryMapVariable f var = do
---    symbols <- gets analyzerSymbols
---    newSymbols <- Map.alterF
---        (\case
---            Nothing -> do
---                addError $ UndefinedVariable var
---                pure Nothing
---            Just val ->
---                pure $ Just $ f val)
---        var
---        symbols
---    modify \st -> st { analyzerSymbols = newSymbols }
-
---variableCheck :: Text -> LogicAnalyzer ()
---variableCheck = tryMapVariable id
-
---markUsed :: Text -> LogicAnalyzer ()
---markUsed = tryMapVariable (\info -> info { unused = False })
 
 analyzeAssign :: Text -> Expression -> LogicAnalyzer ()
 analyzeAssign var expr = do
@@ -186,6 +169,17 @@ checkApply arguments (FunctionType argTypes ret) = do
     traverse_ (uncurry (analyzeExprTypes "function")) $ zip argTypes arguments
     pure $ Just ret
 checkApply _ _ = addError (NotAFunction "not function lol") *> pure Nothing
+
+analyzeRecord :: Name -> [(Name, Expression)] -> LogicAnalyzer [Maybe VariableType]
+analyzeRecord rName fields = do
+    -- Find whether there are fields with duplicate names.
+    -- TODO: Add types to error?
+    let sorted = sort $ map fst fields
+        dups = filter (uncurry (==)) $ zip sorted (drop 1 sorted)
+    traverse_ (warnDuplicate . fst) dups
+    traverse (analyzeExpr . snd) fields
+  where
+    warnDuplicate = addError . DuplicateRecord rName
 
 collectSymbols :: Environment -> [AST] -> Map Name VariableInfo
 collectSymbols env = foldr mkSymbol externsInfo
@@ -304,13 +298,14 @@ analyzeArray (x : xs) = do
 
 vtType :: Variable -> LogicAnalyzer (Maybe VariableType)
 vtType = \case
-    Array es  -> ArrayType <<$>> analyzeArray es
-    Bool _    -> pure $ Just BoolType
-    Char _    -> pure $ Just CharType
-    Double _  -> pure $ Just DoubleType
-    Integer _ -> pure $ Just IntegerType
-    Text _    -> pure $ Just TextType
-    Unit      -> pure $ Just UnitType
+    Array es    -> ArrayType <<$>> analyzeArray es
+    Bool _      -> pure $ Just BoolType
+    Char _      -> pure $ Just CharType
+    Double _    -> pure $ Just DoubleType
+    Integer _   -> pure $ Just IntegerType
+    Record r fs -> fmap RecordType . sequence <$> analyzeRecord r fs
+    Text _      -> pure $ Just TextType
+    Unit        -> pure $ Just UnitType
 
 isNumeric :: VariableType -> Bool
 isNumeric = \case

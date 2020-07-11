@@ -2,15 +2,14 @@
 
 module Language.CSS.Codegen
     ( Options (..)
-    , defaultOptions
     , CSSGeneratorState (..)
-    , defaultGeneratorState
     , withOptions
     ) where
 
 import Universum
 
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Default.Class
 
 import Language.Codegen
 import Language.CSS.AST
@@ -27,19 +26,19 @@ data Options = Options
     { indentLevel :: Int
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
-defaultOptions :: Options
-defaultOptions = Options 4
+instance Default Options where
+    def = Options 4
 
 data CSSGeneratorState = CSSGeneratorState
     { currentIndentLevel :: Int
     , options :: Options
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
-defaultGeneratorState :: CSSGeneratorState
-defaultGeneratorState = CSSGeneratorState 0 defaultOptions
+instance Default CSSGeneratorState where
+    def = CSSGeneratorState 0 def
 
 withOptions :: Options -> CSSGeneratorState
-withOptions options' = defaultGeneratorState { options = options' }
+withOptions options' = def { options = options' }
 
 instance HasIndentation CSSGeneratorState where
     getIndentation = indentLevel . options

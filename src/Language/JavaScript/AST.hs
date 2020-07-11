@@ -1,6 +1,6 @@
 module Language.JavaScript.AST
     ( module Language.Common
-    , JSType (..)
+    , Variable (..)
     , AST (..)
     , Expression (..)
     , binarySymbolToText
@@ -17,10 +17,11 @@ import qualified Data.Text as T
 
 import Language.Common
 
-data JSType
+data Variable
     = Array    [Expression]
     | Boolean !Bool
     | Number  !Double
+    | Record   [(Name, Expression)]
     | Text     Text
     | Void
     deriving (Eq, Show)
@@ -43,7 +44,7 @@ data Expression
     | BinaryOp Expression !BinarySymbol Expression
     | Parenthesis Expression
     | UnaryOp !UnarySymbol Expression
-    | Value (ValueType JSType)
+    | Value (ValueType Variable)
     deriving (Eq, Show)
 
 -- Reference:
