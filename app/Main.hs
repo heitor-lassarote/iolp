@@ -16,12 +16,14 @@ import Network.Wai.Handler.Warp
     , setOnException
     , setPort
     )
-import Network.Wai.Middleware.Cors
-    ( CorsResourcePolicy (..)
-    , cors
-    , simpleCors
-    , simpleCorsResourcePolicy
-    )
+--import Network.Wai.Middleware.Cors
+--    ( CorsResourcePolicy (..)
+--    , cors
+--    , simpleCors
+--    , simpleCorsResourcePolicy
+--    , simpleHeaders
+--    , simpleMethods
+--    )
 import Network.Wai.Middleware.RequestLogger
     ( Destination (Logger)
     , IPAddrSource (..)
@@ -40,20 +42,22 @@ import Config
 import Database
 import Foundation
 
-allowCors :: Middleware
-allowCors = cors (const $ Just appCorsResourcePolicy)
-
-appCorsResourcePolicy :: CorsResourcePolicy
-appCorsResourcePolicy =
-    simpleCorsResourcePolicy
-        { corsMethods = ["OPTIONS", "GET", "PUT", "POST"]
-        , corsRequestHeaders = ["Authorization", "Content-Type"]
-        }
+--allowCors :: Middleware
+--allowCors = cors (const $ Just appCorsResourcePolicy)
+--
+--appCorsResourcePolicy :: CorsResourcePolicy
+--appCorsResourcePolicy =
+--    simpleCorsResourcePolicy
+--        { corsMethods = ["OPTIONS"] <> simpleMethods
+--        , corsOrigins = Just (["http://localhost:4200", "127.0.0.1:4200"], True)
+--        , corsRequestHeaders = ["Authorization", "Content-Type"] <> simpleHeaders
+--        , corsRequireOrigin = True
+--        }
 
 mkFoundation :: ServerConfig -> ConnectionPool -> IO LowCode
 mkFoundation serverConfig pool = do
     runSqlPool (runMigration migrateAll) pool
-    appLogger <- newStdoutLoggerSet defaultBufSize >>= makeYesodLogger
+    appLogger <- makeYesodLogger =<< newStdoutLoggerSet defaultBufSize
     pure $ LowCode appLogger pool serverConfig
 
 mkApplication :: LowCode -> IO Application
@@ -61,7 +65,7 @@ mkApplication foundation = do
     logWare <- makeLogWare foundation
     -- Create the WAI application and apply middlewares
     appPlain <- toWaiAppPlain foundation
-    pure $ logWare $ defaultMiddlewaresNoLogging $ simpleCors appPlain
+    pure $ logWare $ defaultMiddlewaresNoLogging $ appPlain
 
 makeLogWare :: LowCode -> IO Middleware
 makeLogWare foundation =
