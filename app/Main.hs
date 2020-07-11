@@ -7,7 +7,7 @@ import Data.Default.Class
 import Database.Persist.Postgresql (ConnectionPool, withPostgresqlPool)
 import Database.Persist.Sql (runMigration, runSqlPool)
 import Language.Haskell.TH.Syntax (qLocation)
-import Network.Wai (Middleware)
+import Network.Wai (Middleware, requestHeaders)
 import Network.Wai.Handler.Warp
     ( Settings
     , defaultSettings
@@ -16,14 +16,13 @@ import Network.Wai.Handler.Warp
     , setOnException
     , setPort
     )
---import Network.Wai.Middleware.Cors
---    ( CorsResourcePolicy (..)
---    , cors
---    , simpleCors
---    , simpleCorsResourcePolicy
---    , simpleHeaders
---    , simpleMethods
---    )
+import Network.Wai.Middleware.Cors
+    ( CorsResourcePolicy (..)
+    , cors
+    , simpleHeaders
+    , simpleMethods
+    , simpleResponseHeaders
+    )
 import Network.Wai.Middleware.RequestLogger
     ( Destination (Logger)
     , IPAddrSource (..)
@@ -42,17 +41,24 @@ import Config
 import Database
 import Foundation
 
---allowCors :: Middleware
---allowCors = cors (const $ Just appCorsResourcePolicy)
---
---appCorsResourcePolicy :: CorsResourcePolicy
---appCorsResourcePolicy =
---    simpleCorsResourcePolicy
---        { corsMethods = ["OPTIONS"] <> simpleMethods
---        , corsOrigins = Just (["http://localhost:4200", "127.0.0.1:4200"], True)
---        , corsRequestHeaders = ["Authorization", "Content-Type"] <> simpleHeaders
---        , corsRequireOrigin = True
---        }
+allowCors :: Middleware
+allowCors = cors withAnyOrigin
+  where
+    origin = fmap (bimap pure (const True) . swap) . find ((== "Origin") . fst) . requestHeaders
+
+    withAnyOrigin req = Just appCorsResourcePolicy { corsOrigins = origin req }
+
+appCorsResourcePolicy :: CorsResourcePolicy
+appCorsResourcePolicy = CorsResourcePolicy
+    { corsExposedHeaders = Just simpleResponseHeaders
+    , corsIgnoreFailures = True
+    , corsMaxAge = Just 60
+    , corsMethods = "OPTIONS" : simpleMethods
+    , corsOrigins = Nothing
+    , corsRequestHeaders = "Authorization" : "Content-Type" : simpleHeaders
+    , corsRequireOrigin = True
+    , corsVaryOrigin = True
+    }
 
 mkFoundation :: ServerConfig -> ConnectionPool -> IO LowCode
 mkFoundation serverConfig pool = do
@@ -65,7 +71,7 @@ mkApplication foundation = do
     logWare <- makeLogWare foundation
     -- Create the WAI application and apply middlewares
     appPlain <- toWaiAppPlain foundation
-    pure $ logWare $ defaultMiddlewaresNoLogging $ appPlain
+    pure $ logWare $ defaultMiddlewaresNoLogging $ allowCors appPlain
 
 makeLogWare :: LowCode -> IO Middleware
 makeLogWare foundation =

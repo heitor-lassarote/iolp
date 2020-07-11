@@ -9,7 +9,6 @@ import           Data.Aeson
 import           Database.Esqueleto hiding (Value)
 import qualified Database.Persist                 as P
 import           Network.HTTP.Types.Status
-import           Network.Wai (requestHeaders)
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath
 import qualified System.IO.Temp as Temp
@@ -35,10 +34,10 @@ instance YesodPersist LowCode where
     runDB action = runSqlPool action =<< getsYesod connectionPool
 
 mkYesod "LowCode" [parseRoutes|
-/editor                  EditorR  OPTIONS POST
-/editor/#ProjectId       ProjectR GET OPTIONS PUT DELETE
-/editor/#ProjectId/build BuildR   OPTIONS GET
-/user                    UserR    OPTIONS GET POST
+/editor                  EditorR  POST
+/editor/#ProjectId       ProjectR GET PUT DELETE
+/editor/#ProjectId/build BuildR   GET
+/user                    UserR    GET POST
 |]
 
 data EditorPOST = EditorPOST
@@ -92,28 +91,8 @@ authenticate = maybe notAuthenticated validate' =<< lookupBasicAuth
         then pure $ entityKey user
         else notFound  -- We don't return permission denied to not leak available emails.
 
-addCorsHeaders :: Handler ()
-addCorsHeaders = do
-    req <- waiRequest
-    let origin = requestHeaders req
-                    & find ((== "Access-Control-Allow-Origin") . fst)
-                    & fmap (decodeUtf8 . snd)
-                    & fromMaybe "http://localhost:4200"
-    addHeader "Access-Control-Allow-Origin" origin
-    addHeader "Access-Control-Allow-Headers" "Content-Type, Authorization"
-    addHeader "Access-Control-Allow-Credentials" "true"
-
-emptyOptions :: Handler ()
-emptyOptions = do
-    addCorsHeaders
-    sendResponse ("" :: Text)
-
-optionsEditorR :: Handler ()
-optionsEditorR = emptyOptions
-
 postEditorR :: Handler Value
 postEditorR = do
-    addCorsHeaders
     userId <- authenticate
     post <- requireCheckJsonBody :: Handler EditorPOST
     let project = Project (toJSON $ editorPOSTAst post) (editorPOSTName post) userId
@@ -121,16 +100,11 @@ postEditorR = do
 
 getProjectR :: ProjectId -> Handler Value
 getProjectR pid = do
-    addCorsHeaders
     void authenticate
     runDB (toJSON . projectAst <$> get404 pid)
 
-optionsProjectR :: ProjectId -> Handler ()
-optionsProjectR _ = emptyOptions
-
 putProjectR :: ProjectId -> Handler ()
 putProjectR pid = do
-    addCorsHeaders
     userId <- authenticate
     post <- requireCheckJsonBody :: Handler EditorPOST
     let project = Project (toJSON $ editorPOSTAst post) (editorPOSTName post) userId
@@ -139,7 +113,6 @@ putProjectR pid = do
 
 deleteProjectR :: ProjectId -> Handler ()
 deleteProjectR pid = do
-    addCorsHeaders
     userId <- authenticate
     runDB $ delete $ from \project ->
         where_ (project ^. ProjectUserId ==. val userId &&. project ^. ProjectId ==. val pid)
@@ -147,7 +120,6 @@ deleteProjectR pid = do
 
 getBuildR :: ProjectId -> Handler Value
 getBuildR pid = do
-    addCorsHeaders
     void authenticate
     project <- runDB $ get404 pid
     let bundle = fromJSON $ projectAst project :: Result BundleCssHtmlLogic
@@ -171,12 +143,8 @@ getBuildR pid = do
         Zip.createArchive file (traverse_ (uncurry (Zip.addEntry Zip.Store)) entries)
         sendFile "application/zip" file
 
-optionsBuildR :: ProjectId -> Handler ()
-optionsBuildR _ = emptyOptions
-
 getUserR :: Handler Value
 getUserR = do
-    addCorsHeaders
     userId <- authenticate
     projects <- runDB $ select $ from \project -> do
         where_ (project ^. ProjectUserId ==. val userId)
@@ -188,14 +156,8 @@ getUserR = do
             Project _ name _ = entityVal project
          in ProjectGET projectKey name
 
-optionsUserR :: Handler ()
-optionsUserR = emptyOptions
-
 postUserR :: Handler Value
 postUserR = do
-    addHeader "Access-Control-Allow-Origin" "*"
-    addHeader "Access-Control-Allow-Headers" "Content-Type"
-
     userPOST <- requireCheckJsonBody :: Handler UserPOST
     pwd <- liftIO $ hashPassword 13 (encodeUtf8 $ userPOSTPassword userPOST :: ByteString)
     let user = User (userPOSTEmail userPOST) pwd
