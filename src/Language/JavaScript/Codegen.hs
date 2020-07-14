@@ -200,12 +200,10 @@ genExpression
     -> JavaScriptCodegen gen
 genExpression = \case
     Call expr args -> mconcat <$> sequence
-        [ indentCompact
-        , genExpression expr
+        [ genExpression expr
         , emitM "("
         , fmap (mconcat . fmap emit . intersperse ", ") $ traverse genExpression args
-        , emitM ");"
-        , nl
+        , emitM ")"
         ]
     BinaryOp left op right -> mconcat <$> sequence
         [ genExpression left
@@ -240,8 +238,17 @@ javaScriptCodegenInternal
 javaScriptCodegenInternal = \case
     Assign name expression -> genAssignmentOrDeclaration True name expression
     Block asts -> genBlock asts
-    Expression expression -> genExpression expression
-    Function name args inner -> genFunction name args inner
+    Expression expression -> mconcat <$> sequence
+        [ indentCompact
+        , genExpression expression
+        , emitM ";"
+        , nl
+        ]
+    Function nameMaybe args inner -> do
+        whenJust nameMaybe \name ->
+            modify \st -> st { symbols = S.insert name (symbols st) }
+        modify \st -> st { symbols = S.union (symbols st) $ S.fromList args }
+        genFunction nameMaybe args inner
     If expression t f -> do
         indent' <- indentCompact
         space' <- space
@@ -267,12 +274,14 @@ javaScriptCodegenInternal = \case
     Return Nothing -> mconcat <$> sequence
         [ indentCompact
         , emitM "return;"
+        , nl
         ]
     Return (Just expression) -> mconcat <$> sequence
         [ indentCompact
         , emitM "return "
         , genExpression expression
         , emitM ";"
+        , nl
         ]
     Var name expression -> do
         modify \st -> st { symbols = S.insert name (symbols st) }
