@@ -1,4 +1,12 @@
-import { Output, Page, HtmlTagOut, CssOut } from "./../../domain/output";
+import { element } from "protractor";
+import {
+    Output,
+    Page,
+    HtmlTagOut,
+    CssOut,
+    HtmlOut,
+    HtmlTextOut,
+} from "./../../domain/output";
 import { Info } from "./../../domain/info";
 import { Element } from "src/app/components/domain/element";
 import { Component, OnInit } from "@angular/core";
@@ -22,6 +30,7 @@ export class CanvasComponent implements OnInit {
     public style: object = {};
     componentQtt: number = 1;
     elements: Element[] = [];
+    cssObject: CssOut[] = [];
 
     constructor(
         private spawnService: SpawnComponentService,
@@ -65,9 +74,12 @@ export class CanvasComponent implements OnInit {
         let comp: string = `#${targ.id}`;
         let infos: Info = {
             html: {
-                name: $(comp).prop("id"),
-                type: $(comp).prop("tagName").toLowerCase(),
-                text: $(comp).text(),
+                name: $(comp).prop("id") !== null ? $(comp).prop("id") : "",
+                type:
+                    $(comp).prop("tagName") !== null
+                        ? $(comp).prop("tagName").toLowerCase()
+                        : "",
+                text: $(comp).text() !== null ? $(comp).text() : "",
             },
             css: {
                 width: parseFloat(
@@ -85,7 +97,119 @@ export class CanvasComponent implements OnInit {
         this.showInfosService.setComponentInfos(infos);
     }
 
-    apply() {
+    createComponent(
+        element: HTMLElement,
+        htmlObject: HtmlTagOut,
+        isChild: boolean
+    ): HtmlTagOut {
+        let childNodes = element.childNodes;
+        htmlObject.tag = element.tagName.toLowerCase();
+        const canvasPosition = $("#canvas").offset();
+        for (let i = 0; i < element.attributes.length; i++) {
+            let nodeName: string = element.attributes[i].nodeName;
+            let value: string = element.attributes[i].value;
+            switch (nodeName) {
+                case "id":
+                    htmlObject.attributes.push(["id", value]);
+                    break;
+                case "class":
+                    let classArray = value.split(" ");
+                    classArray = classArray.filter((value) => {
+                        return !(
+                            value.includes("drag") || value.includes("ng")
+                        );
+                    });
+                    let classString: string = classArray.join(" ");
+                    htmlObject.attributes.push(["class", classString]);
+                    break;
+                case "style":
+                    let css: CssOut = {
+                        className: `#${element.id.trim()}`,
+                        attributes: [],
+                    };
+                    if (!isChild) {
+                        let elementPosition = $(`#${element.id}`).offset();
+                        let top = elementPosition.top - canvasPosition.top;
+                        let left = elementPosition.left - canvasPosition.left;
+                        top = top < 0 ? 0 : top;
+                        left = left < 0 ? 0 : left;
+                        css.attributes.push(["top", top.toString()]);
+                        css.attributes.push(["left", left.toString()]);
+                        css.attributes.push(["position", "absolute"]);
+                    }
+                    let cssAttr = value.split("; ");
+                    cssAttr.forEach((attr) => {
+                        attr = attr.trim();
+                        if (
+                            attr !== "" &&
+                            !attr.includes("transform") &&
+                            !attr.includes("translate")
+                        ) {
+                            css.attributes.push([
+                                attr.split(":")[0].trim(),
+                                attr.split(":")[1].trim(),
+                            ]);
+                        }
+                    });
+                    this.cssObject.push(css);
+                    break;
+                default:
+                    break;
+            }
+        }
+        let elementCss: string[] = css(element);
+        let localCssObj: CssOut;
+        elementCss.forEach((css: string) => {
+            let className = css.substring(0, css.indexOf("{"));
+            let attributes = css.substring(
+                css.indexOf("{") + 1,
+                css.indexOf("}")
+            );
+            if (!className.includes("drag")) {
+                localCssObj = {
+                    className: className.trim(),
+                    attributes: [],
+                };
+                let cssAttr = attributes.split("; ");
+                cssAttr.forEach((attr) => {
+                    attr = attr.trim();
+                    if (attr !== "") {
+                        localCssObj.attributes.push([
+                            attr.split(":")[0].trim(),
+                            attr.split(":")[1].trim(),
+                        ]);
+                    }
+                });
+                this.cssObject.push(localCssObj);
+            }
+        });
+        if (element.hasChildNodes()) {
+            let childNodes = element.childNodes;
+            for (let i = 0; i < childNodes.length; i++) {
+                let child = childNodes[i];
+                switch (child.nodeType) {
+                    case Node.TEXT_NODE:
+                        let htmlText: HtmlTextOut = {
+                            text: child.nodeValue.trim(),
+                        };
+                        htmlObject.ast.push(htmlText);
+                        break;
+                    case Node.ELEMENT_NODE:
+                        htmlObject.ast.push(
+                            this.createComponent(
+                                child as HTMLElement,
+                                htmlObject,
+                                true
+                            )
+                        );
+                        break;
+                }
+            }
+        }
+        return htmlObject;
+    }
+
+    async apply() {
         this.spinner.show("loadingSpinner");
         let value: Output = {
             name: sessionStorage.getItem("projectName"),
@@ -100,7 +224,6 @@ export class CanvasComponent implements OnInit {
             logic: [],
             html: [],
         };
-        let cssObject: CssOut[] = [];
         $("#canvas")
             .children()
             .each((index: number, child: HTMLElement) => {
@@ -116,92 +239,46 @@ export class CanvasComponent implements OnInit {
                         element = nodes[i] as HTMLElement;
                     }
                 }
-                htmlObject.tag = element.tagName.toLowerCase();
-                const canvasPosition = $("#canvas").offset();
-                for (let i = 0; i < element.attributes.length; i++) {
-                    let nodeName: string = element.attributes[i].nodeName;
-                    let value: string = element.attributes[i].value;
-                    switch (nodeName) {
-                        case "id":
-                            htmlObject.attributes.push(["id", value]);
-                            break;
-                        case "class":
-                            let classArray = value.split(" ");
-                            classArray = classArray.filter((value) => {
-                                return !(
-                                    value.includes("drag") ||
-                                    value.includes("ng")
-                                );
-                            });
-                            let classString: string = classArray.join(" ");
-                            htmlObject.attributes.push(["class", classString]);
-                            break;
-                        case "style":
-                            let css: CssOut = {
-                                className: `#${element.id.trim()}`,
-                                attributes: [],
-                            };
-                            let cssAttr = value.split("; ");
-                            cssAttr.forEach((attr) => {
-                                attr = attr.trim();
-                                if (
-                                    attr !== "" &&
-                                    !attr.includes("transform") &&
-                                    !attr.includes("translate")
-                                ) {
-                                    css.attributes.push([
-                                        attr.split(":")[0].trim(),
-                                        attr.split(":")[1].trim(),
-                                    ]);
-                                }
-                            });
-                            cssObject.push(css);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                let elementPosition = $(`#${element.id}`).offset();
-                let top = elementPosition.top - canvasPosition.top;
-                let left = elementPosition.left - canvasPosition.left;
-                top = top < 0 ? 0 : top;
-                left = left < 0 ? 0 : left;
-                htmlObject.attributes.push(["top", top.toString()]);
-                htmlObject.attributes.push(["left", left.toString()]);
-                if (element.hasChildNodes()) {
-                }
-                let elementCss: string[] = css(element);
-                let localCssObj: CssOut;
-                elementCss.forEach((css: string) => {
-                    let className = css.substring(0, css.indexOf("{"));
-                    let attributes = css.substring(
-                        css.indexOf("{") + 1,
-                        css.indexOf("}")
-                    );
-                    if (!className.includes("drag")) {
-                        localCssObj = {
-                            className: className.trim(),
-                            attributes: [],
-                        };
-                        let cssAttr = attributes.split("; ");
-                        cssAttr.forEach((attr) => {
-                            attr = attr.trim();
-                            if (attr !== "") {
-                                localCssObj.attributes.push([
-                                    attr.split(":")[0].trim(),
-                                    attr.split(":")[1].trim(),
-                                ]);
-                            }
-                        });
-                        cssObject.push(localCssObj);
-                    }
-                });
+                htmlObject = this.createComponent(element, htmlObject, false);
                 pageTest.html.push(htmlObject);
-                pageTest.css = cssObject;
             });
+        pageTest.css = this.cssObject;
+        let logic = {
+            tag: "start",
+            arguments: ["x"],
+            nextAst: {
+                tag: "if",
+                nextAst: null,
+                trueBranchAst: {
+                    tag: "return",
+                    expression: "1",
+                    metadata: { position: [0, 0] },
+                },
+                falseBranchAst: {
+                    tag: "return",
+                    expression: "x * factorial(x - 1)",
+                    metadata: { position: [0, 0] },
+                },
+                expression: "x = 0",
+                metadata: { position: [0, 0] },
+            },
+            name: "factorial",
+            returnType: {
+                return: { type: "integer" },
+                arguments: [{ type: "integer" }],
+                type: "function",
+            },
+            metadata: { position: [0, 0] },
+        };
+        pageTest.logic.push(logic);
         value.ast.pages.push(pageTest);
         try {
-            this.sendService.postCode(value);
+            let projectID = await this.sendService.postCode(value);
+            sessionStorage.setItem("projectID", projectID.toString());
+            this.toastr.success("Aplicado com sucesso!", "Sucesso!", {
+                progressBar: true,
+                closeButton: true,
+            });
         } catch (e) {
             if (e instanceof HttpErrorResponse) {
                 switch (e.status) {

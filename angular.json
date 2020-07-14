@@ -33,7 +33,8 @@
                             "node_modules/jquery-slimscroll/jquery.slimscroll.min.js",
                             "src/assets/js/inspinia.js",
                             "src/assets/js/get-css.js",
-                            "node_modules/jquery-smarttab/dist/js/jquery.smartTab.min.js"
+                            "node_modules/jquery-smarttab/dist/js/jquery.smartTab.min.js",
+                            "node_modules/sweetalert/dist/sweetalert.min.js"
                         ]
                     },
                     "configurations": {

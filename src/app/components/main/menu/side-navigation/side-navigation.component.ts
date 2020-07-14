@@ -3,6 +3,11 @@ import { Component, OnInit } from "@angular/core";
 import { Router } from "@angular/router";
 import { Element } from "src/app/components/domain/element";
 import { SpawnComponentService } from "src/app/services/spawn/spawn-component.service";
+import { SendService } from "src/app/services/send/send.service";
+import { NgxSpinnerService } from "ngx-spinner";
+import { AlertService } from "src/app/services/alert/alert.service";
+import { HttpErrorResponse } from "@angular/common/http";
+import { ToastrService } from "ngx-toastr";
 
 declare let $: any;
 
@@ -18,7 +23,11 @@ export class SideNavigationComponent implements OnInit {
     constructor(
         private router: Router,
         private spawnService: SpawnComponentService,
-        private formBuilder: FormBuilder
+        private formBuilder: FormBuilder,
+        private sendService: SendService,
+        private spinner: NgxSpinnerService,
+        private alertService: AlertService,
+        private toastr: ToastrService
     ) {}
 
     ngOnInit() {
@@ -63,5 +72,41 @@ export class SideNavigationComponent implements OnInit {
                 keyNavigation: false,
             },
         });
+    }
+
+    getBuild() {
+        this.alertService.createConfirmDenyDialog(
+            "Download do código",
+            "Deseja fazer o download do código gerado?",
+            async () => {
+                this.spinner.show("loadingSpinner");
+                try {
+                    let zip = await this.sendService.getProjectBuild();
+                    const blob = new Blob([zip], {
+                        type: "application/zip",
+                    });
+                    const url = window.URL.createObjectURL(blob);
+                    var anchor = document.createElement("a");
+                    anchor.download = `${sessionStorage.getItem(
+                        "projectName"
+                    )}.zip`;
+                    anchor.target = "_blank";
+                    anchor.href = url;
+                    anchor.click();
+                } catch (e) {
+                    if (e instanceof HttpErrorResponse) {
+                        this.toastr.error(
+                            `Motivo: ${e.message}`,
+                            `Erro: ${e.status}`,
+                            { closeButton: true, progressBar: true }
+                        );
+                    } else {
+                        console.log(e);
+                    }
+                } finally {
+                    this.spinner.hide("loadingSpinner");
+                }
+            }
+        );
     }
 }

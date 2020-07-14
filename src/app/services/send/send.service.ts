@@ -13,20 +13,37 @@ export class SendService {
 
     constructor(private http: HttpClient) {
         this.header = new HttpHeaders()
-            .set("Authorization", "Basic " + btoa("heitortoledo@gec.inatel.br:bunda"))
+            .set(
+                "Authorization",
+                "Basic " + btoa("heitortoledo@gec.inatel.br:bunda")
+            )
             .set("Content-Type", "application/json");
     }
 
     getProject(id: any): Promise<any> {
         let url = `${this.getUrl}/${id}`;
         return this.http
-            .get<any>(url, { headers: this.header })
+            .get<any>(url, { headers: this.header, withCredentials: true })
+            .toPromise();
+    }
+
+    getProjectBuild(): Promise<ArrayBuffer> {
+        let url = `${this.getUrl}/${sessionStorage.getItem("projectID")}/build`;
+        return this.http
+            .get<ArrayBuffer>(url, {
+                headers: this.header,
+                withCredentials: true,
+                responseType: "arraybuffer" as "json",
+            })
             .toPromise();
     }
 
     postCode(ast: Output): Promise<any> {
         return this.http
-            .post<any>(this.postUrl, ast, { headers: this.header, withCredentials: true })
+            .post<any>(this.postUrl, ast, {
+                headers: this.header,
+                withCredentials: true,
+            })
             .toPromise();
     }
 }
