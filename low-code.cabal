@@ -94,6 +94,7 @@ library
     , FlexibleInstances
     , LambdaCase
     , MultiParamTypeClasses
+    , MultiWayIf
     , NoImplicitPrelude
     , OverloadedStrings
     , RecordWildCards

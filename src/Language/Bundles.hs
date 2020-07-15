@@ -46,7 +46,7 @@ instance Bundle BundleCssHtmlLogic where
         | otherwise = LogicError $ L.prettyError <$> L.errors analysis
       where
         logics = concatMap logic pages
-        analysis = L.execAnalyzer def $ L.analyzeMany logicEnvironment logics
+        analysis = snd $ L.evalAnalyzer' $ L.analyzeMany logicEnvironment logics
 
         result = map linkHtml pages
         errors = lefts result
