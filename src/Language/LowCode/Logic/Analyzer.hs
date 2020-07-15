@@ -77,9 +77,9 @@ prettyWarning = \case
         "Declared but not used: '" <> name <> "'."
 
 data VariableInfo = VariableInfo
-    { varName :: Name
-    , unused  :: Bool
-    , varType :: VariableType
+    { varName :: !Name
+    , unused  :: !Bool
+    , varType :: !VariableType
     } deriving (Show)
 
 mkInfo :: Name -> VariableType -> VariableInfo
@@ -88,13 +88,14 @@ mkInfo name type' = VariableInfo name True type'
 data AnalyzerState = AnalyzerState
     { analyzerSymbols :: Map Text VariableInfo
     , errors          :: [Error]
+    , returnType      :: !VariableType
     , warnings        :: [Warning]
     } deriving (Show)
 
-type LogicAnalyzer = State AnalyzerState
-
 instance Default AnalyzerState where
-    def = AnalyzerState Map.empty [] []
+    def = AnalyzerState Map.empty [] UnitType []
+
+type LogicAnalyzer = State AnalyzerState
 
 evalAnalyzer :: AnalyzerState -> LogicAnalyzer a -> a
 evalAnalyzer st = runIdentity . flip evalStateT st
@@ -186,7 +187,6 @@ collectSymbols env = foldr mkSymbol externsInfo
   where
     externsInfo = Map.mapWithKey mkInfo (externs env)
 
-    -- TODO: Should we collect all symbols?
     mkSymbol (Start _ name ret@(FunctionType _ _) _ _) acc =
         Map.insert name (mkInfo name ret) acc
     mkSymbol _ acc = acc
@@ -208,19 +208,31 @@ analyzeStart (Start _ name (FunctionType argTypes ret) arguments next) = do
     when (nArgs /= nTypes) $ addError $ IncompatibleSignatures name nArgs nTypes
     let argsInfo = Map.fromList $ zipWith (\n t -> (n, mkInfo n t)) arguments argTypes
     modify \st ->
-        st { analyzerSymbols = Map.union argsInfo (analyzerSymbols st) }
-    whenJustM (analyzeImpl next) $ checkTypes name ret
+        st { analyzerSymbols = Map.union argsInfo (analyzerSymbols st)
+           , returnType = ret
+           }
+
+    analyzeImpl next
 analyzeStart (Start _ name _ _ next) =
     addError (NotAFunction name) *> void (analyzeImpl next)
 analyzeStart next =
     addError StartIsNotFirstSymbol *> void (analyzeImpl next)
 
-analyzeImpl :: AST -> LogicAnalyzer (Maybe VariableType)
+analyzeReturn :: Maybe Expression -> LogicAnalyzer ()
+analyzeReturn Nothing = do
+    ret <- gets returnType
+    when (ret /= UnitType) $ addError $ TypeMismatch "return" ret UnitType
+analyzeReturn (Just expr) = do
+    ret <- gets returnType
+    whenJustM (analyzeExpr expr) \typeE ->
+        when (ret /= typeE) $ addError $ TypeMismatch "return" ret typeE
+
+analyzeImpl :: AST -> LogicAnalyzer ()
 analyzeImpl = \case
     Assign _ var expr next -> do
         analyzeAssign var expr
         analyzeImpl next
-    End -> pure $ Just UnitType
+    End -> pure ()
     Expression _ expr next -> do
         void $ analyzeExpr expr
         analyzeImpl next
@@ -229,7 +241,7 @@ analyzeImpl = \case
         void $ withScope $ analyzeImpl false
         void $ withScope $ analyzeImpl true
         analyzeImpl next
-    Return _ expr -> maybe (pure $ Just UnitType) analyzeExpr expr
+    Return _ expr -> analyzeReturn expr
     Start _ _ _ _ next -> addError StartIsNotFirstSymbol *> analyzeImpl next
     Var _ var type' expr next -> do
         analyzeVar var type' expr
