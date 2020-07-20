@@ -33,9 +33,9 @@ instance LanguageConverter [L.AST] JS.AST where
                       (JS.Block $ convert' true)
                       (tryElse false) : convert' next
             L.Return _ expression ->
-                JS.Return (convert <$> expression) : []
+                [JS.Return (convert <$> expression)]
             L.Start _ name _ arguments next ->
-                JS.Function (Just name) arguments (JS.Block $ convert' next) : []
+                [JS.Function (Just name) arguments (JS.Block $ convert' next)]
             L.Var _ name _ expression next ->
                 JS.Var name (convert expression) : convert' next
             L.While _ expression body next ->
@@ -47,8 +47,10 @@ instance LanguageConverter [L.AST] JS.AST where
 
 instance LanguageConverter L.Expression JS.Expression where
     convert = \case
+        L.Access expr name -> JS.Access (convert expr) name
         L.BinaryOp left op right -> JS.BinaryOp (convert left) op (convert right)
         L.Call expr exprs -> JS.Call (convert expr) (convert <$> exprs)
+        L.Index expr inner -> JS.Index (convert expr) (convert inner)
         L.Parenthesis expr -> JS.Parenthesis $ convert expr
         L.UnaryOp op expr -> JS.UnaryOp op (convert expr)
         L.Value variable -> JS.Value (convert <$> variable)

@@ -16,18 +16,19 @@ module Language.LowCode.Logic.Analyzer
     , analyzeMany
     , analyze
     , analyzeExpr
-    , vtType
+    , analyzeTypeWithHint
     , isNumeric
     , isText
     , interactsWithUnary
     , interactsWithBinary
     ) where
 
-import Universum hiding (asks, gets, modify)
+import           Universum hiding (asks, gets, modify)
 
 import           Control.Monad.Trans.RWS.CPS
 import           Data.Default.Class
 import qualified Data.Map.Strict as Map
+import           Formatting (int, sformat, shown, stext, (%))
 
 import           Language.Common
 import           Language.LowCode.Logic.AST
@@ -37,10 +38,14 @@ import           Language.LowCode.Logic.AST
 -- of simply a Text?
 data Error
     = DuplicateRecord Name Name
+    | IncompatibleRecord Name [Name] [Name]
     | IncompatibleSignatures Name Int Int
     | IncompatibleTypes1 UnarySymbol Expression
     | IncompatibleTypes2 Expression BinarySymbol Expression
+    | NoSuchRecord Name
     | NotAFunction Name
+    | NotAMember VariableType Name
+    | NotARecord VariableType Name
     | ShadowedVariable Name
     | StartIsNotFirstSymbol
     | TypeMismatch Text VariableType VariableType
@@ -50,29 +55,63 @@ data Error
 
 prettyError :: Error -> Text
 prettyError = \case
-    DuplicateRecord recordName fieldName ->
-        "Duplicate field '" <> fieldName <> "' on record '" <> recordName <> "'."
-    IncompatibleSignatures name args1 args2 ->
-        "'" <> name <> "' expects " <> show args1 <> " arguments, but " <> show args2 <> " were given."
-    IncompatibleTypes1 symbol expr ->
-        "Incompatible expression '" <> codegenE expr <> "' for unary operator '" <> unaryToText symbol <> "'."
-    IncompatibleTypes2 left symbol right ->
-        "Incompatible expressions '" <> codegenE left <> "' and '" <> codegenE right <> "' for unary operator '" <> binaryToText symbol <> "'."
-    NotAFunction name ->
+    DuplicateRecord recordName fieldName -> sformat
+        ("Duplicate field '" % stext % "' on record '" % stext % "'.")
+        fieldName
+        recordName
+    IncompatibleRecord name expectedFields actualFields -> sformat
+        ("'" % stext % "' expects the following fields: " % shown % ", but " % shown % " were given.")
+        name
+        expectedFields
+        actualFields
+    IncompatibleSignatures name args1 args2 -> sformat
+        ("'" % stext % "' expects " % int % " arguments, but " % int % " were given.")
+        name
+        args1
+        args2
+    IncompatibleTypes1 symbol expr -> sformat
+        ("Incompatible expression '" % stext % "' for unary operator '" % stext % "'.")
+        (codegenE expr)
+        (unaryToText symbol)
+    IncompatibleTypes2 left symbol right -> sformat
+        ("Incompatible expressions '" % stext % "' and '" % stext % "' for unary operator '" % stext % "'.")
+        (codegenE left)
+        (codegenE right)
+        (binaryToText symbol)
+    NoSuchRecord name -> sformat
+        ("Could not find record '" % stext % "'.")
+        name
+    NotAFunction name -> sformat
         -- TODO: Add types/expressions being applied? And maybe the inferred type?
-        "Can't use '" <> name <> "' as function."
-    ShadowedVariable name ->
+        ("Can't use '" % stext % "' as function.")
+        name
+    NotAMember record memberName -> sformat
+        ("'" % stext % "' is not a member of the record '" % shown % "'.")
+        memberName
+        record
+    NotARecord type' memberName -> sformat
+        ("Can't access '" % stext % "' on non-record type '" % shown % "'.")
+        memberName
+        type'
+    ShadowedVariable name -> sformat
         -- TODO: Add where it was defined and what is the new value being assigned. Maybe old value too.
-        "'" <> name <> "' was shadowed."
+        ("'" % stext % "' was shadowed.")
+        name
     StartIsNotFirstSymbol ->
         "The Start symbol must appear iff it's the first symbol."
-    TypeMismatch name expected actual ->
-        "Type mismatch in '" <> name <> "'. Expected '" <> show expected <> "' but got '" <> show actual <> "'."
-    UndefinedVariable name ->
+    TypeMismatch name expected actual -> sformat
+        ("Type mismatch in '" % stext % "'. Expected '" % shown % "' but got '" % shown % "'.")
+        name
+        expected
+        actual
+    UndefinedVariable name -> sformat
         -- TODO: Scan for similarly named variables.
-        "'" <> name <> "' was used but it was not defined. Perhaps you forgot to declare it or made a typo?"
-    UnknownType location actual ->
-        "Could not deduce type '" <> show actual <> "' from its use in '" <> location <> "'."
+        ("'" % stext % "' was used but it was not defined. Perhaps you forgot to declare it or made a typo?")
+        name
+    UnknownType location actual -> sformat
+        ("Could not deduce type '" % shown % "' from its use in '" % stext % "'.")
+        actual
+        location
 
 data Warning
     = UnusedVariable Name
@@ -80,24 +119,25 @@ data Warning
 
 prettyWarning :: Warning -> Text
 prettyWarning = \case
-    UnusedVariable name ->
-        "Declared but not used: '" <> name <> "'."
+    UnusedVariable name -> sformat
+        ("Declared but not used: '" % stext % "'.")
+        name
 
 data VariableInfo = VariableInfo
-    { varName :: !Name
-    , unused  :: !Bool
+    { unused  :: !Bool
     , varType :: !VariableType
     } deriving (Show)
 
-mkInfo :: Name -> VariableType -> VariableInfo
-mkInfo name type' = VariableInfo name True type'
+mkInfo :: VariableType -> VariableInfo
+mkInfo = VariableInfo True
 
-newtype AnalyzerReader = AnalyzerReader
-    { returnType :: VariableType
+data AnalyzerReader = AnalyzerReader
+    { records    :: Map Name [(Name, VariableType)]
+    , returnType :: VariableType
     } deriving (Show)
 
 instance Default AnalyzerReader where
-    def = AnalyzerReader UnitType
+    def = AnalyzerReader Map.empty UnitType
 
 data AnalyzerWriter = AnalyzerWriter
     { errors          :: ![Error]
@@ -172,14 +212,15 @@ addError e = tell $ mempty { errors = [e] }
 analyzeAssign :: Text -> Expression -> Analyzer ()
 analyzeAssign var expr = do
     symbols <- gets analyzerSymbols
-    typeEMaybe <- analyzeExpr expr
     case Map.lookup var symbols of
         Nothing -> addError $ UndefinedVariable var
-        Just info -> whenJust typeEMaybe \typeE -> if
-            | varType info == typeE ->
-                let info' = info { varType = typeE }
-                in modify \s -> s { analyzerSymbols = Map.insert var info' symbols }
-            | otherwise -> addError $ TypeMismatch var (varType info) typeE
+        Just info -> do
+            typeE <- analyzeExpr (varType info) expr
+            if varType info == typeE
+                then
+                    let info' = info { varType = typeE }
+                    in modify \s -> s { analyzerSymbols = Map.insert var info' symbols }
+                else addError $ TypeMismatch var (varType info) typeE
 
 analyzeVar :: Text -> VariableType -> Expression -> Analyzer ()
 analyzeVar var type' expr = do
@@ -187,8 +228,8 @@ analyzeVar var type' expr = do
     if Map.member var symbols
     then addError $ ShadowedVariable var
     else do
-        analyzeExprTypes var type' expr
-        let info = mkInfo var type'
+        checkTypes var type' =<< analyzeExpr type' expr
+        let info = mkInfo type'
         modify \s -> s { analyzerSymbols = Map.insert var info (analyzerSymbols s) }
 
 checkTypes :: Text -> VariableType -> VariableType -> Analyzer ()
@@ -196,50 +237,21 @@ checkTypes name expectedType actualType
     | expectedType == actualType = pure ()
     | otherwise = addError $ TypeMismatch name expectedType actualType
 
-analyzeExprTypes :: Text -> VariableType -> Expression -> Analyzer ()
-analyzeExprTypes exprName (ArrayType innerTypeA) (Value (Constant (Array xs))) =
-    traverse_ (analyzeExprTypes exprName innerTypeA) xs
-analyzeExprTypes exprName expectedType (Value (Constant (Array _))) =
-    addError $ UnknownType exprName expectedType
-analyzeExprTypes exprName expectedType expr =
-    whenJustM (analyzeExpr expr) (checkTypes exprName expectedType)
-
--- TODO: Generate more descriptive names!
-checkApply :: [Expression] -> VariableType -> Analyzer (Maybe VariableType)
-checkApply arguments (FunctionType argTypes ret) = do
-    let nArgs = length arguments
-        nTypes = length argTypes
-    when (nArgs /= nTypes) $
-        addError $ IncompatibleSignatures "function" nArgs nTypes
-    traverse_ (uncurry (analyzeExprTypes "function")) $ zip argTypes arguments
-    pure $ Just ret
-checkApply _ _ = addError (NotAFunction "not function lol") *> pure Nothing
-
-analyzeRecord :: Name -> [(Name, Expression)] -> Analyzer [Maybe VariableType]
-analyzeRecord rName fields = do
-    -- Find whether there are fields with duplicate names.
-    -- TODO: Add types to error?
-    let sorted = sort $ map fst fields
-        dups = filter (uncurry (==)) $ zip sorted (drop 1 sorted)
-    traverse_ (warnDuplicate . fst) dups
-    traverse (analyzeExpr . snd) fields
+collectStarts :: Environment -> [AST] -> Map Name VariableInfo
+collectStarts env = foldr mkSymbol (Map.map mkInfo (externs env))
   where
-    warnDuplicate = addError . DuplicateRecord rName
-
-collectSymbols :: Environment -> [AST] -> Map Name VariableInfo
-collectSymbols env = foldr mkSymbol externsInfo
-  where
-    externsInfo = Map.mapWithKey mkInfo (externs env)
-
     mkSymbol (Start _ name ret@(FunctionType _ _) _ _) acc =
-        Map.insert name (mkInfo name ret) acc
+        Map.insert name (mkInfo ret) acc
     mkSymbol _ acc = acc
 
 analyzeMany :: Environment -> [AST] -> Analyzer ()
 analyzeMany env asts = do
-    let functions = collectSymbols env asts
-    modify \s -> s { analyzerSymbols = functions }
-    traverse_ (withScope . analyzeStart) asts
+    let functions = collectStarts env asts
+    withRWS (\r s ->
+        ( r { records = recordTemplates env }
+        , s { analyzerSymbols = functions }
+        ))
+        (traverse_ (withScope . analyzeStart) asts)
 
 analyze :: Environment -> AST -> Analyzer ()
 analyze env ast = analyzeMany env [ast]
@@ -250,7 +262,7 @@ analyzeStart (Start _ name (FunctionType argTypes ret) arguments next) = do
     let nArgs = length arguments
         nTypes = length argTypes
     when (nArgs /= nTypes) $ addError $ IncompatibleSignatures name nArgs nTypes
-    let argsInfo = Map.fromList $ zipWith (\n t -> (n, mkInfo n t)) arguments argTypes
+    let argsInfo = Map.fromList $ zipWith (\n t -> (n, mkInfo t)) arguments argTypes
     withRWS (\r s ->
         ( r { returnType = ret }
         , s { analyzerSymbols = Map.union argsInfo (analyzerSymbols s) }
@@ -267,8 +279,8 @@ analyzeReturn Nothing = do
     when (ret /= UnitType) $ addError $ TypeMismatch "return" ret UnitType
 analyzeReturn (Just expr) = do
     ret <- asks returnType
-    whenJustM (analyzeExpr expr) \typeE ->
-        when (ret /= typeE) $ addError $ TypeMismatch "return" ret typeE
+    typeE <- analyzeExpr ret expr
+    when (ret /= typeE) $ addError $ TypeMismatch "return" ret typeE
 
 analyzeImpl :: AST -> Analyzer ()
 analyzeImpl = \case
@@ -277,10 +289,13 @@ analyzeImpl = \case
         analyzeImpl next
     End -> pure ()
     Expression _ expr next -> do
-        void $ analyzeExpr expr
+        -- TODO: What is the correct type in this case? One solution is take the
+        -- C# route and disallow arbitrary expressions, but rather make it become
+        -- a function call.
+        void $ analyzeExpr UnitType expr
         analyzeImpl next
     If _ expr false true next -> do
-        analyzeExprTypes "if" BoolType expr
+        checkTypes "if" BoolType =<< analyzeExpr BoolType expr
         void $ withScope $ analyzeImpl false
         void $ withScope $ analyzeImpl true
         analyzeImpl next
@@ -290,77 +305,158 @@ analyzeImpl = \case
         analyzeVar var type' expr
         analyzeImpl next
     While _ expr body next -> do
-        analyzeExprTypes "while" BoolType expr
+        checkTypes "while" BoolType =<< analyzeExpr BoolType expr
         void $ withScope $ analyzeImpl body
         analyzeImpl next
 
-analyzeExpr :: Expression -> Analyzer (Maybe VariableType)
-analyzeExpr = \case
-    BinaryOp left symbol' right -> do
-        typeL <- analyzeExpr left
-        typeR <- analyzeExpr right
-        let ret = do typeL' <- typeL
-                     typeR' <- typeR
-                     interactsWithBinary typeL' symbol' typeR'
-        maybe (addError (IncompatibleTypes2 left symbol' right) *> pure Nothing)
-              (pure . Just)
+analyzeExpr :: VariableType -> Expression -> Analyzer VariableType
+analyzeExpr !expectedType = \case
+    Access left right -> do
+        -- TODO: Maybe add a withField?
+        -- TODO: Port Call code to Access.
+        analyzeExpr expectedType (Call (Value (Variable right)) [left])
+    BinaryOp left symbol' right -> mdo
+        -- FIXME: This freezes due to the recursive bindings!
+        typeL <- analyzeExpr typeR left
+        typeR <- analyzeExpr typeL right
+        let ret = interactsWithBinary typeL symbol' typeR
+        maybe (addError (IncompatibleTypes2 left symbol' right) *> pure expectedType)
+              pure
               ret
-    Call expr arguments -> do
-        -- In case Call has a name instead of expr:
-        --(infoMaybe, symbols) <- gets $
-        --    Map.updateLookupWithKey markUsed name . analyzerSymbols
-        --modify \s -> s { analyzerSymbols = symbols }
-        --case infoMaybe of
-        --    Nothing -> addError (UndefinedVariable name) *> pure Nothing
-        --    Just (VariableInfo _ _ typeF) -> checkApply name typeF arguments
-        typeFMaybe <- analyzeExpr expr
-        case typeFMaybe of
-            Nothing -> pure Nothing
-            Just typeF -> do
-                checkApply arguments typeF
-    Parenthesis expr -> analyzeExpr expr
+    Call (Value (Variable name)) arguments -> do
+        (infoMaybe, symbols) <- gets $
+            Map.updateLookupWithKey (const (Just . markUsed)) name . analyzerSymbols
+        modify \s -> s { analyzerSymbols = symbols }
+        case infoMaybe of
+            Nothing -> addError (UndefinedVariable name) *> pure expectedType
+            Just (VariableInfo _ typeF@(FunctionType argTypes _)) -> do
+                typeAs <- traverse (uncurry analyzeExpr) $ zip argTypes arguments
+                analyzeApply name typeAs typeF
+            Just (VariableInfo _ _) -> do
+                addError (NotAFunction name) *> pure expectedType
+    Call expr arguments -> mdo
+        let exprC = codegenE expr
+            expectedFunctionType = FunctionType typeAs expectedType
+        -- TODO: Check whether typeE will freeze with typeAs, since they are
+        -- recursive.
+        typeE <- analyzeExpr expectedFunctionType expr
+        (typeAs, ret) <- case typeE of
+            typeF@(FunctionType argTypes _) -> do
+                typeAs' <- traverse (uncurry analyzeExpr) $ zip argTypes arguments
+                ret' <- analyzeApply exprC typeAs' typeF
+                pure (typeAs', ret')
+            _ -> addError (NotAFunction exprC) *> pure ([], expectedType)
+        pure ret
+    Index left right -> do
+        typeL <- analyzeExpr (ArrayType expectedType) left
+        typeR <- analyzeExpr IntegerType right
+        case typeL of
+            ArrayType actualType
+                | actualType == expectedType -> pure ()
+                | otherwise -> addError (TypeMismatch (codegenE left) (ArrayType expectedType) typeL)
+            _ -> addError (TypeMismatch (codegenE left) (ArrayType expectedType) typeL)
+        case typeR of
+            IntegerType -> pure ()
+            _ -> addError (TypeMismatch (codegenE right) IntegerType typeR)
+        pure expectedType
+    Parenthesis expr -> analyzeExpr expectedType expr
     UnaryOp symbol' expr -> do
-        typeE <- analyzeExpr expr
-        let ret = interactsWithUnary symbol' =<< typeE
-        maybe (addError (IncompatibleTypes1 symbol' expr) *> pure Nothing)
-              (pure . Just)
+        typeE <- analyzeExpr expectedType expr
+        let ret = interactsWithUnary symbol' typeE
+        maybe (addError (IncompatibleTypes1 symbol' expr) *> pure expectedType)
+              pure
               ret
     Value value -> case value of
-        Variable v -> analyzeVariable v
-        Constant c -> vtType c
+        Variable v -> maybe expectedType varType <$> analyzeVariable v
+        Constant c -> analyzeTypeWithHint expectedType c
+
+analyzeApply :: Name -> [VariableType] -> VariableType -> Analyzer VariableType
+analyzeApply name arguments (FunctionType argTypes ret) = do
+    let nArgs = length arguments
+        nTypes = length argTypes
+    when (nArgs /= nTypes) $ addError $ IncompatibleSignatures name nArgs nTypes
+    traverse_ (uncurry (checkTypes name)) $ zip argTypes arguments
+    pure ret
+analyzeApply name _ type' = addError (NotAFunction name) *> pure type'
+
+markUsed :: VariableInfo -> VariableInfo
+markUsed info = info { unused = False }
+
+analyzeVariable :: Name -> Analyzer (Maybe VariableInfo)
+analyzeVariable name = do
+    (infoMaybe, symbols) <- gets $
+        Map.updateLookupWithKey (const (Just . markUsed)) name . analyzerSymbols
+    modify \s -> s { analyzerSymbols = symbols }
+    whenNothing_ infoMaybe $ addError (UndefinedVariable name)
+    pure infoMaybe
+
+analyzeArray :: VariableType -> [Expression] -> Analyzer VariableType
+analyzeArray expectedType exprs = do
+    types <- traverse (unnestArray expectedType) exprs
+    case types of
+        [] -> pure expectedType
+        (x : _)
+            | x == expectedType -> pure x
+            | otherwise         -> do
+                addError $ TypeMismatch "array" expectedType x
+                pure x
   where
-    markUsed _ info = Just info { unused = False }
+    unnestArray (ArrayType typeA) (Value (Constant (Array xs))) = do
+        traverse_ (unnestArray typeA) xs
+        pure typeA
+    unnestArray type' expr = do
+        typeE <- analyzeExpr type' expr
+        when (type' /= typeE) $
+            addError $ TypeMismatch (codegenE expr) type' typeE
+        pure typeE
 
-    analyzeVariable name = do
-        (infoMaybe, symbols) <- gets $
-            Map.updateLookupWithKey markUsed name . analyzerSymbols
-        modify \s -> s { analyzerSymbols = symbols }
-        maybe (addError (UndefinedVariable name) *> pure Nothing)
-              (pure . Just . varType)
-              infoMaybe
+    --nestArray 0 typeA = typeA
+    --nestArray n typeA = ArrayType (nestArray (n - 1) typeA)
 
-analyzeArray :: [Expression] -> Analyzer (Maybe VariableType)
-analyzeArray [] = pure Nothing
-analyzeArray (x : xs) = do
-    xTypeMaybe <- analyzeExpr x
-    xsTypesMaybe <- traverse analyzeExpr xs
-    let yTypeMaybe = join $ find (/= xTypeMaybe) xsTypesMaybe
-    case (xTypeMaybe, yTypeMaybe) of
-        (Just xType, Just yType) -> addError (TypeMismatch "array" xType yType) *> pure xTypeMaybe
-        (Just _    , Nothing   ) -> pure xTypeMaybe  -- Everything is ok.
-        (Nothing   , Just _    ) -> pure yTypeMaybe  -- More than one thing failed.
-        (Nothing   , Nothing   ) -> pure xTypeMaybe  -- First failed.
+    --arrayDepth (ArrayType typeA) = 1 + arrayDepth typeA
+    --arrayDepth _                 = 0
 
-vtType :: Variable -> Analyzer (Maybe VariableType)
-vtType = \case
-    Array es    -> ArrayType <<$>> analyzeArray es
-    Bool _      -> pure $ Just BoolType
-    Char _      -> pure $ Just CharType
-    Double _    -> pure $ Just DoubleType
-    Integer _   -> pure $ Just IntegerType
-    Record r fs -> fmap RecordType . sequence <$> analyzeRecord r fs
-    Text _      -> pure $ Just TextType
-    Unit        -> pure $ Just UnitType
+analyzeRecord :: VariableType -> Name -> [(Name, Expression)] -> Analyzer VariableType
+analyzeRecord expectedType name fields = do
+    -- Find whether there are fields with duplicate names:
+    let (names, exprs) = unzip fields
+        sorted = sort names
+        dups = filter (uncurry (==)) $ zip sorted (drop 1 sorted)
+    traverse_ (errorDuplicate . fst) dups
+
+    recs <- asks records
+    case Map.lookup name recs of
+        Nothing -> do
+            --traverse_ (analyzeExpr Nothing) exprs
+            addError $ NoSuchRecord name
+            pure expectedType
+        Just templateFields -> do
+            -- Check if number of fields match.
+            let (templateNames, templateTypes) = unzip templateFields
+                templateSorted = sort templateNames
+            when (templateSorted /= sorted) $
+                addError $ IncompatibleRecord name templateSorted sorted
+            traverse_ (uncurry analyzeExpr) $ zip templateTypes exprs
+            traverse_ (uncurry analyzeWithHint) $ zip templateTypes exprs
+            pure expectedType
+  where
+    -- TODO: Add types to error?
+    errorDuplicate = addError . DuplicateRecord name
+
+    analyzeWithHint expectedType' (Value (Constant var)) =
+        analyzeTypeWithHint expectedType' var
+    analyzeWithHint expectedType' _ = pure expectedType'
+
+analyzeTypeWithHint :: VariableType -> Variable -> Analyzer VariableType
+analyzeTypeWithHint expectedType = \case
+    Array es    -> analyzeArray expectedType es
+    Bool _      -> pure BoolType
+    Char _      -> pure CharType
+    Double _    -> pure DoubleType
+    Integer _   -> pure IntegerType
+    Record r fs -> analyzeRecord expectedType r fs
+    Text _      -> pure TextType
+    Unit        -> pure UnitType
 
 isNumeric :: VariableType -> Bool
 isNumeric = \case

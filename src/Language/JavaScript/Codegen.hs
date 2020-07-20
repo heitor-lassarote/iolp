@@ -59,28 +59,32 @@ withOptions :: Options -> JSGeneratorState
 withOptions options' = def { options = options' }
 
 indentCompact :: (Emit gen) => JavaScriptCodegen gen
-indentCompact = do
-    compactCode' <- gets (compactCode . options)
-    if compactCode' then emitM "" else indent
+indentCompact = ifM (gets (compactCode . options)) (emitM "") indent
+
+commaSpace :: (Emit gen, Semigroup gen) => JavaScriptCodegen gen
+commaSpace = fmap (emit "," <>) space
+
+nl :: (Emit gen) => JavaScriptCodegen gen
+nl = ifM (gets (compactCode . options)) (emitM "") (emitM "\n")
+
+space :: (Emit gen) => JavaScriptCodegen gen
+space = ifM (gets (compactCode . options)) (emitM "") (emitM " ")
+
+nlIndent :: (Emit gen, Semigroup gen) => JavaScriptCodegen gen
+nlIndent = ifM (gets (bracesOnNewLine . options)) (liftA2 (<>) nl indentCompact) space
 
 genConstant
     :: (Emit gen, Monoid gen)
     => Variable
     -> JavaScriptCodegen gen
 genConstant = \case
-    Array xs -> mconcat <$> sequence
-        [ emitM "["
-        , mconcat . fmap emit . intersperse ", " <$> traverse genExpression xs
-        , emitM "]"
-        ]
+    Array xs -> emitBetween' "[" "]" (separatedBy xs =<< commaSpace)
     Boolean x -> emitM if x then "true" else "false"
     Number x -> emitM $ show x
-    Record fs -> mconcat <$> sequence
-        [ emitM "{"
-        , mconcat . fmap emit . intersperse ", " <$> traverse (uncurry codegenField) fs
-        , emitM "}"
-        ]
-    Text x -> pure $ emit "\"" <> emit x <> emit "\""
+    Record fs -> do
+        cs <- commaSpace
+        emitBetween' "{" "}" $ separatedByF (uncurry codegenField) cs fs
+    Text x -> emitBetween' "\"" "\"" $ emitM x
     Void -> lift $ throwE "Cannot print variable of type 'Void'."
   where
     codegenField fieldName expr = mconcat <$> sequence
@@ -90,38 +94,19 @@ genConstant = \case
         , codegen expr
         ]
 
-nl :: (Emit gen) => JavaScriptCodegen gen
-nl = do
-    compactCode' <- gets (compactCode . options)
-    emitM if compactCode' then "" else "\n"
-
-space :: (Emit gen) => JavaScriptCodegen gen
-space = do
-    compactCode' <- gets (compactCode . options)
-    emitM if compactCode' then "" else " "
-
 genBlock
     :: (Emit gen, Monoid gen)
     => [AST]
     -> JavaScriptCodegen gen
-genBlock asts = do
-    bracesOnNewLine' <- gets (bracesOnNewLine . options)
-    indent' <- indentCompact
-    nl' <- nl
-    codes <- genLines asts
-    space' <- space
-    pure $ mconcat
-        [ if bracesOnNewLine' then nl' <> indent' else space'
-        , emit "{"
-        , nl'
-        , codes
-        , indent'
-        , emit "}"
-        , nl'
-        ]
-  where
-    genLines :: (Emit gen, Monoid gen) => [AST] -> JavaScriptCodegen gen
-    genLines = fmap mconcat . traverse (withIndent . javaScriptCodegenInternal)
+genBlock asts = mconcat <$> sequence
+    [ nlIndent
+    , emitM "{"
+    , nl
+    , separatedByF (withIndent . javaScriptCodegenInternal) mempty asts
+    , indentCompact
+    , emitM "}"
+    , nl
+    ]
 
 emitIfValid :: (Emit gen) => Name -> JavaScriptCodegen gen
 emitIfValid name
@@ -199,22 +184,25 @@ genExpression
     => Expression
     -> JavaScriptCodegen gen
 genExpression = \case
+    Access expr name -> mconcat <$> sequence
+        [ genExpression expr
+        , emitM "."
+        , emitM name
+        ]
     Call expr args -> mconcat <$> sequence
         [ genExpression expr
-        , emitM "("
-        , fmap (mconcat . fmap emit . intersperse ", ") $ traverse genExpression args
-        , emitM ")"
+        , emitBetween' "(" ")" $ args `separatedBy'` ", "
+        ]
+    Index expr inner -> mconcat <$> sequence
+        [ genExpression expr
+        , emitBetween' "[" "]" $ genExpression inner
         ]
     BinaryOp left op right -> mconcat <$> sequence
         [ genExpression left
         , emitM $ binarySymbolToText op
         , genExpression right
         ]
-    Parenthesis expr -> mconcat <$> sequence
-        [ emitM "("
-        , genExpression expr
-        , emitM ")"
-        ]
+    Parenthesis expr -> emitBetween' "(" ")" $ genExpression expr
     UnaryOp op expr -> mconcat <$> sequence
         [ emitM $ unarySymbolToText op
         , genExpression expr
@@ -226,7 +214,7 @@ javaScriptCodegen
     => AST
     -> JavaScriptCodegen gen
 javaScriptCodegen ast = do
-    strict' <- gets $ strict . options
+    strict' <- gets (strict . options)
     let useStrict = emit if strict' then "\"use strict\";\n" else ""
     body <- javaScriptCodegenInternal ast
     pure $ useStrict <> body
@@ -290,9 +278,7 @@ javaScriptCodegenInternal = \case
         [ indentCompact
         , emitM "while"
         , space
-        , emitM "("
-        , genExpression expression
-        , emitM ")"
+        , emitBetween' "(" ")" $ genExpression expression
         , go body
         ]
   where

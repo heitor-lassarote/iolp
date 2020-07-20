@@ -6,6 +6,10 @@ import qualified Data.Text as T
 
 import Language.Emit
 
+class Codegen ast where
+    type GeneratorState ast
+    codegen :: (Emit gen, Monoid gen) => ast -> CodegenT (GeneratorState ast) gen
+
 type CodegenT state = StateT state (ExceptT Text Identity)
 
 class HasIndentation a where
@@ -44,6 +48,40 @@ withIndent action = do
     modify $ modifyCurrentIndentation (subtract indent')
     pure result
 
-class Codegen ast where
-    type GeneratorState ast
-    codegen :: (Emit gen, Monoid gen) => ast -> CodegenT (GeneratorState ast) gen
+separatedBy
+    :: (Codegen ast, Emit gen, Monoid gen)
+    => [ast]
+    -> gen
+    -> CodegenT (GeneratorState ast) gen
+separatedBy xs sep = separatedByF codegen sep xs
+
+separatedBy'
+    :: (Codegen ast, Emit gen, Monoid gen)
+    => [ast]
+    -> Text
+    -> CodegenT (GeneratorState ast) gen
+separatedBy' xs sep = separatedByF codegen (emit sep) xs
+
+separatedByF
+    :: (Applicative f, Monoid gen)
+    => (ast -> f gen)
+    -> gen
+    -> [ast]
+    -> f gen
+separatedByF f sep = fmap (mconcat . intersperse sep) . traverse f
+
+emitBetween
+    :: (Applicative f, Emit gen, Monoid gen)
+    => f gen
+    -> f gen
+    -> f gen
+    -> f gen
+emitBetween left right middle = mconcat <$> sequenceA [ left, middle, right ]
+
+emitBetween'
+    :: (Applicative f, Emit gen, Monoid gen)
+    => Text
+    -> Text
+    -> f gen
+    -> f gen
+emitBetween' left right = emitBetween (emitA left) (emitA right)

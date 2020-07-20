@@ -22,7 +22,7 @@ instance Codegen AST where
 
     codegen = cssCodegen
 
-data Options = Options
+newtype Options = Options
     { indentLevel :: Int
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 

@@ -40,7 +40,9 @@ data AST
     deriving (Eq, Show)
 
 data Expression
-    = Call Expression [Expression]
+    = Access Expression Name
+    | Call Expression [Expression]
+    | Index Expression Expression
     | BinaryOp Expression !BinarySymbol Expression
     | Parenthesis Expression
     | UnaryOp !UnarySymbol Expression

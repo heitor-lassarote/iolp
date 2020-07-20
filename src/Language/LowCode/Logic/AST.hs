@@ -5,6 +5,7 @@ module Language.LowCode.Logic.AST
     , Expression (..)
     , codegenE
     , Variable (..)
+    , codegenV
     , VariableType (..)
     , parseExpression
     , unaryToText
@@ -31,12 +32,13 @@ import           Language.Codegen
 import           Language.Common
 import           Language.Emit
 
-newtype Environment = Environment
-    { externs :: Map Name VariableType
+data Environment = Environment
+    { externs         :: Map Name VariableType
+    , recordTemplates :: Map Name [(Name, VariableType)]
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 instance Default Environment where
-    def = Environment Map.empty
+    def = Environment Map.empty Map.empty
 
 newtype Metadata = Metadata
     { position :: Double2
@@ -155,20 +157,22 @@ instance ToJSON AST where
             ]
 
 data Expression
-    = BinaryOp Expression !BinarySymbol Expression
+    = Access Expression Name
+    | BinaryOp Expression !BinarySymbol Expression
     | Call Expression [Expression]
+    | Index Expression Expression
     | Parenthesis Expression
     | UnaryOp !UnarySymbol Expression
     | Value (ValueType Variable)
     deriving (Eq, Show)
 
 instance FromJSON Expression where
-    parseJSON = withText "expression ast" (either (fail . toString) pure . parseExpression)
+    parseJSON = withText "Language.LowCode.Logic.AST.Expression" (either (fail . toString) pure . parseExpression)
 
 instance ToJSON Expression where
     toJSON = String . codegenE
 
--- Codegen for expression never fails, so this function is safe.
+-- Codegen for Expression never fails, so this function is safe.
 codegenE :: Expression -> Text
 codegenE = Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
 
@@ -176,6 +180,11 @@ instance Codegen Expression where
     type GeneratorState Expression = ()
 
     codegen = \case
+        Access expr name -> mconcat <$> sequence
+            [ codegen expr
+            , emitM "."
+            , emitM name
+            ]
         BinaryOp left symbol' right -> mconcat <$> sequence
             [ codegen left
             , emitM " "
@@ -185,49 +194,20 @@ instance Codegen Expression where
             ]
         Call expr exprs -> mconcat <$> sequence
             [ codegen expr
-            , emitM "("
-            , mconcat . fmap emit . intersperse ", " <$> traverse codegen exprs
-            , emitM ")"
+            , emitBetween' "(" ")" $ exprs `separatedBy'` ", "
             ]
-        Parenthesis expression -> mconcat <$> sequence
-            [ emitM "("
-            , codegen expression
-            , emitM ")"
+        Index expr inner -> mconcat <$> sequence
+            [ codegen expr
+            , emitBetween' "[" "]" $ codegen inner
             ]
-        UnaryOp symbol' expression -> mconcat <$> sequence
+        Parenthesis expr -> emitBetween' "(" ")" $ codegen expr
+        UnaryOp symbol' expr -> mconcat <$> sequence
             [ emitM $ unaryToText symbol'
-            , codegen expression
+            , codegen expr
             ]
         Value value' -> case value' of
             Variable variable' -> emitM variable'
-            Constant constant' -> case constant' of
-                Array a -> codegenArray a
-                Bool b -> emitM if b then "true" else "false"
-                Char c -> pure $ emit "'" <> emit (Text.singleton c) <> emit "'"
-                Double d -> emitM $ show d
-                Integer i -> emitM $ show i
-                Record r fs -> codegenRecord r fs
-                Text t -> pure $ emit "\"" <> emit t <> emit "\""
-                Unit -> emitM "()"
-      where
-        codegenArray exprs = mconcat <$> sequence
-            [ emitM "["
-            , mconcat . fmap emit . intersperse ", " <$> traverse codegen exprs
-            , emitM "]"
-            ]
-
-        codegenField fieldName expr = mconcat <$> sequence
-            [ emitM fieldName
-            , emitM " = "
-            , codegen expr
-            ]
-
-        codegenRecord recordName fields = mconcat <$> sequence
-            [ emitM recordName
-            , emitM " { "
-            , mconcat . fmap emit . intersperse ", " <$> traverse (uncurry codegenField) fields
-            , emitM " }"
-            ]
+            Constant constant' -> codegen constant'
 
 -- TODO: Add let ... in ... so that we can declare variables and functions?
 data Variable
@@ -240,6 +220,34 @@ data Variable
     | Text Text
     | Unit
     deriving (Eq, Show)
+
+-- Codegen for Expression never fails, so this function is safe.
+codegenV :: Variable -> Text
+codegenV = Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
+
+instance Codegen Variable where
+    type GeneratorState Variable = ()
+
+    codegen = \case
+        Array a -> emitBetween' "[" "]" $ a `separatedBy'` ", "
+        Bool b -> emitM if b then "true" else "false"
+        Char c -> emitBetween' "'" "'" $ emitM (Text.singleton c)
+        Double d -> emitM $ show d
+        Integer i -> emitM $ show i
+        Record r fs -> codegenRecord r fs
+        Text t -> emitBetween' "\""  "\"" $ emitM t
+        Unit -> emitM "()"
+      where
+        codegenField fieldName expr = mconcat <$> sequence
+            [ emitM fieldName
+            , emitM " = "
+            , codegen expr
+            ]
+
+        codegenRecord recordName fields = mconcat <$> sequence
+            [ emitM recordName
+            , emitBetween' " { " " }" $ separatedByF (uncurry codegenField) (emit ", ") fields
+            ]
 
 instance FromJSON Variable where
     parseJSON = withObject "Language.LowCode.Logic.AST.Variable" \o -> do
@@ -259,8 +267,9 @@ instance FromJSON Variable where
                 "integer" -> Integer <$> parseJSON value'
                 "text"    -> Text    <$> parseJSON value'
                 other     -> fail $
-                               "Expected 'array', 'bool', 'char', 'double', 'function', 'integer'"
-                               <> ", 'record', 'text' or 'unit', but got '" <> other <> "'."
+                               "Expected 'array', 'bool', 'char', 'double',\
+                               \ 'function', 'integer', 'record', 'text' or\
+                               \ 'unit', but got '" <> other <> "'."
 
 instance ToJSON Variable where
     toJSON (Array a) = object
@@ -303,7 +312,7 @@ data VariableType
     | DoubleType
     | FunctionType [VariableType] VariableType
     | IntegerType
-    | RecordType [VariableType]
+    | RecordType [(Name, VariableType)]
     | TextType
     | UnitType
     deriving (Eq, Ord, Show)
@@ -316,11 +325,13 @@ instance FromJSON VariableType where
         "double"   -> pure DoubleType
         "function" -> FunctionType <$> o .: "arguments" <*> o .: "return"
         "integer"  -> pure IntegerType
+        "record"   -> RecordType <$> o .: "fields"
         "text"     -> pure TextType
         "unit"     -> pure UnitType
         other      -> fail $
-                       "Expected 'array', 'bool', 'char', 'double', 'function', 'integer', 'text' or"
-                       <> " 'unit', but got '" <> other <> "'."
+                       "Expected 'array', 'bool', 'char', 'double', 'function',\
+                       \ 'integer', 'record', 'text' or 'unit',\
+                       \ but got '" <> other <> "'."
 
 instance ToJSON VariableType where
     toJSON (ArrayType elements) = object
@@ -337,8 +348,8 @@ instance ToJSON VariableType where
         ]
     toJSON IntegerType = object [ "type" .= String "integer" ]
     toJSON (RecordType fieldsType) = object
-        [ "type"   .= String "record"
-        , "fields" .= fieldsType
+        [ "type"       .= String "record"
+        , "fields"     .= fieldsType
         ]
     toJSON TextType    = object [ "type" .= String "text"    ]
     toJSON UnitType    = object [ "type" .= String "unit"    ]
@@ -376,7 +387,7 @@ parseExpression = first (toText . errorBundlePretty) . parse (expression0 <* eof
 -- Reference:
 -- https://en.wikipedia.org/wiki/Operator-precedence_parser#Precedence_climbing_method
 expression0 :: Parser Expression
-expression0 = expression1 0 =<< nonBinary
+expression0 = expression1 0 =<< primary
 
 expression1 :: Int -> Expression -> Parser Expression
 expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
@@ -385,7 +396,7 @@ expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
         | precedence op >= minPrecedence = do
             space
             symbol <- binaryOperator
-            rhs <- nonBinary
+            rhs <- primary
             lookaheadMaybe <- peek
             case lookaheadMaybe of
                 Nothing -> pure $ BinaryOp lhs' symbol rhs
@@ -406,20 +417,33 @@ expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
 
     peek = optional $ lookAhead $ binarySymbolToOperator <$> binaryOperator
 
-nonBinary :: Parser Expression
-nonBinary = do
+primary :: Parser Expression
+primary = space *> (secondary =<< choice [value, unary, parenthesis]) <* space
+
+secondary :: Expression -> Parser Expression
+secondary lhs = do
     space
-    lhs <- choice [value, unary, parenthesis]
-    exprs <- many $
-        try (space *> between (char '(') (space *> char ')') (expression0 `sepBy` char ','))
-    space
-    pure $ foldl' Call lhs exprs
+    rhs <- optional (secondary =<< choice [access' lhs, call' lhs, index' lhs])
+    pure $ fromMaybe lhs rhs
+  where
+    access' lhs' = Access lhs' <$> access
+    call' lhs' = Call lhs' <$> tuple
+    index' lhs' = Index lhs' <$> index
+
+access :: Parser Name
+access = char '.' *> space *> variableName
+
+tuple :: Parser [Expression]
+tuple = between (char '(') (space *> char ')') (expression0 `sepBy` char ',')
+
+index :: Parser Expression
+index = between (char '[') (space *> char ']') expression0
 
 array :: Parser [Expression]
 array = between (char '[') (space *> char ']') (expression0 `sepEndBy` char ',')
 
 unary :: Parser Expression
-unary = liftA2 UnaryOp unaryOperator nonBinary
+unary = liftA2 UnaryOp unaryOperator primary
 
 integer :: Parser Integer
 integer = try (Lexer.decimal <* notFollowedBy (char 'e' <|> char '.'))
@@ -500,7 +524,7 @@ isOperatorSymbol :: Char -> Bool
 isOperatorSymbol c = (c `notElem` forbidden) && (isPunctuation c || isSymbol c)
   where
     forbidden :: String
-    forbidden = ",()[]{}"
+    forbidden = ",.()[]{}"
 
 unaryOperator :: Parser UnarySymbol
 unaryOperator = do
