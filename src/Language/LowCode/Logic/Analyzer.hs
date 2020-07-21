@@ -16,6 +16,8 @@ module Language.LowCode.Logic.Analyzer
     , analyzeMany
     , analyze
     , analyzeExpr
+    , analyzeExprWithHint
+    , analyzeType
     , analyzeTypeWithHint
     , isNumeric
     , isText
@@ -50,7 +52,6 @@ data Error
     | StartIsNotFirstSymbol
     | TypeMismatch Text VariableType VariableType
     | UndefinedVariable Name
-    | UnknownType Name VariableType
     deriving (Eq, Show)
 
 prettyError :: Error -> Text
@@ -74,7 +75,7 @@ prettyError = \case
         (codegenE expr)
         (unaryToText symbol)
     IncompatibleTypes2 left symbol right -> sformat
-        ("Incompatible expressions '" % stext % "' and '" % stext % "' for unary operator '" % stext % "'.")
+        ("Incompatible expressions '" % stext % "' and '" % stext % "' for binary operator '" % stext % "'.")
         (codegenE left)
         (codegenE right)
         (binaryToText symbol)
@@ -108,10 +109,6 @@ prettyError = \case
         -- TODO: Scan for similarly named variables.
         ("'" % stext % "' was used but it was not defined. Perhaps you forgot to declare it or made a typo?")
         name
-    UnknownType location actual -> sformat
-        ("Could not deduce type '" % shown % "' from its use in '" % stext % "'.")
-        actual
-        location
 
 data Warning
     = UnusedVariable Name
@@ -215,7 +212,7 @@ analyzeAssign var expr = do
     case Map.lookup var symbols of
         Nothing -> addError $ UndefinedVariable var
         Just info -> do
-            typeE <- analyzeExpr (varType info) expr
+            typeE <- analyzeExprWithHint (varType info) expr
             if varType info == typeE
                 then
                     let info' = info { varType = typeE }
@@ -228,7 +225,7 @@ analyzeVar var type' expr = do
     if Map.member var symbols
     then addError $ ShadowedVariable var
     else do
-        checkTypes var type' =<< analyzeExpr type' expr
+        checkTypes var type' =<< analyzeExprWithHint type' expr
         let info = mkInfo type'
         modify \s -> s { analyzerSymbols = Map.insert var info (analyzerSymbols s) }
 
@@ -279,8 +276,8 @@ analyzeReturn Nothing = do
     when (ret /= UnitType) $ addError $ TypeMismatch "return" ret UnitType
 analyzeReturn (Just expr) = do
     ret <- asks returnType
-    typeE <- analyzeExpr ret expr
-    when (ret /= typeE) $ addError $ TypeMismatch "return" ret typeE
+    typeE <- analyzeExprWithHint ret expr
+    when (ret /= typeE) $ addError $ TypeMismatch (codegenE expr) ret typeE
 
 analyzeImpl :: AST -> Analyzer ()
 analyzeImpl = \case
@@ -289,13 +286,10 @@ analyzeImpl = \case
         analyzeImpl next
     End -> pure ()
     Expression _ expr next -> do
-        -- TODO: What is the correct type in this case? One solution is take the
-        -- C# route and disallow arbitrary expressions, but rather make it become
-        -- a function call.
-        void $ analyzeExpr UnitType expr
+        void $ analyzeExpr expr
         analyzeImpl next
     If _ expr false true next -> do
-        checkTypes "if" BoolType =<< analyzeExpr BoolType expr
+        checkTypes "if" BoolType =<< analyzeExprWithHint BoolType expr
         void $ withScope $ analyzeImpl false
         void $ withScope $ analyzeImpl true
         analyzeImpl next
@@ -305,67 +299,139 @@ analyzeImpl = \case
         analyzeVar var type' expr
         analyzeImpl next
     While _ expr body next -> do
-        checkTypes "while" BoolType =<< analyzeExpr BoolType expr
+        checkTypes "while" BoolType =<< analyzeExprWithHint BoolType expr
         void $ withScope $ analyzeImpl body
         analyzeImpl next
 
-analyzeExpr :: VariableType -> Expression -> Analyzer VariableType
-analyzeExpr !expectedType = \case
+analyzeExpr :: Expression -> Analyzer (Maybe VariableType)
+analyzeExpr = \case
     Access left right -> do
-        -- TODO: Maybe add a withField?
-        -- TODO: Port Call code to Access.
-        analyzeExpr expectedType (Call (Value (Variable right)) [left])
-    BinaryOp left symbol' right -> mdo
-        -- FIXME: This freezes due to the recursive bindings!
-        typeL <- analyzeExpr typeR left
-        typeR <- analyzeExpr typeL right
-        let ret = interactsWithBinary typeL symbol' typeR
-        maybe (addError (IncompatibleTypes2 left symbol' right) *> pure expectedType)
-              pure
-              ret
+        typeLMaybe <- analyzeExpr left
+        case typeLMaybe of
+            Nothing -> pure Nothing
+            Just typeL@(RecordType fields) -> do
+                let fieldSearch = find (\l -> fst l == right) fields
+                whenNothing_ fieldSearch $ addError (NotAMember typeL right)
+                pure $ Just typeL
+            Just typeL -> addError (NotARecord typeL right) *> pure (Just typeL)
+    BinaryOp left symbol' right -> do
+        typeLMaybe <- analyzeExpr left
+        case typeLMaybe of
+            Nothing -> pure Nothing
+            Just typeL -> do
+                typeR <- analyzeExprWithHint typeL right
+                let ret = interactsWithBinary typeL symbol' typeR
+                whenNothing_ ret $
+                    addError (IncompatibleTypes2 left symbol' right)
+                pure ret
     Call (Value (Variable name)) arguments -> do
-        (infoMaybe, symbols) <- gets $
-            Map.updateLookupWithKey (const (Just . markUsed)) name . analyzerSymbols
-        modify \s -> s { analyzerSymbols = symbols }
+        infoMaybe <- analyzeVariable name
+        case infoMaybe of
+            Nothing -> addError (UndefinedVariable name) *> pure Nothing
+            Just (VariableInfo _ typeF@(FunctionType argTypes _)) -> do
+                typeAs <- traverse (uncurry analyzeExprWithHint) $ zip argTypes arguments
+                Just <$> analyzeApply name typeAs typeF
+            Just (VariableInfo _ _) -> do
+                addError (NotAFunction name) *> pure Nothing
+    Call expr arguments -> do
+        let exprC = codegenE expr
+        typeEMaybe <- analyzeExpr expr
+        case typeEMaybe of
+            Nothing -> pure Nothing
+            Just (typeF@(FunctionType argTypes _)) -> do
+                typeAs <- traverse (uncurry analyzeExprWithHint) $ zip argTypes arguments
+                Just <$> analyzeApply exprC typeAs typeF
+            Just type' -> addError (NotAFunction exprC) *> pure (Just type')
+    Index left right -> do
+        typeLMaybe <- analyzeExpr left
+        void $ analyzeExprWithHint IntegerType right
+        case typeLMaybe of
+            Nothing -> pure ()
+            Just (ArrayType _) -> pure ()
+            Just typeL ->
+                addError (TypeMismatch (codegenE left) (ArrayType typeL) typeL)
+        pure typeLMaybe
+    Parenthesis expr -> analyzeExpr expr
+    UnaryOp symbol' expr -> do
+        typeEMaybe <- analyzeExpr expr
+        let ret = interactsWithUnary symbol' =<< typeEMaybe
+        whenNothing_ ret $
+            addError (IncompatibleTypes1 symbol' expr)
+        pure ret
+    Value value -> case value of
+        Variable v -> varType <<$>> analyzeVariable v
+        Constant c -> analyzeType c
+
+analyzeExprWithHint :: VariableType -> Expression -> Analyzer VariableType
+analyzeExprWithHint !expectedType = \case
+    Access left right -> do
+        typeLMaybe <- analyzeExpr left
+        case typeLMaybe of
+            Nothing -> pure expectedType
+            Just typeL@(RecordType fields) -> do
+                let fieldSearch = find (\l -> fst l == right) fields
+                case fieldSearch of
+                    Nothing -> do
+                        addError (NotAMember typeL right)
+                        pure expectedType
+                    Just field -> pure $ snd field
+            Just typeL -> addError (NotARecord typeL right) *> pure typeL
+    BinaryOp left symbol' right -> do
+        typeLMaybe <- analyzeExpr left
+        case typeLMaybe of
+            Nothing -> pure expectedType
+            Just typeL -> do
+                typeR <- analyzeExprWithHint typeL right
+                let ret = interactsWithBinary typeL symbol' typeR
+                maybe
+                    (addError (IncompatibleTypes2 left symbol' right) *> pure expectedType)
+                    pure
+                    ret
+    Call (Value (Variable name)) arguments -> do
+        infoMaybe <- analyzeVariable name
         case infoMaybe of
             Nothing -> addError (UndefinedVariable name) *> pure expectedType
             Just (VariableInfo _ typeF@(FunctionType argTypes _)) -> do
-                typeAs <- traverse (uncurry analyzeExpr) $ zip argTypes arguments
+                typeAs <- traverse (uncurry analyzeExprWithHint) $ zip argTypes arguments
                 analyzeApply name typeAs typeF
-            Just (VariableInfo _ _) -> do
-                addError (NotAFunction name) *> pure expectedType
-    Call expr arguments -> mdo
+            Just (VariableInfo _ type') -> do
+                addError (NotAFunction name)
+                pure type'
+    Call expr arguments -> do
         let exprC = codegenE expr
-            expectedFunctionType = FunctionType typeAs expectedType
-        -- TODO: Check whether typeE will freeze with typeAs, since they are
-        -- recursive.
-        typeE <- analyzeExpr expectedFunctionType expr
-        (typeAs, ret) <- case typeE of
-            typeF@(FunctionType argTypes _) -> do
-                typeAs' <- traverse (uncurry analyzeExpr) $ zip argTypes arguments
-                ret' <- analyzeApply exprC typeAs' typeF
-                pure (typeAs', ret')
-            _ -> addError (NotAFunction exprC) *> pure ([], expectedType)
-        pure ret
+        typeEMaybe <- analyzeExpr expr
+        case typeEMaybe of
+            Nothing -> pure expectedType
+            Just (typeF@(FunctionType argTypes _)) -> do
+                typeAs <- traverse (uncurry analyzeExprWithHint) $ zip argTypes arguments
+                analyzeApply exprC typeAs typeF
+            Just typeE -> addError (NotAFunction exprC) *> pure typeE
     Index left right -> do
-        typeL <- analyzeExpr (ArrayType expectedType) left
-        typeR <- analyzeExpr IntegerType right
-        case typeL of
+        let leftC  = codegenE left
+            rightC = codegenE right
+        typeL <- analyzeExprWithHint (ArrayType expectedType) left
+        typeR <- analyzeExprWithHint IntegerType right
+        typeL' <- case typeL of
             ArrayType actualType
-                | actualType == expectedType -> pure ()
-                | otherwise -> addError (TypeMismatch (codegenE left) (ArrayType expectedType) typeL)
-            _ -> addError (TypeMismatch (codegenE left) (ArrayType expectedType) typeL)
+                | actualType == expectedType -> pure actualType
+                | otherwise                  -> do
+                    addError (TypeMismatch leftC (ArrayType expectedType) typeL)
+                    pure expectedType
+            _ -> do
+                addError (TypeMismatch leftC (ArrayType expectedType) typeL)
+                pure expectedType
         case typeR of
             IntegerType -> pure ()
-            _ -> addError (TypeMismatch (codegenE right) IntegerType typeR)
-        pure expectedType
-    Parenthesis expr -> analyzeExpr expectedType expr
+            _           -> addError (TypeMismatch rightC IntegerType typeR)
+        pure typeL'
+    Parenthesis expr -> analyzeExprWithHint expectedType expr
     UnaryOp symbol' expr -> do
-        typeE <- analyzeExpr expectedType expr
+        typeE <- analyzeExprWithHint expectedType expr
         let ret = interactsWithUnary symbol' typeE
-        maybe (addError (IncompatibleTypes1 symbol' expr) *> pure expectedType)
-              pure
-              ret
+        maybe
+            (addError (IncompatibleTypes1 symbol' expr) *> pure expectedType)
+            pure
+            ret
     Value value -> case value of
         Variable v -> maybe expectedType varType <$> analyzeVariable v
         Constant c -> analyzeTypeWithHint expectedType c
@@ -390,34 +456,37 @@ analyzeVariable name = do
     whenNothing_ infoMaybe $ addError (UndefinedVariable name)
     pure infoMaybe
 
-analyzeArray :: VariableType -> [Expression] -> Analyzer VariableType
-analyzeArray expectedType exprs = do
-    types <- traverse (unnestArray expectedType) exprs
-    case types of
-        [] -> pure expectedType
-        (x : _)
-            | x == expectedType -> pure x
-            | otherwise         -> do
-                addError $ TypeMismatch "array" expectedType x
-                pure x
-  where
-    unnestArray (ArrayType typeA) (Value (Constant (Array xs))) = do
-        traverse_ (unnestArray typeA) xs
-        pure typeA
-    unnestArray type' expr = do
-        typeE <- analyzeExpr type' expr
-        when (type' /= typeE) $
-            addError $ TypeMismatch (codegenE expr) type' typeE
-        pure typeE
+analyzeArray :: [Expression] -> Analyzer (Maybe VariableType)
+analyzeArray [] = pure Nothing
+analyzeArray (x : xs) = do
+    xTypeMaybe <- analyzeExpr x
+    case xTypeMaybe of
+        Nothing    -> pure Nothing
+        Just xType -> do
+            --xsTypes <- traverse (analyzeExprWithHint xType) xs
+            --let yTypeMaybe = find (/= xType) xsTypes
+            --whenJust yTypeMaybe \yType ->
+            --    addError (TypeMismatch (codegenE x) xType yType)
+            traverse_ (analyzeExprWithHint xType) xs
+            pure xTypeMaybe
 
-    --nestArray 0 typeA = typeA
-    --nestArray n typeA = ArrayType (nestArray (n - 1) typeA)
+-- TODO: Stil not properly typechecking!
+analyzeArrayWithHint :: VariableType -> [Expression] -> Analyzer VariableType
+analyzeArrayWithHint expectedType [] = pure $ ArrayType $ unnestArray expectedType
+analyzeArrayWithHint expectedType (x : xs) = do
+    let expectedType' = unnestArray expectedType
+    xType <- analyzeExprWithHint expectedType' x
+    traverse_ (analyzeExprWithHint expectedType') xs
+    when (xType == expectedType) $
+        addError $ TypeMismatch (codegenE x) (ArrayType expectedType) xType
+    pure $ ArrayType xType
 
-    --arrayDepth (ArrayType typeA) = 1 + arrayDepth typeA
-    --arrayDepth _                 = 0
+unnestArray :: VariableType -> VariableType
+unnestArray (ArrayType typeA) = typeA
+unnestArray type'             = type'
 
-analyzeRecord :: VariableType -> Name -> [(Name, Expression)] -> Analyzer VariableType
-analyzeRecord expectedType name fields = do
+analyzeRecord :: Name -> [(Name, Expression)] -> Analyzer (Maybe VariableType)
+analyzeRecord name fields = do
     -- Find whether there are fields with duplicate names:
     let (names, exprs) = unzip fields
         sorted = sort names
@@ -427,18 +496,20 @@ analyzeRecord expectedType name fields = do
     recs <- asks records
     case Map.lookup name recs of
         Nothing -> do
-            --traverse_ (analyzeExpr Nothing) exprs
             addError $ NoSuchRecord name
-            pure expectedType
+            typesMaybe <- sequence <$> traverse analyzeExpr exprs
+            case typesMaybe of
+                Nothing -> pure Nothing
+                Just types -> pure $ Just $ RecordType $ zip names types
         Just templateFields -> do
             -- Check if number of fields match.
             let (templateNames, templateTypes) = unzip templateFields
                 templateSorted = sort templateNames
             when (templateSorted /= sorted) $
                 addError $ IncompatibleRecord name templateSorted sorted
-            traverse_ (uncurry analyzeExpr) $ zip templateTypes exprs
+            traverse_ (uncurry analyzeExprWithHint) $ zip templateTypes exprs
             traverse_ (uncurry analyzeWithHint) $ zip templateTypes exprs
-            pure expectedType
+            pure $ Just $ RecordType templateFields
   where
     -- TODO: Add types to error?
     errorDuplicate = addError . DuplicateRecord name
@@ -447,16 +518,35 @@ analyzeRecord expectedType name fields = do
         analyzeTypeWithHint expectedType' var
     analyzeWithHint expectedType' _ = pure expectedType'
 
+analyzeRecordWithHint :: VariableType -> Name -> [(Name, Expression)] -> Analyzer VariableType
+analyzeRecordWithHint expectedType name fields = do
+    typeRMaybe <- analyzeRecord name fields
+    maybe (pure expectedType) pure typeRMaybe
+
+analyzeType :: Variable -> Analyzer (Maybe VariableType)
+analyzeType = \case
+    Array es    -> analyzeArray es
+    Bool _      -> pure $ Just BoolType
+    Char _      -> pure $ Just CharType
+    Double _    -> pure $ Just DoubleType
+    Integer _   -> pure $ Just IntegerType
+    Record r fs -> analyzeRecord r fs
+    Text _      -> pure $ Just TextType
+    Unit        -> pure $ Just UnitType
+
 analyzeTypeWithHint :: VariableType -> Variable -> Analyzer VariableType
 analyzeTypeWithHint expectedType = \case
-    Array es    -> analyzeArray expectedType es
-    Bool _      -> pure BoolType
-    Char _      -> pure CharType
-    Double _    -> pure DoubleType
-    Integer _   -> pure IntegerType
-    Record r fs -> analyzeRecord expectedType r fs
-    Text _      -> pure TextType
-    Unit        -> pure UnitType
+    Array es    -> analyzeArrayWithHint expectedType es
+    Record r fs -> analyzeRecordWithHint expectedType r fs
+    var         -> do
+        typeVMaybe <- analyzeType var
+        case typeVMaybe of
+            Nothing -> pure expectedType  -- Absurd.
+            Just typeV
+                | typeV == expectedType -> pure typeV
+                | otherwise             -> do
+                    addError (TypeMismatch (codegenV var) expectedType typeV)
+                    pure typeV
 
 isNumeric :: VariableType -> Bool
 isNumeric = \case

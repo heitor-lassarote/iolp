@@ -95,11 +95,9 @@ library
     , FlexibleInstances
     , LambdaCase
     , MultiParamTypeClasses
-    , MultiWayIf
     , NoImplicitPrelude
     , OverloadedStrings
     , RecordWildCards
-    , RecursiveDo
     , TupleSections
     , TypeFamilies
   default-language:     Haskell2010
