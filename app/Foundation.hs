@@ -1,17 +1,12 @@
 module Foundation where
 
-import Data.Foldable (traverse_)
 import Universum hiding (get, traverse_, (^.))
 
-import qualified Codec.Archive.Zip as Zip
 import           Crypto.KDF.BCrypt
 import           Data.Aeson
 import           Database.Esqueleto hiding (Value)
-import qualified Database.Persist                 as P
+import qualified Database.Persist as P
 import           Network.HTTP.Types.Status
-import           System.Directory (createDirectoryIfMissing)
-import           System.FilePath
-import qualified System.IO.Temp as Temp
 import           Yesod hiding (delete, (==.))
 import           Yesod.Core.Types (Logger)
 
@@ -127,21 +122,11 @@ getBuildR pid = do
         Error err -> sendResponseStatus status500 err
         Success bundle' -> pure $ generate bundle'
     case status of
-        OK files -> mkBundleZip (toString $ projectName project) files
+        OK files -> do
+            zipPath <- mkBundleZip (show $ fromSqlKey pid) (toString $ projectName project) files
+            sendFile "application/zip" zipPath
         LogicError errors -> sendResponseStatus status500 $ toJSON errors
         CodegenError errors -> sendResponseStatus status500 $ toJSON errors
-  where
-    mkBundleZip name files = do
-        -- FIXME (maybe): Creates a temporary folder with name SqlBackendKey {unSqlBackendKey = ?}
-        -- where ? is the actual PID.
-        tempPath <- liftIO $ (</> show pid) <$> Temp.getCanonicalTemporaryDirectory
-        liftIO $ createDirectoryIfMissing False tempPath
-        traverse_ (uncurry (writeFile . (tempPath </>))) files
-        selectors <- traverse (Zip.mkEntrySelector . fst) files
-        let entries = zip (encodeUtf8 . snd <$> files) selectors
-            file = tempPath </> name <> ".zip"
-        Zip.createArchive file (traverse_ (uncurry (Zip.addEntry Zip.Store)) entries)
-        sendFile "application/zip" file
 
 getUserR :: Handler Value
 getUserR = do

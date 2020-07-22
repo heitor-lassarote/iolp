@@ -44,10 +44,8 @@ executable LowCode
       aeson                 >=1 && <2
     , cryptonite            >=0 && <1
     , data-default-class    >=0 && <1
-    , directory             >=1 && <2
     , esqueleto             >=3 && <4
     , fast-logger           >=3 && <4
-    , filepath              >=1 && <2
     , http-types            >=0 && <1
     , low-code              >=0 && <1
     , monad-logger          >=0 && <1
@@ -56,7 +54,6 @@ executable LowCode
     , persistent-postgresql >=2 && <3
     , persistent-template   >=2 && <3
     , template-haskell      >=2 && <3
-    , temporary             >=1 && <2
     , text                  >=1 && <2
     , unliftio-core         >=0 && <1
     , wai                   >=3 && <4
@@ -66,7 +63,6 @@ executable LowCode
     , yesod                 >=1 && <2
     , yesod-core            >=1 && <2
     , yesod-persistent      >=1 && <2
-    , zip                   >=1 && <2
   default-extensions:
       DeriveAnyClass
     , DeriveGeneric
@@ -96,10 +92,14 @@ library
       aeson                 >=1 && <2
     , containers            >=0 && <1
     , data-default-class    >=0 && <1
+    , directory             >=1 && <2
+    , filepath              >=1 && <2
     , formatting            >=6 && <7
     , megaparsec            >=8 && <9
+    , temporary             >=1 && <2
     , text                  >=1 && <2
     , transformers          >=0 && <1
+    , zip                   >=1 && <2
   default-extensions:
       DeriveAnyClass
     , DeriveDataTypeable

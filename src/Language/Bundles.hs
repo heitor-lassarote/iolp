@@ -2,8 +2,12 @@ module Language.Bundles where
 
 import Universum
 
+import qualified Codec.Archive.Zip as Zip
 import           Data.Aeson
 import           Data.Default.Class
+import           System.Directory (createDirectoryIfMissing)
+import           System.FilePath
+import qualified System.IO.Temp as Temp
 
 import           Language.Codegen
 import           Language.Common (Name)
@@ -23,6 +27,22 @@ data Status gen
 
 class Bundle bundle where
     generate :: (Emit gen, Monoid gen) => bundle -> Status gen
+
+mkBundleZip
+    :: (MonadIO m, MonadThrow m)
+    => FilePath
+    -> FilePath
+    -> [(FilePath, Text)]
+    -> m FilePath
+mkBundleZip tempFolderName name files = do
+    tempPath <- liftIO $ (</> tempFolderName) <$> Temp.getCanonicalTemporaryDirectory
+    liftIO $ createDirectoryIfMissing False tempPath
+    traverse_ (uncurry (writeFile . (tempPath </>))) files
+    selectors <- traverse (Zip.mkEntrySelector . fst) files
+    let entries = zip (encodeUtf8 . snd <$> files) selectors
+        file = tempPath </> name <> ".zip"
+    Zip.createArchive file (traverse_ (uncurry (Zip.addEntry Zip.Store)) entries)
+    pure file
 
 data PageCssHtmlLogic = PageCssHtmlLogic
     { css   :: CSS.AST
