@@ -206,28 +206,30 @@ addError e = tell $ mempty { errors = [e] }
 --addWarning :: Warning -> Analyzer ()
 --addWarning w = tell $ mempty { warnings = [w] }
 
-analyzeAssign :: Text -> Expression -> Analyzer ()
-analyzeAssign var expr = do
+-- TODO: Is having two branches necessary?
+analyzeAssign :: Expression -> Expression -> Analyzer ()
+analyzeAssign (Value (Variable name)) expr = do
     symbols <- gets analyzerSymbols
-    case Map.lookup var symbols of
-        Nothing -> addError $ UndefinedVariable var
+    case Map.lookup name symbols of
+        Nothing -> addError $ UndefinedVariable name
         Just info -> do
             typeE <- analyzeExprWithHint (varType info) expr
-            if varType info == typeE
-                then
-                    let info' = info { varType = typeE }
-                    in modify \s -> s { analyzerSymbols = Map.insert var info' symbols }
-                else addError $ TypeMismatch var (varType info) typeE
+            when (varType info /= typeE) $
+                addError $ TypeMismatch name (varType info) typeE
+analyzeAssign left right = whenJustM (analyzeExpr left) \typeL -> do
+    typeR <- analyzeExprWithHint typeL right
+    when (typeL /= typeR) $
+        addError $ TypeMismatch (codegenE left <> " = " <> codegenE right) typeL typeR
 
-analyzeVar :: Text -> VariableType -> Expression -> Analyzer ()
-analyzeVar var type' expr = do
+analyzeVar :: Name -> VariableType -> Expression -> Analyzer ()
+analyzeVar name type' expr = do
     symbols <- gets analyzerSymbols
-    if Map.member var symbols
-    then addError $ ShadowedVariable var
-    else do
-        checkTypes var type' =<< analyzeExprWithHint type' expr
-        let info = mkInfo type'
-        modify \s -> s { analyzerSymbols = Map.insert var info (analyzerSymbols s) }
+    if Map.member name symbols
+        then addError $ ShadowedVariable name
+        else do
+            checkTypes name type' =<< analyzeExprWithHint type' expr
+            let info = mkInfo type'
+            modify \s -> s { analyzerSymbols = Map.insert name info (analyzerSymbols s) }
 
 checkTypes :: Text -> VariableType -> VariableType -> Analyzer ()
 checkTypes name expectedType actualType
@@ -281,8 +283,8 @@ analyzeReturn (Just expr) = do
 
 analyzeImpl :: AST -> Analyzer ()
 analyzeImpl = \case
-    Assign _ var expr next -> do
-        analyzeAssign var expr
+    Assign _ left right next -> do
+        analyzeAssign left right
         analyzeImpl next
     End -> pure ()
     Expression _ expr next -> do
@@ -312,7 +314,11 @@ analyzeExpr = \case
             Just typeL@(RecordType fields) -> do
                 let fieldSearch = find (\l -> fst l == right) fields
                 whenNothing_ fieldSearch $ addError (NotAMember typeL right)
-                pure $ Just typeL
+                case fieldSearch of
+                    Nothing -> do
+                        addError (NotAMember typeL right)
+                        pure Nothing
+                    Just field -> pure $ Just $ snd field
             Just typeL -> addError (NotARecord typeL right) *> pure (Just typeL)
     BinaryOp left symbol' right -> do
         typeLMaybe <- analyzeExpr left

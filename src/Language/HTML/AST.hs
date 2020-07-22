@@ -41,4 +41,4 @@ link cssFiles jsFiles html =
         ]
   where
     includeStylesheets fs = [Tag "link" [("rel", "stylesheet"), ("type", "text/css"), ("href", f)] [] | f <- fs]
-    includeScripts fs = [Tag "script" [("src", f)] [] | f <- fs]
+    includeScripts fs = [Tag "script" [("src", f), ("type", "text/javascript")] [] | f <- fs]

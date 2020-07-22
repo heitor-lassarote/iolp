@@ -28,7 +28,7 @@ data Variable
 
 -- Simplified version good enough to create the conversion.
 data AST
-    = Assign Text Expression
+    = Assign Expression Expression
     | Block [AST]
     | Expression Expression
     | Function (Maybe Text) [Text] AST

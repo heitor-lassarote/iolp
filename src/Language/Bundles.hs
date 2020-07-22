@@ -33,6 +33,7 @@ data PageCssHtmlLogic = PageCssHtmlLogic
 
 data BundleCssHtmlLogic = BundleCssHtmlLogic
     { cssOptions       :: CSS.Options
+    , extraJsFiles     :: [(Name, Text)]
     , htmlOptions      :: HTML.Options
     , jsOptions        :: JS.Options
     , logicEnvironment :: L.Environment
@@ -42,6 +43,7 @@ data BundleCssHtmlLogic = BundleCssHtmlLogic
 instance FromJSON BundleCssHtmlLogic where
     parseJSON = withObject "Language.Bundles.BundleCssHtmlLogic" \o ->
         BundleCssHtmlLogic <$> o .:? "cssOptions"       .!= def
+                           <*> o .:? "extraJsFiles"     .!= []
                            <*> o .:? "htmlOptions"      .!= def
                            <*> o .:? "jsOptions"        .!= def
                            <*> o .:? "logicEnvironment" .!= def
@@ -60,15 +62,20 @@ instance Bundle BundleCssHtmlLogic where
         errors = lefts result
         files = join $ rights result
 
+        jsFiles :: (Emit gen, Monoid gen) => [(String, gen)]
+        jsFiles = bimap toString emit <$> extraJsFiles
+
+        linkHtml :: (Emit gen, Monoid gen) => PageCssHtmlLogic -> Either (String, Text) [(String, gen)]
         linkHtml page = do
-            let pName = name page
-                cssName = pName <> ".css"
-                cssNames = if css page == CSS.CSS [] then [] else [cssName]
-                jsName = pName <> ".js"
-                jsNames = if null (logic page) then [] else [jsName]
-                htmlName = pName <> ".html"
-                withName name = bimap (toString name,) (toString name,)
             js' <- withName jsName $ evalCodegenT (JS.withOptions jsOptions) $ codegen $ L.lToJs $ logic page
             css' <- withName cssName $ evalCodegenT (CSS.withOptions cssOptions) $ codegen $ css page
-            html' <- withName htmlName $ evalCodegenT (HTML.withOptions htmlOptions) $ codegen $ HTML.link cssNames jsNames $ html page
-            pure [js', css', html']
+            html' <- withName htmlName $ evalCodegenT (HTML.withOptions htmlOptions) $ codegen $ HTML.link cssNames (map fst extraJsFiles <> jsNames) $ html page
+            pure (jsFiles <> [js', css', html'])
+          where
+            pName = name page
+            cssName = pName <> ".css"
+            cssNames = if css page == CSS.CSS [] then [] else [cssName]
+            jsName = pName <> ".js"
+            jsNames = if null (logic page) then [] else [jsName]
+            htmlName = pName <> ".html"
+            withName name = bimap (toString name,) (toString name,)

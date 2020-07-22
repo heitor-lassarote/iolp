@@ -22,8 +22,8 @@ instance LanguageConverter [L.AST] JS.AST where
     convert = JS.NonScopedBlock . concatMap convert'
       where
         convert' = \case
-            L.Assign _ name expression next ->
-                JS.Assign name (convert expression) : convert' next
+            L.Assign _ left right next ->
+                JS.Assign (convert left) (convert right) : convert' next
             L.End ->
                 []
             L.Expression _ expression next ->

@@ -10,10 +10,9 @@ module Language.JavaScript.Codegen
 
 import Universum
 
-import           Control.Monad.Trans.Except (throwE)
-import           Data.Aeson (FromJSON, ToJSON)
-import           Data.Default.Class
-import qualified Data.Set  as S
+import Control.Monad.Trans.Except (throwE)
+import Data.Aeson (FromJSON, ToJSON)
+import Data.Default.Class
 
 import Language.Codegen
 import Language.Emit
@@ -44,7 +43,6 @@ instance Default Options where
 data JSGeneratorState = JSGeneratorState
     { currentIndentLevel :: Int
     , options            :: Options
-    , symbols            :: Set Text
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 instance HasIndentation JSGeneratorState where
@@ -53,7 +51,7 @@ instance HasIndentation JSGeneratorState where
     setCurrentIndentation l st = st { currentIndentLevel = l }
 
 instance Default JSGeneratorState where
-    def = JSGeneratorState 0 def S.empty
+    def = JSGeneratorState 0 def
 
 withOptions :: Options -> JSGeneratorState
 withOptions options' = def { options = options' }
@@ -141,15 +139,30 @@ genFunction name args body = case name of
         , javaScriptCodegenInternal body
         ]
 
-genAssignmentOrDeclaration
+genAssignment
     :: (Emit gen, Monoid gen)
-    => Bool
-    -> Name
+    => Expression
     -> Expression
     -> JavaScriptCodegen gen
-genAssignmentOrDeclaration isAssignment name expression = mconcat <$> sequence
+genAssignment left right = mconcat <$> sequence
     [ indentCompact
-    , emitM if isAssignment then "" else "let "
+    , genExpression left
+    , space
+    , emitM "="
+    , space
+    , genExpression right
+    , emitM ";"
+    , nl
+    ]
+
+genDeclaration
+    :: (Emit gen, Monoid gen)
+    => Name
+    -> Expression
+    -> JavaScriptCodegen gen
+genDeclaration name expression = mconcat <$> sequence
+    [ indentCompact
+    , emitM "let "
     , emitIfValid name
     , space
     , emitM "="
@@ -159,24 +172,11 @@ genAssignmentOrDeclaration isAssignment name expression = mconcat <$> sequence
     , nl
     ]
 
-undefinedVariableError :: Name -> JavaScriptCodegen gen
-undefinedVariableError name =
-    lift $ throwE $
-        "Undefined symbol '" <> name <> "'. Maybe you forgot to declare it?"
-
-checkVariable :: Name -> JavaScriptCodegen ()
-checkVariable name = do
-    symbols' <- gets symbols
-    if S.member name symbols' then
-        pure ()
-    else
-        undefinedVariableError name
-
 genVariable
     :: (Emit gen, Monoid gen)
     => ValueType Variable
     -> JavaScriptCodegen gen
-genVariable (Variable v) = checkVariable v *> emitIfValid v
+genVariable (Variable v) = emitIfValid v
 genVariable (Constant c) = genConstant c
 
 genExpression
@@ -224,7 +224,7 @@ javaScriptCodegenInternal
     => AST
     -> JavaScriptCodegen gen
 javaScriptCodegenInternal = \case
-    Assign name expression -> genAssignmentOrDeclaration True name expression
+    Assign left right -> genAssignment left right
     Block asts -> genBlock asts
     Expression expression -> mconcat <$> sequence
         [ indentCompact
@@ -232,11 +232,7 @@ javaScriptCodegenInternal = \case
         , emitM ";"
         , nl
         ]
-    Function nameMaybe args inner -> do
-        whenJust nameMaybe \name ->
-            modify \st -> st { symbols = S.insert name (symbols st) }
-        modify \st -> st { symbols = S.union (symbols st) $ S.fromList args }
-        genFunction nameMaybe args inner
+    Function nameMaybe args inner -> genFunction nameMaybe args inner
     If expression t f -> do
         indent' <- indentCompact
         space' <- space
@@ -271,9 +267,7 @@ javaScriptCodegenInternal = \case
         , emitM ";"
         , nl
         ]
-    Var name expression -> do
-        modify \st -> st { symbols = S.insert name (symbols st) }
-        genAssignmentOrDeclaration False name expression
+    Var name expression -> genDeclaration name expression
     While expression body -> mconcat <$> sequence
         [ indentCompact
         , emitM "while"

@@ -45,9 +45,8 @@ newtype Metadata = Metadata
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 data AST
-    -- | Assigns a new value to the variable with the specified name and type
-    -- and what follows after.
-    = Assign Metadata Name Expression AST
+    -- | Assigns a new value to the first expression, and what follows after.
+    = Assign Metadata Expression Expression AST
     -- | Represents the end of a cycle.
     | End
     -- | Executes a raw expression. Useful for Call.
@@ -71,8 +70,8 @@ data AST
 instance FromJSON AST where
     parseJSON = withObject "Language.LowCode.Logic.AST.AST" \o -> o .: "tag" >>= \case
         "assign"      -> Assign     <$> o .:  "metadata"
-                                    <*> o .:  "name"
-                                    <*> o .:  "expression"
+                                    <*> o .:  "leftExpression"
+                                    <*> o .:  "rightExpression"
                                     <*> o .:? "nextAst"         .!= End
         "expression"  -> Expression <$> o .:  "metadata"
                                     <*> o .:  "expression"
@@ -105,11 +104,11 @@ instance FromJSON AST where
 
 instance ToJSON AST where
     toJSON = \case
-        Assign metadata name expression ast -> object
+        Assign metadata left right ast -> object
             [ "metadata"         .= metadata
             , "tag"              .= String "assign"
-            , "name"             .= String name
-            , "expression"       .= expression
+            , "leftExpression"   .= left
+            , "rightExpression"  .= right
             , "nextAst"          .= ast
             ]
         End -> Null

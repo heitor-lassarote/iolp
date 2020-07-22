@@ -1,6 +1,6 @@
+cabal-version:       2.2
 author:              Heitor Toledo Lassarote de Paula
 build-type:          Simple
-cabal-version:       >=1.10
 category:            Language
 copyright:           Copyright (c) 2020 Bruno Pereira Garcia Caputo, Heitor Toledo Lassarote de Paula & Mauro Alexandre Amaro da Cruz
 extra-source-files:  ChangeLog.md
@@ -16,10 +16,32 @@ source-repository head
   type: git
   location: https://github.com/heitor-lassarote/low-code
 
+flag lib-Werror
+  default: False
+  manual:  True
+
+common shared-properties
+  build-depends:
+      base                  >=4 && <5
+    , universum             >=1 && <2
+  default-extensions:
+      ApplicativeDo
+    , BangPatterns
+    , BlockArguments
+    , DeriveFunctor
+    , FlexibleContexts
+    , FlexibleInstances
+    , LambdaCase
+    , NoImplicitPrelude
+    , OverloadedStrings
+    , RecordWildCards
+    , TypeFamilies
+  default-language:     Haskell2010
+
 executable LowCode
+  import:               shared-properties
   build-depends:
       aeson                 >=1 && <2
-    , base                  >=4 && <5
     , cryptonite            >=0 && <1
     , data-default-class    >=0 && <1
     , directory             >=1 && <2
@@ -36,7 +58,6 @@ executable LowCode
     , template-haskell      >=2 && <3
     , temporary             >=1 && <2
     , text                  >=1 && <2
-    , universum             >=1 && <2
     , unliftio-core         >=0 && <1
     , wai                   >=3 && <4
     , wai-cors              >=0 && <1
@@ -47,60 +68,44 @@ executable LowCode
     , yesod-persistent      >=1 && <2
     , zip                   >=1 && <2
   default-extensions:
-      BlockArguments
-    , DeriveAnyClass
+      DeriveAnyClass
     , DeriveGeneric
     , DerivingStrategies
-    , FlexibleContexts
     , GADTs
     , GeneralizedNewtypeDeriving
     , MultiParamTypeClasses
-    , NoImplicitPrelude
-    , OverloadedStrings
     , QuasiQuotes
-    , RecordWildCards
     , StandaloneDeriving
     , TemplateHaskell
-    , TypeFamilies
     , ViewPatterns
-  default-language:     Haskell2010
+  if flag(lib-Werror)
+    ghc-options:        -Werror
+  ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat
   other-extensions:
       UndecidableInstances
   other-modules:
       Config
     , Database
     , Foundation
-  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
   hs-source-dirs:       app
   main-is:              Main.hs
 
 library
+  import:               shared-properties
   build-depends:
       aeson                 >=1 && <2
-    , base                  >=4 && <5
     , containers            >=0 && <1
     , data-default-class    >=0 && <1
     , formatting            >=6 && <7
     , megaparsec            >=8 && <9
     , text                  >=1 && <2
     , transformers          >=0 && <1
-    , universum             >=1 && <2
   default-extensions:
-      BangPatterns
-    , BlockArguments
-    , DeriveAnyClass
+      DeriveAnyClass
     , DeriveDataTypeable
-    , DeriveFunctor
     , DeriveGeneric
-    , FlexibleInstances
-    , LambdaCase
     , MultiParamTypeClasses
-    , NoImplicitPrelude
-    , OverloadedStrings
-    , RecordWildCards
     , TupleSections
-    , TypeFamilies
-  default-language:     Haskell2010
   exposed-modules:
       Language.Bundles
     , Language.Codegen
@@ -123,15 +128,20 @@ library
     , Language.LowCode.UI
     , Language.LowCode.UI.AST
     , Language.LowCode.UI.HTMLConverter
-  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
+  if flag(lib-Werror)
+    ghc-options:        -Werror
+  ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat
   hs-source-dirs:       src
 
 test-suite test
+  import:               shared-properties
   build-depends:
-      low-code              >=0 && <1
-    , universum             >=1 && <2
-  default-language:     Haskell2010
-  ghc-options:          -Wall -Werror -Wincomplete-uni-patterns -Wcompat
+      containers            >=0 && <1
+    , data-default-class    >=0 && <1
+    , HUnit                 >=1 && <2
+    , low-code              >=0 && <1
+    , QuickCheck            >=2 && <3
   hs-source-dirs:       test
-  main-is:              Tests.hs
+  ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat
+  main-is:              Main.hs
   type:                 exitcode-stdio-1.0
