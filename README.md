@@ -2,9 +2,9 @@
 This serves as the backend for the [LowCode UI](https://github.com/BrunoCaputo/low-code-ui), and contains functions and types that can be used to convert the editor's language into other languages (currently only JavaScript, CSS and HTML).
 
 ## Building
-You can use `stack build` to build this project. To use Stack, you can get the [Haskell Platform](https://www.haskell.org/platform/).
+You can use `stack build` to build this project. For that, you can get the [Haskell Platform](https://www.haskell.org/platform/) and [The Haskell Tool Stack](https://docs.haskellstack.org/en/stable/install_and_upgrade/).
 
-You can run the project with `stack run -- --dbhost ADDRESS --dbname postgres --dbpassword PASSWORD --dbport DB_PORT --dbuser USERNAME --connections CONNECTION_POOL_COUNT --port PORT`. A PostgreSQL database running in the background is needed. The database schema will automatically be created once the project is run for the first time (as defined in [Database.hs](https://github.com/heitor-lassarote/low-code/blob/master/app/Database.hs#L64#L74)).
+You can run the project with `stack run -- --dbhost ADDRESS --dbname postgres --dbpassword PASSWORD --dbport DB_PORT --dbuser USERNAME --connections CONNECTION_POOL_COUNT --port PORT`. A PostgreSQL database running in the background is needed. The database schema will automatically be created once the project is run for the first time (as defined in [Database.hs](https://github.com/heitor-lassarote/low-code/blob/master/app/Database.hs#L25#L33)).
 
 Afterwards, navigate to the given host to use it.
 
