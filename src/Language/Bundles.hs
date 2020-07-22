@@ -9,9 +9,9 @@ import           Language.Codegen
 import           Language.Common (Name)
 import qualified Language.CSS as CSS
 import           Language.Emit
+import           Language.LanguageConverter
 import qualified Language.HTML as HTML
 import qualified Language.JavaScript as JS
-import qualified Language.LowCode.Logic.JavaScriptConverter as L
 import qualified Language.LowCode.Logic as L
 
 data Status gen
@@ -67,7 +67,7 @@ instance Bundle BundleCssHtmlLogic where
 
         linkHtml :: (Emit gen, Monoid gen) => PageCssHtmlLogic -> Either (String, Text) [(String, gen)]
         linkHtml page = do
-            js' <- withName jsName $ evalCodegenT (JS.withOptions jsOptions) $ codegen $ L.lToJs $ logic page
+            js' <- withName jsName $ evalCodegenT (JS.withOptions jsOptions) $ codegen $ (convert $ logic page :: JS.AST)
             css' <- withName cssName $ evalCodegenT (CSS.withOptions cssOptions) $ codegen $ css page
             html' <- withName htmlName $ evalCodegenT (HTML.withOptions htmlOptions) $ codegen $ HTML.link cssNames (map fst extraJsFiles <> jsNames) $ html page
             pure (jsFiles <> [js', css', html'])

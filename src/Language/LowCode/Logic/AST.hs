@@ -20,11 +20,12 @@ import           Universum hiding (bool, many, take, takeWhile, try)
 import qualified Universum.Unsafe as Unsafe
 
 import           Data.Aeson hiding (Array, Bool)
+import           Data.Aeson.Types (prependFailure, unexpected)
 import           Data.Char (isAlphaNum, isPunctuation, isSymbol)
 import           Data.Default.Class
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
-import           Text.Megaparsec
+import           Text.Megaparsec hiding (unexpected)
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 
@@ -97,10 +98,10 @@ instance FromJSON AST where
                                     <*> o .:  "expression"
                                     <*> o .:  "whileAst"
                                     <*> o .:? "nextAst"         .!= End
-        other         -> fail $ "Unknown tag '"
-                            <> other
-                            <> "'. Available tags are: 'assign', 'expression'"
-                            <> ", 'if', 'return', 'start', 'var' and 'while'."
+        other         -> fail $
+                            "Unknown tag '" <> other <> "'. Available tags are:\
+                            \ 'assign', 'expression', 'if', 'return', 'start',\
+                            \ 'var' and 'while'."
 
 instance ToJSON AST where
     toJSON = \case
@@ -166,10 +167,63 @@ data Expression
     deriving (Eq, Show)
 
 instance FromJSON Expression where
-    parseJSON = withText "Language.LowCode.Logic.AST.Expression" (either (fail . toString) pure . parseExpression)
+    parseJSON (String s) = either (fail . toString) pure $ parseExpression s
+    parseJSON (Object o) = o .: "tag" >>= \case
+        "access"      -> Access      <$> o .: "expression"
+                                     <*> o .: "name"
+        "binaryOp"    -> BinaryOp    <$> o .: "leftExpression"
+                                     <*> o .: "symbol"
+                                     <*> o .: "rightExpression"
+        "call"        -> Call        <$> o .: "expression"
+                                     <*> o .: "arguments"
+        "index"       -> Index       <$> o .: "leftExpression"
+                                     <*> o .: "rightExpression"
+        "parenthesis" -> Parenthesis <$> o .: "expression"
+        "unaryOp"     -> UnaryOp     <$> o .: "symbol"
+                                     <*> o .: "expression"
+        "value"       -> Value       <$> o .: "value"
+        other         -> fail $
+                            "Expected 'access', 'binaryOp', 'call', 'index',\
+                            \ 'parenthesis', 'unaryOp' or 'value', but got '"
+                            <> other <> "'."
+    parseJSON other = prependFailure "Expected String or Object, but got " (unexpected other)
 
 instance ToJSON Expression where
-    toJSON = String . codegenE
+    toJSON = \case
+        Access expression name -> object
+            [ "tag"             .= String "access"
+            , "expression"      .= expression
+            , "name"            .= name
+            ]
+        BinaryOp left symbol' right -> object
+            [ "tag"             .= String "binaryOp"
+            , "leftExpression"  .= left
+            , "symbol"          .= symbol'
+            , "rightExpression" .= right
+            ]
+        Call expression arguments -> object
+            [ "tag"             .= String "call"
+            , "expression"      .= expression
+            , "arguments"       .= arguments
+            ]
+        Index left right -> object
+            [ "tag"             .= String "index"
+            , "leftExpression"  .= left
+            , "rightExpression" .= right
+            ]
+        Parenthesis expression -> object
+            [ "tag"             .= String "parenthesis"
+            , "expression"      .= expression
+            ]
+        UnaryOp symbol' expression -> object
+            [ "tag"             .= String "unaryOp"
+            , "symbol"          .= symbol'
+            , "expression"      .= expression
+            ]
+        Value value' -> object
+            [ "tag"             .= String "value"
+            , "value"           .= value'
+            ]
 
 -- Codegen for Expression never fails, so this function is safe.
 codegenE :: Expression -> Text
@@ -271,38 +325,39 @@ instance FromJSON Variable where
                                \ 'unit', but got '" <> other <> "'."
 
 instance ToJSON Variable where
-    toJSON (Array a) = object
-        [ "type"  .= String "array"
-        , "value" .= a
-        ]
-    toJSON (Bool b) = object
-        [ "type"  .= String "bool"
-        , "value" .= b
-        ]
-    toJSON (Char c) = object
-        [ "type"  .= String "char"
-        , "value" .= c
-        ]
-    toJSON (Double d) = object
-        [ "type"  .= String "double"
-        , "value" .= d
-        ]
-    toJSON (Integer i) = object
-        [ "type"  .= String "integer"
-        , "value" .= i
-        ]
-    toJSON (Record recordName fields) = object
-        [ "type"   .= String "field"
-        , "name"   .= String recordName
-        , "fields" .= toJSON fields
-        ]
-    toJSON (Text t) = object
-        [ "type"  .= String "text"
-        , "value" .= t
-        ]
-    toJSON Unit = object
-        [ "type"  .= String "unit"
-        ]
+    toJSON = \case
+        Array a -> object
+            [ "type"  .= String "array"
+            , "value" .= a
+            ]
+        Bool b -> object
+            [ "type"  .= String "bool"
+            , "value" .= b
+            ]
+        Char c -> object
+            [ "type"  .= String "char"
+            , "value" .= c
+            ]
+        Double d -> object
+            [ "type"  .= String "double"
+            , "value" .= d
+            ]
+        Integer i -> object
+            [ "type"  .= String "integer"
+            , "value" .= i
+            ]
+        Record recordName fields -> object
+            [ "type"   .= String "field"
+            , "name"   .= String recordName
+            , "fields" .= fields
+            ]
+        Text t -> object
+            [ "type"  .= String "text"
+            , "value" .= t
+            ]
+        Unit -> object
+            [ "type"  .= String "unit"
+            ]
 
 data VariableType
     = ArrayType VariableType
