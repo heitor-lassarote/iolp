@@ -12,9 +12,14 @@ import Network.Wai.Handler.Warp
     ( Settings
     , defaultSettings
     , defaultShouldDisplayException
-    , runSettings
     , setOnException
     , setPort
+    )
+import Network.Wai.Handler.WarpTLS
+    ( OnInsecure (..)
+    , onInsecure
+    , runTLS
+    , tlsSettings
     )
 import Network.Wai.Middleware.Cors
     ( CorsResourcePolicy (..)
@@ -106,9 +111,15 @@ main = do
     runStderrLoggingT $ withPostgresqlPool (connectionString $ dbConfig config) (serverConnections config) \pool -> liftIO do
         foundation <- mkFoundation config pool
         app <- mkApplication foundation
-        runSettings (warpSettings foundation) app
+        runTLS (mkTlsSettings config) (warpSettings foundation) app
   where
     opts = info (parseServerConfig <**> helper)
                 (  fullDesc
                 <> header "low-code: a backend for low-code-ui"
                 <> progDesc "Start the low-code backend" )
+
+    mkTlsSettings config =
+        let tlsS = tlsSettings (serverCertificate config) (serverKey config)
+         in if serverAcceptInsecureHttp config
+                then tlsS { onInsecure = AllowInsecure }
+                else tlsS

@@ -60,6 +60,7 @@ executable LowCode
     , wai-cors              >=0 && <1
     , wai-extra             >=3 && <4
     , warp                  >=3 && <4
+    , warp-tls              >=3 && <4
     , yesod                 >=1 && <2
     , yesod-core            >=1 && <2
     , yesod-persistent      >=1 && <2

@@ -5,11 +5,11 @@ import Universum
 import Options.Applicative
 
 data DBConfig = DBConfig
-    { dbHost        :: Text
-    , dbName        :: Text
-    , dbPassword    :: Text
-    , dbPort        :: Int
-    , dbUser        :: Text
+    { dbHost     :: Text
+    , dbName     :: Text
+    , dbPassword :: Text
+    , dbPort     :: Int
+    , dbUser     :: Text
     }
 
 parseDBConfig :: Parser DBConfig
@@ -42,8 +42,11 @@ parseDBConfig = DBConfig
 
 data ServerConfig = ServerConfig
     { dbConfig                     :: DBConfig
+    , serverAcceptInsecureHttp     :: Bool
+    , serverCertificate            :: FilePath
     , serverConnections            :: Int
     , serverDetailedRequestLogging :: Bool
+    , serverKey                    :: FilePath
     , serverIpFromHeader           :: Bool
     , serverPort                   :: Int
     }
@@ -51,6 +54,15 @@ data ServerConfig = ServerConfig
 parseServerConfig :: Parser ServerConfig
 parseServerConfig = ServerConfig
     <$> parseDBConfig
+    <*> switch
+        (  long "accept-insecure"
+        <> short 'h'
+        <> help "Accept insecure connections over HTTP." )
+    <*> strOption
+        (  long "certificate"
+        <> short 'C'
+        <> metavar "PATH_TO_CERTIFICATE"
+        <> help "Path to the TLS certificate." )
     <*> option auto
         (  long "connections"
         <> short 'c'
@@ -60,6 +72,11 @@ parseServerConfig = ServerConfig
         (  long "ip-from-header"
         <> short 'i'
         <> help "Get the IP address from the header when logging. Useful when sitting behind a reverse proxy." )
+    <*> strOption
+        (  long "key"
+        <> short 'K'
+        <> metavar "PATH_TO_KEY"
+        <> help "Path to the TLS key." )
     <*> switch
         (  long "detailed-request-logging"
         <> short 'l'
