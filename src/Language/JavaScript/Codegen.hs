@@ -189,18 +189,19 @@ genExpression = \case
         , emitM "."
         , emitM name
         ]
-    Call expr args -> mconcat <$> sequence
-        [ genExpression expr
-        , emitBetween' "(" ")" $ args `separatedBy'` ", "
-        ]
-    Index expr inner -> mconcat <$> sequence
-        [ genExpression expr
-        , emitBetween' "[" "]" $ genExpression inner
-        ]
     BinaryOp left op right -> mconcat <$> sequence
         [ genExpression left
         , emitM $ binarySymbolToText op
         , genExpression right
+        ]
+    Call expr args -> mconcat <$> sequence
+        [ genExpression expr
+        , emitBetween' "(" ")" $ args `separatedBy'` ", "
+        ]
+    Function nameMaybe args inner -> genFunction nameMaybe args inner
+    Index expr inner -> mconcat <$> sequence
+        [ genExpression expr
+        , emitBetween' "[" "]" $ genExpression inner
         ]
     Parenthesis expr -> emitBetween' "(" ")" $ genExpression expr
     UnaryOp op expr -> mconcat <$> sequence
@@ -232,7 +233,6 @@ javaScriptCodegenInternal = \case
         , emitM ";"
         , nl
         ]
-    Function nameMaybe args inner -> genFunction nameMaybe args inner
     If expression t f -> do
         indent' <- indentCompact
         space' <- space

@@ -13,11 +13,6 @@ import qualified Language.LowCode.Logic.AST   as L
 instance LanguageConverter L.AST JS.AST where
     convert ast = convert [ast]
 
--- | For some reason, I couldn't declare this function in Bundle.hs, because GHC
--- would say "no instance for (LanguageConverter [L.AST] JS.AST)".
-lToJs :: [L.AST] -> JS.AST
-lToJs = convert
-
 instance LanguageConverter [L.AST] JS.AST where
     convert = JS.NonScopedBlock . concatMap convert'
       where
@@ -35,7 +30,7 @@ instance LanguageConverter [L.AST] JS.AST where
             L.Return _ expression ->
                 [JS.Return (convert <$> expression)]
             L.Start _ name _ arguments next ->
-                [JS.Function (Just name) arguments (JS.Block $ convert' next)]
+                [JS.Expression $ JS.Function (Just name) arguments (JS.Block $ convert' next)]
             L.Var _ name _ expression next ->
                 JS.Var name (convert expression) : convert' next
             L.While _ expression body next ->

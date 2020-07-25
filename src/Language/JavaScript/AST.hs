@@ -31,7 +31,6 @@ data AST
     = Assign Expression Expression
     | Block [AST]
     | Expression Expression
-    | Function (Maybe Text) [Text] AST
     | If Expression AST (Maybe AST)
     | NonScopedBlock [AST]
     | Return (Maybe Expression)
@@ -41,9 +40,10 @@ data AST
 
 data Expression
     = Access Expression Name
-    | Call Expression [Expression]
-    | Index Expression Expression
     | BinaryOp Expression !BinarySymbol Expression
+    | Call Expression [Expression]
+    | Function (Maybe Text) [Text] AST
+    | Index Expression Expression
     | Parenthesis Expression
     | UnaryOp !UnarySymbol Expression
     | Value (ValueType Variable)
