@@ -1,5 +1,6 @@
 module Language.LowCode.Logic.AST
-    ( Environment (..)
+    ( module Language.Common
+    , Environment (..)
     , Metadata (..)
     , AST (..)
     , Expression (..)
@@ -16,12 +17,12 @@ module Language.LowCode.Logic.AST
     , mapTextToBinary
     ) where
 
-import           Universum hiding (bool, many, take, takeWhile, try)
+import           Universum hiding (bool, bracket, many, take, takeWhile, try)
 import qualified Universum.Unsafe as Unsafe
 
 import           Data.Aeson hiding (Array, Bool)
 import           Data.Aeson.Types (prependFailure, unexpected)
-import           Data.Char (isAlphaNum, isPunctuation, isSymbol)
+import qualified Data.Char as Char
 import           Data.Default.Class
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
@@ -45,30 +46,30 @@ newtype Metadata = Metadata
     { position :: Double2
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
-data AST
+data AST metadata
     -- | Assigns a new value to the first expression, and what follows after.
-    = Assign Metadata Expression Expression AST
+    = Assign metadata Expression Expression (AST metadata)
     -- | Represents the end of a cycle.
     | End
     -- | Executes a raw expression. Useful for Call.
-    | Expression Metadata Expression AST
+    | Expression metadata Expression (AST metadata)
     -- | Allows a condition to be tested, and contains the true branch, false
     -- branch and what follows after the branches.
-    | If Metadata Expression AST AST AST
+    | If metadata Expression (AST metadata) (AST metadata) (AST metadata)
     -- | Exits the function, optionally returning a value.
-    | Return Metadata (Maybe Expression)
+    | Return metadata (Maybe Expression)
     -- | Represents the start of a cycle with a given name and a list of
     -- parameters.
-    | Start Metadata Name !VariableType [Name] AST
+    | Start metadata Name !VariableType [Name] (AST metadata)
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var Metadata Name !VariableType Expression AST
+    | Var metadata Name !VariableType Expression (AST metadata)
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
-    | While Metadata Expression AST AST
-    deriving (Eq, Show)
+    | While metadata Expression (AST metadata) (AST metadata)
+    deriving (Eq, Functor, Show)
 
-instance FromJSON AST where
+instance (FromJSON metadata) => FromJSON (AST metadata) where
     parseJSON = withObject "Language.LowCode.Logic.AST.AST" \o -> o .: "tag" >>= \case
         "assign"      -> Assign     <$> o .:  "metadata"
                                     <*> o .:  "leftExpression"
@@ -103,7 +104,7 @@ instance FromJSON AST where
                             \ 'assign', 'expression', 'if', 'return', 'start',\
                             \ 'var' and 'while'."
 
-instance ToJSON AST where
+instance (ToJSON metadata) => ToJSON (AST metadata) where
     toJSON = \case
         Assign metadata left right ast -> object
             [ "metadata"         .= metadata
@@ -487,20 +488,44 @@ secondary lhs = do
 access :: Parser Name
 access = char '.' *> space *> variableName
 
+bracket :: Char -> Char -> Parser a -> Parser a
+bracket left right = between (char left) (space *> char right)
+
 tuple :: Parser [Expression]
-tuple = between (char '(') (space *> char ')') (expression0 `sepBy` char ',')
+tuple = bracket '(' ')' (expression0 `sepBy` char ',')
 
 index :: Parser Expression
-index = between (char '[') (space *> char ']') expression0
+index = bracket '[' ']' expression0
 
 array :: Parser [Expression]
-array = between (char '[') (space *> char ']') (expression0 `sepEndBy` char ',')
+array = bracket '[' ']' (expression0 `sepEndBy` char ',')
 
 unary :: Parser Expression
 unary = liftA2 UnaryOp unaryOperator primary
 
 integer :: Parser Integer
-integer = try (Lexer.decimal <* notFollowedBy (char 'e' <|> char '.'))
+integer = do
+    radixMaybe <- optional (mkRadix <* char' 'r')
+    let radix = fromMaybe 10 radixMaybe
+    when (radix < 1 || radix > 36) $
+        fail "Radix must be a natural number in [1, 36] range."
+    number <- takeNums
+    when (any ((>= radix) . toInt) number)
+        if radixMaybe == Nothing
+        then fail "Not a valid number."
+        else fail "Number must contain only digits or ASCII letters and must be encodable in the given radix."
+    pure $ mkNum radix number
+  where
+    mkRadix = mkNum 10 <$> takeWhile1P (Just "digit") Char.isDigit
+    takeNums = takeWhile1P (Just "digit") (\c -> Char.isDigit c || Char.isAsciiLower c || Char.isAsciiUpper c)
+    mkNum r = foldl' (\a c -> step r a $ toInt c) 0
+    step r a c = a * r + c
+    toInt = toInteger . toInt'
+    toInt' c
+        | Char.isDigit      c = Char.digitToInt c
+        | Char.isAsciiLower c = Char.ord c - Char.ord 'a' + 10
+        | Char.isAsciiUpper c = Char.ord c - Char.ord 'A' + 10
+        | otherwise           = error $ "Panic in integer: Unknown digit: " <> Text.singleton c
 
 value :: Parser Expression
 value = constant <|> variable
@@ -511,7 +536,7 @@ constant = Value . Constant <$> choice
     , Bool    <$> bool
     , Char    <$> char''
     , Double  <$> try Lexer.float
-    , Integer <$> integer
+    , Integer <$> try integer
     , record' <$> try record
     , Text    <$> text
     , unit'   <$> unit
@@ -524,7 +549,7 @@ variable :: Parser Expression
 variable = Value . Variable <$> variableName
 
 parenthesis :: Parser Expression
-parenthesis = between (char '(') (char ')') (Parenthesis <$> expression0)
+parenthesis = bracket '(' ')' (Parenthesis <$> expression0)
 
 bool :: Parser Bool
 bool = do
@@ -546,7 +571,7 @@ text = toText <$> (char '"' *> manyTill Lexer.charLiteral (char '"'))
 variableName :: Parser Text
 variableName = do
     head' <- letterChar <|> char '_'
-    tail' <- takeWhileP Nothing (\c -> isAlphaNum c || c == '_')
+    tail' <- takeWhileP Nothing (\c -> Char.isAlphaNum c || c == '_')
     pure $ Text.cons head' tail'
 
 record :: Parser (Name, [(Name, Expression)])
@@ -575,9 +600,9 @@ errorBinaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorBinaryNotFound symbol' = "Undefined binary operator '" <> symbol' <> "'."
 
 isOperatorSymbol :: Char -> Bool
-isOperatorSymbol c = (c `notElem` forbidden) && (isPunctuation c || isSymbol c)
+isOperatorSymbol c = (c `notElem` forbidden) && (Char.isPunctuation c || Char.isSymbol c)
   where
-    forbidden :: String
+    forbidden :: Text
     forbidden = ",.()[]{}"
 
 unaryOperator :: Parser UnarySymbol

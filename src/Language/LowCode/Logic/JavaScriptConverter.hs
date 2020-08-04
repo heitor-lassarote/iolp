@@ -10,10 +10,10 @@ import qualified Language.JavaScript.AST as JS
 import           Language.LanguageConverter
 import qualified Language.LowCode.Logic.AST   as L
 
-instance LanguageConverter L.AST JS.AST where
+instance LanguageConverter (L.AST metadata) JS.AST where
     convert ast = convert [ast]
 
-instance LanguageConverter [L.AST] JS.AST where
+instance LanguageConverter [L.AST metadata] JS.AST where
     convert = JS.NonScopedBlock . concatMap convert'
       where
         convert' = \case

@@ -236,14 +236,14 @@ checkTypes name expectedType actualType
     | expectedType == actualType = pure ()
     | otherwise = addError $ TypeMismatch name expectedType actualType
 
-collectStarts :: Environment -> [AST] -> Map Name VariableInfo
+collectStarts :: Environment -> [AST metadata] -> Map Name VariableInfo
 collectStarts env = foldr mkSymbol (Map.map mkInfo (externs env))
   where
     mkSymbol (Start _ name ret@(FunctionType _ _) _ _) acc =
         Map.insert name (mkInfo ret) acc
     mkSymbol _ acc = acc
 
-analyzeMany :: Environment -> [AST] -> Analyzer ()
+analyzeMany :: Environment -> [AST metadata] -> Analyzer ()
 analyzeMany env asts = do
     let functions = collectStarts env asts
     withRWS (\r s ->
@@ -252,11 +252,11 @@ analyzeMany env asts = do
         ))
         (traverse_ (withScope . analyzeStart) asts)
 
-analyze :: Environment -> AST -> Analyzer ()
+analyze :: Environment -> AST metadata -> Analyzer ()
 analyze env ast = analyzeMany env [ast]
 {-# INLINE analyze #-}
 
-analyzeStart :: AST -> Analyzer ()
+analyzeStart :: AST metadata -> Analyzer ()
 analyzeStart (Start _ name (FunctionType argTypes ret) arguments next) = do
     let nArgs = length arguments
         nTypes = length argTypes
@@ -281,7 +281,7 @@ analyzeReturn (Just expr) = do
     typeE <- analyzeExprWithHint ret expr
     when (ret /= typeE) $ addError $ TypeMismatch (codegenE expr) ret typeE
 
-analyzeImpl :: AST -> Analyzer ()
+analyzeImpl :: AST metadata -> Analyzer ()
 analyzeImpl = \case
     Assign _ left right next -> do
         analyzeAssign left right
