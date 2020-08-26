@@ -1,4 +1,3 @@
-import { element } from "protractor";
 import {
     Output,
     Page,
@@ -17,6 +16,13 @@ import { ShowComponentInfoService } from "src/app/services/show-component-info/s
 import { SendService } from "src/app/services/send/send.service";
 import { HttpErrorResponse } from "@angular/common/http";
 import { ToastrService } from "ngx-toastr";
+import {
+    CdkDragEnd,
+    CdkDragStart,
+    CdkDragRelease,
+    CdkDragMove,
+    CdkDragDrop,
+} from "@angular/cdk/drag-drop";
 
 declare let $: any;
 declare let css: any;
@@ -68,6 +74,40 @@ export class CanvasComponent implements OnInit {
             width: `${event.rectangle.width}px`,
             height: `${event.rectangle.height}px`,
         };
+    }
+
+    drop(event: CdkDragEnd) {
+        // console.log(event.source);
+        // if (event.previousContainer === event.container) {
+        //     moveItemInArray(
+        //         event.container.data,
+        //         event.previousIndex,
+        //         event.currentIndex
+        //     );
+        // } else {
+        //     transferArrayItem(
+        //         event.previousContainer.data,
+        //         event.container.data,
+        //         event.previousIndex,
+        //         event.currentIndex
+        //     );
+        // }
+    }
+
+    onDragMoved(event: CdkDragMove) {
+        console.log(event);
+    }
+
+    onDrop(event: CdkDragDrop<HTMLElement>) {
+        console.log(event);
+    }
+
+    onDragStart(event: CdkDragStart) {
+        // console.log(event);
+    }
+
+    onDragRelease(event: CdkDragRelease) {
+        // console.log(event);
     }
 
     click(ev: any, targ: any) {
