@@ -25,15 +25,17 @@ module Language.LowCode.Logic.Analyzer
     , interactsWithBinary
     ) where
 
-import           Universum hiding (asks, gets, modify)
+import           Universum hiding (Type, asks, find, gets, modify)
 
 import           Control.Monad.Trans.RWS.CPS
 import           Data.Default.Class
+import           Data.Foldable (find)
 import qualified Data.Map.Strict as Map
 import           Formatting (int, sformat, shown, stext, (%))
 
 import           Language.Common
 import           Language.LowCode.Logic.AST
+import           Utility
 
 -- TODO: Should IncompatibleTypes and TypeMismatch really have these signatures?
 -- Or even better: Should TypeMismatch instead have info about the node instead
@@ -44,13 +46,14 @@ data Error
     | IncompatibleSignatures Name Int Int
     | IncompatibleTypes1 UnarySymbol Expression
     | IncompatibleTypes2 Expression BinarySymbol Expression
+    | NoSuchConstructor Name
     | NoSuchRecord Name
     | NotAFunction Name
-    | NotAMember VariableType Name
-    | NotARecord VariableType Name
+    | NotAMember Type Name
+    | NotARecord Type Name
     | ShadowedVariable Name
     | StartIsNotFirstSymbol
-    | TypeMismatch Text VariableType VariableType
+    | TypeMismatch Text Type Type
     | UndefinedVariable Name
     deriving (Eq, Show)
 
@@ -79,6 +82,9 @@ prettyError = \case
         (codegenE left)
         (codegenE right)
         (binaryToText symbol)
+    NoSuchConstructor name -> sformat
+        ("Could not find ADT containing a constuctor called '" % stext % "'.")
+        name
     NoSuchRecord name -> sformat
         ("Could not find record '" % stext % "'.")
         name
@@ -122,19 +128,19 @@ prettyWarning = \case
 
 data VariableInfo = VariableInfo
     { unused  :: !Bool
-    , varType :: !VariableType
+    , varType :: !Type
     } deriving (Show)
 
-mkInfo :: VariableType -> VariableInfo
+mkInfo :: Type -> VariableInfo
 mkInfo = VariableInfo True
 
 data AnalyzerReader = AnalyzerReader
-    { records    :: Map Name [(Name, VariableType)]
-    , returnType :: VariableType
+    { environment :: Environment
+    , returnType  :: Type
     } deriving (Show)
 
 instance Default AnalyzerReader where
-    def = AnalyzerReader Map.empty UnitType
+    def = AnalyzerReader def unitType
 
 data AnalyzerWriter = AnalyzerWriter
     { errors          :: ![Error]
@@ -208,7 +214,7 @@ addError e = tell $ mempty { errors = [e] }
 
 -- TODO: Is having two branches necessary?
 analyzeAssign :: Expression -> Expression -> Analyzer ()
-analyzeAssign (Value (Variable name)) expr = do
+analyzeAssign (Variable name) expr = do
     symbols <- gets analyzerSymbols
     case Map.lookup name symbols of
         Nothing -> addError $ UndefinedVariable name
@@ -221,7 +227,7 @@ analyzeAssign left right = whenJustM (analyzeExpr left) \typeL -> do
     when (typeL /= typeR) $
         addError $ TypeMismatch (codegenE left <> " = " <> codegenE right) typeL typeR
 
-analyzeVar :: Name -> VariableType -> Expression -> Analyzer ()
+analyzeVar :: Name -> Type -> Expression -> Analyzer ()
 analyzeVar name type' expr = do
     symbols <- gets analyzerSymbols
     if Map.member name symbols
@@ -231,7 +237,7 @@ analyzeVar name type' expr = do
             let info = mkInfo type'
             modify \s -> s { analyzerSymbols = Map.insert name info (analyzerSymbols s) }
 
-checkTypes :: Text -> VariableType -> VariableType -> Analyzer ()
+checkTypes :: Text -> Type -> Type -> Analyzer ()
 checkTypes name expectedType actualType
     | expectedType == actualType = pure ()
     | otherwise = addError $ TypeMismatch name expectedType actualType
@@ -247,7 +253,7 @@ analyzeMany :: Environment -> [AST metadata] -> Analyzer ()
 analyzeMany env asts = do
     let functions = collectStarts env asts
     withRWS (\r s ->
-        ( r { records = recordTemplates env }
+        ( r { environment = env }
         , s { analyzerSymbols = functions }
         ))
         (traverse_ (withScope . analyzeStart) asts)
@@ -275,7 +281,7 @@ analyzeStart next =
 analyzeReturn :: Maybe Expression -> Analyzer ()
 analyzeReturn Nothing = do
     ret <- asks returnType
-    when (ret /= UnitType) $ addError $ TypeMismatch "return" ret UnitType
+    when (ret /= unitType) $ addError $ TypeMismatch "return" ret unitType
 analyzeReturn (Just expr) = do
     ret <- asks returnType
     typeE <- analyzeExprWithHint ret expr
@@ -291,7 +297,7 @@ analyzeImpl = \case
         void $ analyzeExpr expr
         analyzeImpl next
     If _ expr false true next -> do
-        checkTypes "if" BoolType =<< analyzeExprWithHint BoolType expr
+        checkTypes "if" boolType =<< analyzeExprWithHint boolType expr
         void $ withScope $ analyzeImpl false
         void $ withScope $ analyzeImpl true
         analyzeImpl next
@@ -301,24 +307,24 @@ analyzeImpl = \case
         analyzeVar var type' expr
         analyzeImpl next
     While _ expr body next -> do
-        checkTypes "while" BoolType =<< analyzeExprWithHint BoolType expr
+        checkTypes "while" boolType =<< analyzeExprWithHint boolType expr
         void $ withScope $ analyzeImpl body
         analyzeImpl next
 
-analyzeExpr :: Expression -> Analyzer (Maybe VariableType)
+analyzeExpr :: Expression -> Analyzer (Maybe Type)
 analyzeExpr = \case
     Access left right -> do
         typeLMaybe <- analyzeExpr left
         case typeLMaybe of
             Nothing -> pure Nothing
-            Just typeL@(RecordType fields) -> do
-                let fieldSearch = find (\l -> fst l == right) fields
+            Just typeL@(RecordType fieldTypes) -> do
+                let fieldSearch = find (\(Field l _) -> l == right) fieldTypes
                 whenNothing_ fieldSearch $ addError (NotAMember typeL right)
                 case fieldSearch of
                     Nothing -> do
                         addError (NotAMember typeL right)
                         pure Nothing
-                    Just field -> pure $ Just $ snd field
+                    Just (Field _ fields) -> pure $ Just fields
             Just typeL -> addError (NotARecord typeL right) *> pure (Just typeL)
     BinaryOp left symbol' right -> do
         typeLMaybe <- analyzeExpr left
@@ -330,7 +336,7 @@ analyzeExpr = \case
                 whenNothing_ ret $
                     addError (IncompatibleTypes2 left symbol' right)
                 pure ret
-    Call (Value (Variable name)) arguments -> do
+    Call (Variable name) arguments -> do
         infoMaybe <- analyzeVariable name
         case infoMaybe of
             Nothing -> addError (UndefinedVariable name) *> pure Nothing
@@ -357,6 +363,7 @@ analyzeExpr = \case
             Just typeL ->
                 addError (TypeMismatch (codegenE left) (ArrayType typeL) typeL)
         pure typeLMaybe
+    Literal l -> analyzeType l
     Parenthesis expr -> analyzeExpr expr
     UnaryOp symbol' expr -> do
         typeEMaybe <- analyzeExpr expr
@@ -364,23 +371,21 @@ analyzeExpr = \case
         whenNothing_ ret $
             addError (IncompatibleTypes1 symbol' expr)
         pure ret
-    Value value -> case value of
-        Variable v -> varType <<$>> analyzeVariable v
-        Constant c -> analyzeType c
+    Variable v -> varType <<$>> analyzeVariable v
 
-analyzeExprWithHint :: VariableType -> Expression -> Analyzer VariableType
+analyzeExprWithHint :: Type -> Expression -> Analyzer Type
 analyzeExprWithHint !expectedType = \case
     Access left right -> do
         typeLMaybe <- analyzeExpr left
         case typeLMaybe of
             Nothing -> pure expectedType
-            Just typeL@(RecordType fields) -> do
-                let fieldSearch = find (\l -> fst l == right) fields
+            Just typeL@(RecordType fieldTypes) -> do
+                let fieldSearch = find (\(Field l _) -> l == right) fieldTypes
                 case fieldSearch of
                     Nothing -> do
                         addError (NotAMember typeL right)
                         pure expectedType
-                    Just field -> pure $ snd field
+                    Just (Field _ fields) -> pure fields
             Just typeL -> addError (NotARecord typeL right) *> pure typeL
     BinaryOp left symbol' right -> do
         typeLMaybe <- analyzeExpr left
@@ -393,7 +398,7 @@ analyzeExprWithHint !expectedType = \case
                     (addError (IncompatibleTypes2 left symbol' right) *> pure expectedType)
                     pure
                     ret
-    Call (Value (Variable name)) arguments -> do
+    Call (Variable name) arguments -> do
         infoMaybe <- analyzeVariable name
         case infoMaybe of
             Nothing -> addError (UndefinedVariable name) *> pure expectedType
@@ -430,6 +435,7 @@ analyzeExprWithHint !expectedType = \case
             IntegerType -> pure ()
             _           -> addError (TypeMismatch rightC IntegerType typeR)
         pure typeL'
+    Literal l -> analyzeTypeWithHint expectedType l
     Parenthesis expr -> analyzeExprWithHint expectedType expr
     UnaryOp symbol' expr -> do
         typeE <- analyzeExprWithHint expectedType expr
@@ -438,11 +444,9 @@ analyzeExprWithHint !expectedType = \case
             (addError (IncompatibleTypes1 symbol' expr) *> pure expectedType)
             pure
             ret
-    Value value -> case value of
-        Variable v -> maybe expectedType varType <$> analyzeVariable v
-        Constant c -> analyzeTypeWithHint expectedType c
+    Variable v -> maybe expectedType varType <$> analyzeVariable v
 
-analyzeApply :: Name -> [VariableType] -> VariableType -> Analyzer VariableType
+analyzeApply :: Name -> [Type] -> Type -> Analyzer Type
 analyzeApply name arguments (FunctionType argTypes ret) = do
     let nArgs = length arguments
         nTypes = length argTypes
@@ -462,7 +466,7 @@ analyzeVariable name = do
     whenNothing_ infoMaybe $ addError (UndefinedVariable name)
     pure infoMaybe
 
-analyzeArray :: [Expression] -> Analyzer (Maybe VariableType)
+analyzeArray :: [Expression] -> Analyzer (Maybe Type)
 analyzeArray [] = pure Nothing
 analyzeArray (x : xs) = do
     xTypeMaybe <- analyzeExpr x
@@ -477,7 +481,7 @@ analyzeArray (x : xs) = do
             pure xTypeMaybe
 
 -- TODO: Stil not properly typechecking!
-analyzeArrayWithHint :: VariableType -> [Expression] -> Analyzer VariableType
+analyzeArrayWithHint :: Type -> [Expression] -> Analyzer Type
 analyzeArrayWithHint expectedType [] = pure $ ArrayType $ unnestArray expectedType
 analyzeArrayWithHint expectedType (x : xs) = do
     let expectedType' = unnestArray expectedType
@@ -487,60 +491,72 @@ analyzeArrayWithHint expectedType (x : xs) = do
         addError $ TypeMismatch (codegenE x) (ArrayType expectedType) xType
     pure $ ArrayType xType
 
-unnestArray :: VariableType -> VariableType
+unnestArray :: Type -> Type
 unnestArray (ArrayType typeA) = typeA
 unnestArray type'             = type'
 
-analyzeRecord :: Name -> [(Name, Expression)] -> Analyzer (Maybe VariableType)
-analyzeRecord name fields = do
-    -- Find whether there are fields with duplicate names:
-    let (names, exprs) = unzip fields
-        sorted = sort names
-        dups = filter (uncurry (==)) $ zip sorted (drop 1 sorted)
-    traverse_ (errorDuplicate . fst) dups
+-- TODO: Add types to error?
+analyzeDuplicates :: Name -> [Name] -> Analyzer [Name]
+analyzeDuplicates origin names =
+    traverse_ (addError . DuplicateRecord origin . fst) dups *> pure sorted
+  where
+    sorted = sort names
+    dups = filter (uncurry (==)) $ zip sorted (drop 1 sorted)
 
-    recs <- asks records
+analyzeRecord :: Name -> [(Name, Expression)] -> Analyzer (Maybe Type)
+analyzeRecord name fields = do
+    let (names, exprs) = unzip fields
+    sorted <- analyzeDuplicates name names
+
+    recs <- asks $ recordTemplates . environment
     case Map.lookup name recs of
         Nothing -> do
             addError $ NoSuchRecord name
             typesMaybe <- sequence <$> traverse analyzeExpr exprs
-            case typesMaybe of
-                Nothing -> pure Nothing
-                Just types -> pure $ Just $ RecordType $ zip names types
+            pure case typesMaybe of
+                Nothing -> Nothing
+                Just types -> Just $ RecordType $ zipWith Field names types
         Just templateFields -> do
-            -- Check if number of fields match.
-            let (templateNames, templateTypes) = unzip templateFields
+            -- Check if number of fields match:
+            let (templateNames, templateTypes) = unzip $ fmap (\(Field n f) -> (n, f)) templateFields
                 templateSorted = sort templateNames
             when (templateSorted /= sorted) $
                 addError $ IncompatibleRecord name templateSorted sorted
             traverse_ (uncurry analyzeExprWithHint) $ zip templateTypes exprs
-            traverse_ (uncurry analyzeWithHint) $ zip templateTypes exprs
             pure $ Just $ RecordType templateFields
+
+analyzeRecordWithHint :: Type -> Name -> [(Name, Expression)] -> Analyzer Type
+analyzeRecordWithHint expectedType name fields =
+    fromMaybe expectedType <$> analyzeRecord name fields
+
+analyzeAlgebraic :: Name -> [Expression] -> Analyzer (Maybe Type)
+analyzeAlgebraic name exprs = do
+    adts <- asks $ adtTemplates . environment
+    case findMap findAdt $ Map.toList adts of
+        Nothing -> do
+            addError $ NoSuchConstructor name
+            traverse_ analyzeExpr exprs
+            pure Nothing
+        Just (adtName, adtConstructors, adtConstructor) -> do
+            -- TODO: Check whether exprs and adtConstructors have the same length.
+            --traverse_ (uncurry analyzeExprWithHint) $ zip (constructorTypes adtConstructor) exprs
+            sequence_ $ zipWith analyzeExprWithHint (constructorTypes adtConstructor) exprs
+            pure $ Just $ AlgebraicType adtName adtConstructors
   where
-    -- TODO: Add types to error?
-    errorDuplicate = addError . DuplicateRecord name
+    findAdt (adtName, adtConstructors) =
+        (adtName, adtConstructors,) <$> find ((== name) . constructorName) adtConstructors
 
-    analyzeWithHint expectedType' (Value (Constant var)) =
-        analyzeTypeWithHint expectedType' var
-    analyzeWithHint expectedType' _ = pure expectedType'
-
-analyzeRecordWithHint :: VariableType -> Name -> [(Name, Expression)] -> Analyzer VariableType
-analyzeRecordWithHint expectedType name fields = do
-    typeRMaybe <- analyzeRecord name fields
-    maybe (pure expectedType) pure typeRMaybe
-
-analyzeType :: Variable -> Analyzer (Maybe VariableType)
+analyzeType :: Literal -> Analyzer (Maybe Type)
 analyzeType = \case
-    Array es    -> analyzeArray es
-    Bool _      -> pure $ Just BoolType
-    Char _      -> pure $ Just CharType
-    Double _    -> pure $ Just DoubleType
-    Integer _   -> pure $ Just IntegerType
-    Record r fs -> analyzeRecord r fs
-    Text _      -> pure $ Just TextType
-    Unit        -> pure $ Just UnitType
+    Algebraic name fields -> analyzeAlgebraic name fields
+    Array elements        -> analyzeArray elements
+    Char _                -> pure $ Just CharType
+    Double _              -> pure $ Just DoubleType
+    Integer _             -> pure $ Just IntegerType
+    Record name fields    -> analyzeRecord name fields
+    Text _                -> pure $ Just TextType
 
-analyzeTypeWithHint :: VariableType -> Variable -> Analyzer VariableType
+analyzeTypeWithHint :: Type -> Literal -> Analyzer Type
 analyzeTypeWithHint expectedType = \case
     Array es    -> analyzeArrayWithHint expectedType es
     Record r fs -> analyzeRecordWithHint expectedType r fs
@@ -551,38 +567,37 @@ analyzeTypeWithHint expectedType = \case
             Just typeV
                 | typeV == expectedType -> pure typeV
                 | otherwise             -> do
-                    addError (TypeMismatch (codegenV var) expectedType typeV)
+                    addError (TypeMismatch (codegenL var) expectedType typeV)
                     pure typeV
 
-isNumeric :: VariableType -> Bool
+isNumeric :: Type -> Bool
 isNumeric = \case
     DoubleType  -> True
     IntegerType -> True
     _           -> False
 
-isText :: VariableType -> Bool
+isText :: Type -> Bool
 isText = \case
     CharType -> True
     TextType -> True
     _        -> False
 
-interactsWithUnary :: UnarySymbol -> VariableType -> Maybe VariableType
+interactsWithUnary :: UnarySymbol -> Type -> Maybe Type
 interactsWithUnary Negate = \case
     DoubleType  -> Just DoubleType
     IntegerType -> Just IntegerType
     _           -> Nothing
 interactsWithUnary Not = \case
-    BoolType    -> Just BoolType
     IntegerType -> Just IntegerType
-    _           -> Nothing
+    other
+        | other == boolType -> Just boolType
+        | otherwise         -> Nothing
 
-interactsWithBinary :: VariableType -> BinarySymbol -> VariableType -> Maybe VariableType
+interactsWithBinary :: Type -> BinarySymbol -> Type -> Maybe Type
 interactsWithBinary TextType Add TextType = Just TextType  -- Concatenate strings.
-interactsWithBinary BoolType s BoolType
-    | isLogical s = Just BoolType  -- Logical operators only interact with logical variables.
-    | otherwise   = Nothing
 interactsWithBinary l s r
     | l /= r                        = Nothing  -- Different types never interact.
+    | l == boolType && isLogical s  = Just boolType
     | isArithmetic s && isNumeric l = Just l  -- Numeric types interact with all arithmetic operators.
-    | isComparison s                = Just BoolType  -- Comparisons always return booleans.
+    | isComparison s                = Just boolType  -- Comparisons always return booleans.
     | otherwise                     = Nothing

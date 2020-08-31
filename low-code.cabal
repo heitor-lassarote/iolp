@@ -129,6 +129,7 @@ library
     , Language.LowCode.UI
     , Language.LowCode.UI.AST
     , Language.LowCode.UI.HTMLConverter
+    , Utility
   if flag(lib-Werror)
     ghc-options:        -Werror
   ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat

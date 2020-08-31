@@ -1,13 +1,17 @@
 module Language.LowCode.Logic.AST
     ( module Language.Common
+    , Field (..)
+    , Constructor (..)
     , Environment (..)
     , Metadata (..)
     , AST (..)
     , Expression (..)
     , codegenE
-    , Variable (..)
-    , codegenV
-    , VariableType (..)
+    , Literal (..)
+    , codegenL
+    , Type (..)
+    , boolType
+    , unitType
     , parseExpression
     , unaryToText
     , mapUnaryToText
@@ -17,7 +21,7 @@ module Language.LowCode.Logic.AST
     , mapTextToBinary
     ) where
 
-import           Universum hiding (bool, bracket, many, take, takeWhile, try)
+import           Universum hiding (Type, bool, bracket, many, take, takeWhile, try)
 import qualified Universum.Unsafe as Unsafe
 
 import           Data.Aeson hiding (Array, Bool)
@@ -34,13 +38,24 @@ import           Language.Codegen
 import           Language.Common
 import           Language.Emit
 
+data Field = Field
+    { fieldName :: Name
+    , fieldType :: Type
+    } deriving (Eq, Generic, Ord, Show, FromJSON, ToJSON)
+
+data Constructor = Constructor
+    { constructorName  :: Name
+    , constructorTypes :: [Type]
+    } deriving (Eq, Generic, Ord, Show, FromJSON, ToJSON)
+
 data Environment = Environment
-    { externs         :: Map Name VariableType
-    , recordTemplates :: Map Name [(Name, VariableType)]
+    { externs         :: Map Name Type
+    , recordTemplates :: Map Name [Field]
+    , adtTemplates    :: Map Name [Constructor]
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 instance Default Environment where
-    def = Environment Map.empty Map.empty
+    def = Environment Map.empty Map.empty Map.empty
 
 newtype Metadata = Metadata
     { position :: Double2
@@ -60,10 +75,10 @@ data AST metadata
     | Return metadata (Maybe Expression)
     -- | Represents the start of a cycle with a given name and a list of
     -- parameters.
-    | Start metadata Name !VariableType [Name] (AST metadata)
+    | Start metadata Name !Type [Name] (AST metadata)
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var metadata Name !VariableType Expression (AST metadata)
+    | Var metadata Name !Type Expression (AST metadata)
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
     | While metadata Expression (AST metadata) (AST metadata)
@@ -74,31 +89,31 @@ instance (FromJSON metadata) => FromJSON (AST metadata) where
         "assign"      -> Assign     <$> o .:  "metadata"
                                     <*> o .:  "leftExpression"
                                     <*> o .:  "rightExpression"
-                                    <*> o .:? "nextAst"         .!= End
+                                    <*> o .:? "nextAst"        .!= End
         "expression"  -> Expression <$> o .:  "metadata"
                                     <*> o .:  "expression"
-                                    <*> o .:? "nextAst"         .!= End
+                                    <*> o .:? "nextAst"        .!= End
         "if"          -> If         <$> o .:  "metadata"
                                     <*> o .:  "expression"
                                     <*> o .:  "trueBranchAst"
-                                    <*> o .:? "falseBranchAst"  .!= End
-                                    <*> o .:? "nextAst"         .!= End
+                                    <*> o .:? "falseBranchAst" .!= End
+                                    <*> o .:? "nextAst"        .!= End
         "return"      -> Return     <$> o .:  "metadata"
                                     <*> o .:? "expression"
         "start"       -> Start      <$> o .:  "metadata"
                                     <*> o .:  "name"
                                     <*> o .:  "returnType"
                                     <*> o .:  "arguments"
-                                    <*> o .:? "nextAst"         .!= End
+                                    <*> o .:? "nextAst"        .!= End
         "var"         -> Var        <$> o .:  "metadata"
                                     <*> o .:  "name"
                                     <*> o .:  "type"
                                     <*> o .:  "expression"
-                                    <*> o .:? "nextAst"         .!= End
+                                    <*> o .:? "nextAst"        .!= End
         "while"       -> While      <$> o .:  "metadata"
                                     <*> o .:  "expression"
                                     <*> o .:  "whileAst"
-                                    <*> o .:? "nextAst"         .!= End
+                                    <*> o .:? "nextAst"        .!= End
         other         -> fail $
                             "Unknown tag '" <> other <> "'. Available tags are:\
                             \ 'assign', 'expression', 'if', 'return', 'start',\
@@ -162,9 +177,10 @@ data Expression
     | BinaryOp Expression !BinarySymbol Expression
     | Call Expression [Expression]
     | Index Expression Expression
+    | Literal Literal
     | Parenthesis Expression
     | UnaryOp !UnarySymbol Expression
-    | Value (ValueType Variable)
+    | Variable Name
     deriving (Eq, Show)
 
 instance FromJSON Expression where
@@ -179,13 +195,14 @@ instance FromJSON Expression where
                                      <*> o .: "arguments"
         "index"       -> Index       <$> o .: "leftExpression"
                                      <*> o .: "rightExpression"
+        "literal"     -> Literal     <$> o .: "value"
         "parenthesis" -> Parenthesis <$> o .: "expression"
         "unaryOp"     -> UnaryOp     <$> o .: "symbol"
                                      <*> o .: "expression"
-        "value"       -> Value       <$> o .: "value"
+        "variable"    -> Variable    <$> o .: "name"
         other         -> fail $
-                            "Expected 'access', 'binaryOp', 'call', 'index',\
-                            \ 'parenthesis', 'unaryOp' or 'value', but got '"
+                            "Expected 'access', 'binaryOp', 'call', 'index', 'literal',\
+                            \ 'parenthesis', 'unaryOp' or 'variable', but got '"
                             <> other <> "'."
     parseJSON other = prependFailure "Expected String or Object, but got " (unexpected other)
 
@@ -212,6 +229,10 @@ instance ToJSON Expression where
             , "leftExpression"  .= left
             , "rightExpression" .= right
             ]
+        Literal value' -> object
+            [ "tag"             .= String "literal"
+            , "value"           .= value'
+            ]
         Parenthesis expression -> object
             [ "tag"             .= String "parenthesis"
             , "expression"      .= expression
@@ -221,9 +242,9 @@ instance ToJSON Expression where
             , "symbol"          .= symbol'
             , "expression"      .= expression
             ]
-        Value value' -> object
-            [ "tag"             .= String "value"
-            , "value"           .= value'
+        Variable name -> object
+            [ "tag"             .= String "variable"
+            , "name"            .= name
             ]
 
 -- Codegen for Expression never fails, so this function is safe.
@@ -254,44 +275,46 @@ instance Codegen Expression where
             [ codegen expr
             , emitBetween' "[" "]" $ codegen inner
             ]
+        Literal value' -> codegen value'
         Parenthesis expr -> emitBetween' "(" ")" $ codegen expr
         UnaryOp symbol' expr -> mconcat <$> sequence
             [ emitM $ unaryToText symbol'
             , codegen expr
             ]
-        Value value' -> case value' of
-            Variable variable' -> emitM variable'
-            Constant constant' -> codegen constant'
+        Variable name' -> emitM name'
 
 -- TODO: Add let ... in ... so that we can declare variables and functions?
-data Variable
-    = Array [Expression]
-    | Bool Bool
+data Literal
+    = Algebraic Name [Expression]
+    | Array [Expression]
     | Char Char
     | Double Double
     | Integer Integer
     | Record Name [(Name, Expression)]
     | Text Text
-    | Unit
     deriving (Eq, Show)
 
--- Codegen for Expression never fails, so this function is safe.
-codegenV :: Variable -> Text
-codegenV = Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
+-- Codegen for Literal never fails, so this function is safe.
+codegenL :: Literal -> Text
+codegenL = Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
 
-instance Codegen Variable where
-    type GeneratorState Variable = ()
+instance Codegen Literal where
+    type GeneratorState Literal = ()
 
     codegen = \case
+        Algebraic name fields -> codegenAlgebraic name fields
         Array a -> emitBetween' "[" "]" $ a `separatedBy'` ", "
-        Bool b -> emitM if b then "true" else "false"
         Char c -> emitBetween' "'" "'" $ emitM (Text.singleton c)
         Double d -> emitM $ show d
         Integer i -> emitM $ show i
         Record r fs -> codegenRecord r fs
         Text t -> emitBetween' "\""  "\"" $ emitM t
-        Unit -> emitM "()"
       where
+        codegenAlgebraic name fields = mconcat <$> sequence
+            [ emitM name
+            , emitBetween' "(" ")" $ fields `separatedBy'` ", "
+            ]
+
         codegenField fieldName expr = mconcat <$> sequence
             [ emitM fieldName
             , emitM " = "
@@ -300,114 +323,112 @@ instance Codegen Variable where
 
         codegenRecord recordName fields = mconcat <$> sequence
             [ emitM recordName
-            , emitBetween' " { " " }" $ separatedByF (uncurry codegenField) (emit ", ") fields
+            , emitBetween' "{" "}" $ separatedByF (uncurry codegenField) (emit ", ") fields
             ]
 
-instance FromJSON Variable where
-    parseJSON = withObject "Language.LowCode.Logic.AST.Variable" \o -> do
-        tag <- o .: "type"
-        -- TODO: Should unit be encoded as ()?
-        if tag == "unit"
-        then pure Unit
-        else if tag == "record"
-        then Record <$> o .: "name" <*> o .: "fields"
-        else do
-            value' <- o .: "value"
-            case tag of
-                "array"   -> Array   <$> parseJSON value'
-                "bool"    -> Bool    <$> parseJSON value'
-                "char"    -> Char    <$> parseJSON value'
-                "double"  -> Double  <$> parseJSON value'
-                "integer" -> Integer <$> parseJSON value'
-                "text"    -> Text    <$> parseJSON value'
-                other     -> fail $
-                               "Expected 'array', 'bool', 'char', 'double',\
-                               \ 'function', 'integer', 'record', 'text' or\
-                               \ 'unit', but got '" <> other <> "'."
+instance FromJSON Literal where
+    parseJSON = withObject "Language.LowCode.Logic.AST.Variable" \o -> o .: "type" >>= \case
+        "adt"    -> Algebraic <$> o .: "name"  <*> o .: "fields"
+        "record" -> Record    <$> o .: "name"  <*> o .: "fields"
+        "array"  -> Array     <$> o .: "value"
+        "char"   -> Char      <$> o .: "value"
+        "double" -> Double    <$> o .: "value"
+        "integer"-> Integer   <$> o .: "value"
+        "text"   -> Text      <$> o .: "value"
+        other    -> fail $
+            "Expected 'algebraic', 'array', 'char', 'double', 'function',\
+            \ 'integer', 'record' or 'text', but got '" <> other <> "'."
 
-instance ToJSON Variable where
+instance ToJSON Literal where
     toJSON = \case
-        Array a -> object
-            [ "type"  .= String "array"
-            , "value" .= a
+        Algebraic name constructors -> object
+            [ "type"   .= String "adt"
+            , "name"   .= name
+            , "fields" .= constructors
             ]
-        Bool b -> object
-            [ "type"  .= String "bool"
-            , "value" .= b
+        Array a -> object
+            [ "type"   .= String "array"
+            , "value"  .= a
             ]
         Char c -> object
-            [ "type"  .= String "char"
-            , "value" .= c
+            [ "type"   .= String "char"
+            , "value"  .= c
             ]
         Double d -> object
-            [ "type"  .= String "double"
-            , "value" .= d
+            [ "type"   .= String "double"
+            , "value"  .= d
             ]
         Integer i -> object
-            [ "type"  .= String "integer"
-            , "value" .= i
+            [ "type"   .= String "integer"
+            , "value"  .= i
             ]
         Record recordName fields -> object
-            [ "type"   .= String "field"
-            , "name"   .= String recordName
+            [ "type"   .= String "record"
+            , "name"   .= recordName
             , "fields" .= fields
             ]
         Text t -> object
-            [ "type"  .= String "text"
-            , "value" .= t
-            ]
-        Unit -> object
-            [ "type"  .= String "unit"
+            [ "type"   .= String "text"
+            , "value"  .= t
             ]
 
-data VariableType
-    = ArrayType VariableType
-    | BoolType
+data Type
+    = AlgebraicType Name [Constructor]
+    | ArrayType Type
     | CharType
     | DoubleType
-    | FunctionType [VariableType] VariableType
+    | FunctionType [Type] Type
     | IntegerType
-    | RecordType [(Name, VariableType)]
+    | RecordType [Field]
     | TextType
-    | UnitType
     deriving (Eq, Ord, Show)
 
-instance FromJSON VariableType where
+-- TODO: In the future, move these "concrete" types to a standard library.
+boolType :: Type
+boolType = AlgebraicType "Bool" [Constructor "False" [], Constructor "True" []]
+
+unitType :: Type
+unitType = AlgebraicType "Unit" [Constructor "Unit" []]
+
+instance FromJSON Type where
     parseJSON = withObject "Language.LowCode.Logic.AST.VariableType" \o -> o .: "type" >>= \case
+        "adt"      -> AlgebraicType <$> o .: "name" <*> o .: "constructors"
         "array"    -> ArrayType <$> o .: "elements"
-        "bool"     -> pure BoolType
         "char"     -> pure CharType
         "double"   -> pure DoubleType
         "function" -> FunctionType <$> o .: "arguments" <*> o .: "return"
         "integer"  -> pure IntegerType
         "record"   -> RecordType <$> o .: "fields"
         "text"     -> pure TextType
-        "unit"     -> pure UnitType
         other      -> fail $
-                       "Expected 'array', 'bool', 'char', 'double', 'function',\
-                       \ 'integer', 'record', 'text' or 'unit',\
+                       "Expected 'array', 'char', 'double', 'function',\
+                       \ 'integer', 'record' or 'text',\
                        \ but got '" <> other <> "'."
 
-instance ToJSON VariableType where
-    toJSON (ArrayType elements) = object
-        [ "type"     .= String "array"
-        , "elements" .= elements
-        ]
-    toJSON BoolType    = object [ "type" .= String "bool"    ]
-    toJSON CharType    = object [ "type" .= String "char"    ]
-    toJSON DoubleType  = object [ "type" .= String "double"  ]
-    toJSON (FunctionType arguments return') = object
-        [ "type"      .= String "function"
-        , "arguments" .= arguments
-        , "return"    .= return'
-        ]
-    toJSON IntegerType = object [ "type" .= String "integer" ]
-    toJSON (RecordType fieldsType) = object
-        [ "type"       .= String "record"
-        , "fields"     .= fieldsType
-        ]
-    toJSON TextType    = object [ "type" .= String "text"    ]
-    toJSON UnitType    = object [ "type" .= String "unit"    ]
+instance ToJSON Type where
+    toJSON = \case
+        AlgebraicType name constructors -> object
+            [ "type"         .= String "adt"
+            , "name"         .= name
+            , "constructors" .= constructors
+            ]
+        ArrayType elements -> object
+            [ "type"         .= String "array"
+            , "elements"     .= elements
+            ]
+        CharType    -> object [ "type" .= String "char"    ]
+        DoubleType  -> object [ "type" .= String "double"  ]
+        FunctionType arguments return' -> object
+            [ "type"          .= String "function"
+            , "arguments"     .= arguments
+            , "return"        .= return'
+            ]
+        IntegerType -> object [ "type" .= String "integer" ]
+        RecordType fieldsType -> object
+            [ "type"        .= String "record"
+            , "fields"      .= fieldsType
+            ]
+        TextType    -> object [ "type" .= String "text"    ]
 
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 type Precedence = Int
@@ -518,8 +539,7 @@ integer = do
   where
     mkRadix = mkNum 10 <$> takeWhile1P (Just "digit") Char.isDigit
     takeNums = takeWhile1P (Just "digit") (\c -> Char.isDigit c || Char.isAsciiLower c || Char.isAsciiUpper c)
-    mkNum r = foldl' (\a c -> step r a $ toInt c) 0
-    step r a c = a * r + c
+    mkNum r = foldl' (\a c -> a * r + toInt c) 0
     toInt = toInteger . toInt'
     toInt' c
         | Char.isDigit      c = Char.digitToInt c
@@ -531,36 +551,22 @@ value :: Parser Expression
 value = constant <|> variable
 
 constant :: Parser Expression
-constant = Value . Constant <$> choice
+constant = Literal <$> choice
     [ Array   <$> array
-    , Bool    <$> bool
     , Char    <$> char''
     , Double  <$> try Lexer.float
     , Integer <$> try integer
     , record' <$> try record
     , Text    <$> text
-    , unit'   <$> unit
     ]
   where
     record' = uncurry Record
-    unit' = const Unit
 
 variable :: Parser Expression
-variable = Value . Variable <$> variableName
+variable = Variable <$> variableName
 
 parenthesis :: Parser Expression
 parenthesis = bracket '(' ')' (Parenthesis <$> expression0)
-
-bool :: Parser Bool
-bool = do
-    b <- string "false" <|> string "true"
-    case b of
-        "false" -> pure False
-        "true" -> pure True
-        _ -> fail $
-            "Could not read '"
-            <> toString b
-            <> "'. Perhaps you meant 'false' or 'true'?"
 
 char'' :: Parser Char
 char'' = between (char '\'') (char '\'') Lexer.charLiteral
@@ -589,9 +595,6 @@ record = do
         pure (fieldName, expr)
     space
     pure (recordName, fields)
-
-unit :: Parser ()
-unit = void $ string "()"
 
 errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorUnaryNotFound symbol' = "Undefined unary operator '" <> symbol' <> "'."

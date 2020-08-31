@@ -8,24 +8,6 @@ type Name = Text
 
 type Double2 = (Double, Double)
 
-data ValueType varType
-    = Variable Name
-    | Constant varType
-    deriving (Eq, Functor, Show)
-
-instance (FromJSON varType) => FromJSON (ValueType varType) where
-    parseJSON = withObject "Language.Common.ValueType" \o -> do
-        variable <- o .:? "variable"
-        constant <- o .:? "constant"
-        case (variable, constant) of
-            (Nothing, Just c ) -> Constant <$> parseJSON c
-            (Just v , Nothing) -> pure $ Variable v
-            _                  -> fail "Must provide either a variable xor a constant."
-
-instance (ToJSON varType) => ToJSON (ValueType varType) where
-    toJSON (Variable text) = object [ "variable" .= String text ]
-    toJSON (Constant var ) = object [ "constant" .= toJSON var  ]
-
 data BinarySymbol
     -- Arithmetic
     = Add

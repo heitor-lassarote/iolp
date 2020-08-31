@@ -1,6 +1,8 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Language.LowCode.Logic.JavaScriptConverter where
+module Language.LowCode.Logic.JavaScriptConverter
+    ( module Language.LanguageConverter
+    ) where
 
 import Universum
 
@@ -46,16 +48,24 @@ instance LanguageConverter L.Expression JS.Expression where
         L.BinaryOp left op right -> JS.BinaryOp (convert left) op (convert right)
         L.Call expr exprs -> JS.Call (convert expr) (convert <$> exprs)
         L.Index expr inner -> JS.Index (convert expr) (convert inner)
+        L.Literal literal -> convert literal
         L.Parenthesis expr -> JS.Parenthesis $ convert expr
         L.UnaryOp op expr -> JS.UnaryOp op (convert expr)
-        L.Value variable -> JS.Value (convert <$> variable)
+        L.Variable name -> JS.Variable name
 
-instance LanguageConverter L.Variable JS.Variable where
-    convert (L.Array a) = JS.Array (convert <$> a)
-    convert (L.Bool b) = JS.Boolean b
-    convert (L.Char c) = JS.Text $! Text.singleton c
-    convert (L.Double d) = JS.Number d
-    convert (L.Integer i) = JS.Number $! fromInteger i
-    convert (L.Record _ fs) = JS.Record (second convert <$> fs)
-    convert (L.Text t) = JS.Text t
-    convert L.Unit = JS.Void
+convertAlgebraic :: L.Name -> [L.Expression] -> JS.Expression
+convertAlgebraic "False" [] = JS.Literal $ JS.Boolean False
+convertAlgebraic "True" [] = JS.Literal $ JS.Boolean True
+convertAlgebraic "Unit" [] = JS.Literal $ JS.Record []
+convertAlgebraic name fields =
+    JS.Function Nothing ["visitor"] (JS.Expression $ JS.Call (JS.Access (JS.Variable "visitor") ("visit" <> name)) (convert <$> fields))
+
+instance LanguageConverter L.Literal JS.Expression where
+    convert = \case
+        L.Algebraic name fields -> convertAlgebraic name fields
+        L.Array a -> JS.Literal $ JS.Array (convert <$> a)
+        L.Char c -> JS.Literal $ JS.Text $! Text.singleton c
+        L.Double d -> JS.Literal $ JS.Number d
+        L.Integer i -> JS.Literal $ JS.Number $! fromInteger i
+        L.Record _ fs -> JS.Literal $ JS.Record (second convert <$> fs)
+        L.Text t -> JS.Literal $ JS.Text t

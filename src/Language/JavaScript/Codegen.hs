@@ -71,11 +71,11 @@ space = ifM (gets (compactCode . options)) (emitM "") (emitM " ")
 nlIndent :: (Emit gen, Semigroup gen) => JavaScriptCodegen gen
 nlIndent = ifM (gets (bracesOnNewLine . options)) (liftA2 (<>) nl indentCompact) space
 
-genConstant
+genLiteral
     :: (Emit gen, Monoid gen)
-    => Variable
+    => Literal
     -> JavaScriptCodegen gen
-genConstant = \case
+genLiteral = \case
     Array xs -> emitBetween' "[" "]" (separatedBy xs =<< commaSpace)
     Boolean x -> emitM if x then "true" else "false"
     Number x -> emitM $ show x
@@ -172,13 +172,6 @@ genDeclaration name expression = mconcat <$> sequence
     , nl
     ]
 
-genVariable
-    :: (Emit gen, Monoid gen)
-    => ValueType Variable
-    -> JavaScriptCodegen gen
-genVariable (Variable v) = emitIfValid v
-genVariable (Constant c) = genConstant c
-
 genExpression
     :: (Emit gen, Monoid gen)
     => Expression
@@ -203,12 +196,13 @@ genExpression = \case
         [ genExpression expr
         , emitBetween' "[" "]" $ genExpression inner
         ]
+    Literal value -> genLiteral value
     Parenthesis expr -> emitBetween' "(" ")" $ genExpression expr
     UnaryOp op expr -> mconcat <$> sequence
         [ emitM $ unarySymbolToText op
         , genExpression expr
         ]
-    Value value -> genVariable value
+    Variable name -> emitIfValid name
 
 javaScriptCodegen
     :: (Emit gen, Monoid gen)

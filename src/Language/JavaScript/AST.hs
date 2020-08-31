@@ -1,8 +1,8 @@
 module Language.JavaScript.AST
     ( module Language.Common
-    , Variable (..)
     , AST (..)
     , Expression (..)
+    , Literal (..)
     , binarySymbolToText
     , unarySymbolToText
     , reservedNames
@@ -16,15 +16,6 @@ import           Data.Set  as Set
 import qualified Data.Text as T
 
 import Language.Common
-
-data Variable
-    = Array    [Expression]
-    | Boolean !Bool
-    | Number  !Double
-    | Record   [(Name, Expression)]
-    | Text     Text
-    | Void
-    deriving (Eq, Show)
 
 -- Simplified version good enough to create the conversion.
 data AST
@@ -44,9 +35,19 @@ data Expression
     | Call Expression [Expression]
     | Function (Maybe Text) [Text] AST
     | Index Expression Expression
+    | Literal Literal
     | Parenthesis Expression
     | UnaryOp !UnarySymbol Expression
-    | Value (ValueType Variable)
+    | Variable Name
+    deriving (Eq, Show)
+
+data Literal
+    = Array    [Expression]
+    | Boolean !Bool
+    | Number  !Double
+    | Record   [(Name, Expression)]
+    | Text     Text
+    | Void
     deriving (Eq, Show)
 
 -- Reference:
