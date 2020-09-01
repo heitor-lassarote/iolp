@@ -44,8 +44,8 @@ data Error
     = DuplicateRecord Name Name
     | IncompatibleRecord Name [Name] [Name]
     | IncompatibleSignatures Name Int Int
-    | IncompatibleTypes1 UnarySymbol Expression
-    | IncompatibleTypes2 Expression BinarySymbol Expression
+    | IncompatibleTypes1 UnarySymbol (Expression ())
+    | IncompatibleTypes2 (Expression ()) BinarySymbol (Expression ())
     | NoSuchConstructor Name
     | NoSuchRecord Name
     | NotAFunction Name
@@ -213,8 +213,8 @@ addError e = tell $ mempty { errors = [e] }
 --addWarning w = tell $ mempty { warnings = [w] }
 
 -- TODO: Is having two branches necessary?
-analyzeAssign :: Expression -> Expression -> Analyzer ()
-analyzeAssign (Variable name) expr = do
+analyzeAssign :: Expression metadata -> Expression metadata -> Analyzer ()
+analyzeAssign (Variable _ name) expr = do
     symbols <- gets analyzerSymbols
     case Map.lookup name symbols of
         Nothing -> addError $ UndefinedVariable name
@@ -227,7 +227,7 @@ analyzeAssign left right = whenJustM (analyzeExpr left) \typeL -> do
     when (typeL /= typeR) $
         addError $ TypeMismatch (codegenE left <> " = " <> codegenE right) typeL typeR
 
-analyzeVar :: Name -> Type -> Expression -> Analyzer ()
+analyzeVar :: Name -> Type -> Expression metadata -> Analyzer ()
 analyzeVar name type' expr = do
     symbols <- gets analyzerSymbols
     if Map.member name symbols
@@ -242,14 +242,14 @@ checkTypes name expectedType actualType
     | expectedType == actualType = pure ()
     | otherwise = addError $ TypeMismatch name expectedType actualType
 
-collectStarts :: Environment -> [AST metadata] -> Map Name VariableInfo
+collectStarts :: Environment -> [AST expressionMetadata metadata] -> Map Name VariableInfo
 collectStarts env = foldr mkSymbol (Map.map mkInfo (externs env))
   where
     mkSymbol (Start _ name ret@(FunctionType _ _) _ _) acc =
         Map.insert name (mkInfo ret) acc
     mkSymbol _ acc = acc
 
-analyzeMany :: Environment -> [AST metadata] -> Analyzer ()
+analyzeMany :: Environment -> [AST expressionMetadata metadata] -> Analyzer ()
 analyzeMany env asts = do
     let functions = collectStarts env asts
     withRWS (\r s ->
@@ -258,11 +258,11 @@ analyzeMany env asts = do
         ))
         (traverse_ (withScope . analyzeStart) asts)
 
-analyze :: Environment -> AST metadata -> Analyzer ()
+analyze :: Environment -> AST expressionMetadata metadata -> Analyzer ()
 analyze env ast = analyzeMany env [ast]
 {-# INLINE analyze #-}
 
-analyzeStart :: AST metadata -> Analyzer ()
+analyzeStart :: AST expressionMetadata metadata -> Analyzer ()
 analyzeStart (Start _ name (FunctionType argTypes ret) arguments next) = do
     let nArgs = length arguments
         nTypes = length argTypes
@@ -278,7 +278,7 @@ analyzeStart (Start _ name _ _ next) =
 analyzeStart next =
     addError StartIsNotFirstSymbol *> void (analyzeImpl next)
 
-analyzeReturn :: Maybe Expression -> Analyzer ()
+analyzeReturn :: Maybe (Expression metadata) -> Analyzer ()
 analyzeReturn Nothing = do
     ret <- asks returnType
     when (ret /= unitType) $ addError $ TypeMismatch "return" ret unitType
@@ -287,7 +287,7 @@ analyzeReturn (Just expr) = do
     typeE <- analyzeExprWithHint ret expr
     when (ret /= typeE) $ addError $ TypeMismatch (codegenE expr) ret typeE
 
-analyzeImpl :: AST metadata -> Analyzer ()
+analyzeImpl :: AST expressionMetadata metadata -> Analyzer ()
 analyzeImpl = \case
     Assign _ left right next -> do
         analyzeAssign left right
@@ -311,9 +311,9 @@ analyzeImpl = \case
         void $ withScope $ analyzeImpl body
         analyzeImpl next
 
-analyzeExpr :: Expression -> Analyzer (Maybe Type)
+analyzeExpr :: Expression metadata -> Analyzer (Maybe Type)
 analyzeExpr = \case
-    Access left right -> do
+    Access _ left right -> do
         typeLMaybe <- analyzeExpr left
         case typeLMaybe of
             Nothing -> pure Nothing
@@ -326,7 +326,7 @@ analyzeExpr = \case
                         pure Nothing
                     Just (Field _ fields) -> pure $ Just fields
             Just typeL -> addError (NotARecord typeL right) *> pure (Just typeL)
-    BinaryOp left symbol' right -> do
+    BinaryOp _ left symbol' right -> do
         typeLMaybe <- analyzeExpr left
         case typeLMaybe of
             Nothing -> pure Nothing
@@ -334,9 +334,9 @@ analyzeExpr = \case
                 typeR <- analyzeExprWithHint typeL right
                 let ret = interactsWithBinary typeL symbol' typeR
                 whenNothing_ ret $
-                    addError (IncompatibleTypes2 left symbol' right)
+                    addError (IncompatibleTypes2 (void left) symbol' (void right))
                 pure ret
-    Call (Variable name) arguments -> do
+    Call _ (Variable _ name) arguments -> do
         infoMaybe <- analyzeVariable name
         case infoMaybe of
             Nothing -> addError (UndefinedVariable name) *> pure Nothing
@@ -345,7 +345,7 @@ analyzeExpr = \case
                 Just <$> analyzeApply name typeAs typeF
             Just (VariableInfo _ _) -> do
                 addError (NotAFunction name) *> pure Nothing
-    Call expr arguments -> do
+    Call _ expr arguments -> do
         let exprC = codegenE expr
         typeEMaybe <- analyzeExpr expr
         case typeEMaybe of
@@ -354,7 +354,7 @@ analyzeExpr = \case
                 typeAs <- traverse (uncurry analyzeExprWithHint) $ zip argTypes arguments
                 Just <$> analyzeApply exprC typeAs typeF
             Just type' -> addError (NotAFunction exprC) *> pure (Just type')
-    Index left right -> do
+    Index _ left right -> do
         typeLMaybe <- analyzeExpr left
         void $ analyzeExprWithHint IntegerType right
         case typeLMaybe of
@@ -363,19 +363,19 @@ analyzeExpr = \case
             Just typeL ->
                 addError (TypeMismatch (codegenE left) (ArrayType typeL) typeL)
         pure typeLMaybe
-    Literal l -> analyzeType l
-    Parenthesis expr -> analyzeExpr expr
-    UnaryOp symbol' expr -> do
+    Literal _ l -> analyzeType l
+    Parenthesis _ expr -> analyzeExpr expr
+    UnaryOp _ symbol' expr -> do
         typeEMaybe <- analyzeExpr expr
         let ret = interactsWithUnary symbol' =<< typeEMaybe
         whenNothing_ ret $
-            addError (IncompatibleTypes1 symbol' expr)
+            addError (IncompatibleTypes1 symbol' (void expr))
         pure ret
-    Variable v -> varType <<$>> analyzeVariable v
+    Variable _ v -> varType <<$>> analyzeVariable v
 
-analyzeExprWithHint :: Type -> Expression -> Analyzer Type
+analyzeExprWithHint :: Type -> Expression metadata -> Analyzer Type
 analyzeExprWithHint !expectedType = \case
-    Access left right -> do
+    Access _ left right -> do
         typeLMaybe <- analyzeExpr left
         case typeLMaybe of
             Nothing -> pure expectedType
@@ -387,7 +387,7 @@ analyzeExprWithHint !expectedType = \case
                         pure expectedType
                     Just (Field _ fields) -> pure fields
             Just typeL -> addError (NotARecord typeL right) *> pure typeL
-    BinaryOp left symbol' right -> do
+    BinaryOp _ left symbol' right -> do
         typeLMaybe <- analyzeExpr left
         case typeLMaybe of
             Nothing -> pure expectedType
@@ -395,10 +395,10 @@ analyzeExprWithHint !expectedType = \case
                 typeR <- analyzeExprWithHint typeL right
                 let ret = interactsWithBinary typeL symbol' typeR
                 maybe
-                    (addError (IncompatibleTypes2 left symbol' right) *> pure expectedType)
+                    (addError (IncompatibleTypes2 (void left) symbol' (void right)) *> pure expectedType)
                     pure
                     ret
-    Call (Variable name) arguments -> do
+    Call _ (Variable _ name) arguments -> do
         infoMaybe <- analyzeVariable name
         case infoMaybe of
             Nothing -> addError (UndefinedVariable name) *> pure expectedType
@@ -408,7 +408,7 @@ analyzeExprWithHint !expectedType = \case
             Just (VariableInfo _ type') -> do
                 addError (NotAFunction name)
                 pure type'
-    Call expr arguments -> do
+    Call _ expr arguments -> do
         let exprC = codegenE expr
         typeEMaybe <- analyzeExpr expr
         case typeEMaybe of
@@ -417,7 +417,7 @@ analyzeExprWithHint !expectedType = \case
                 typeAs <- traverse (uncurry analyzeExprWithHint) $ zip argTypes arguments
                 analyzeApply exprC typeAs typeF
             Just typeE -> addError (NotAFunction exprC) *> pure typeE
-    Index left right -> do
+    Index _ left right -> do
         let leftC  = codegenE left
             rightC = codegenE right
         typeL <- analyzeExprWithHint (ArrayType expectedType) left
@@ -435,16 +435,16 @@ analyzeExprWithHint !expectedType = \case
             IntegerType -> pure ()
             _           -> addError (TypeMismatch rightC IntegerType typeR)
         pure typeL'
-    Literal l -> analyzeTypeWithHint expectedType l
-    Parenthesis expr -> analyzeExprWithHint expectedType expr
-    UnaryOp symbol' expr -> do
+    Literal _ l -> analyzeTypeWithHint expectedType l
+    Parenthesis _ expr -> analyzeExprWithHint expectedType expr
+    UnaryOp _ symbol' expr -> do
         typeE <- analyzeExprWithHint expectedType expr
         let ret = interactsWithUnary symbol' typeE
         maybe
-            (addError (IncompatibleTypes1 symbol' expr) *> pure expectedType)
+            (addError (IncompatibleTypes1 symbol' (void expr)) *> pure expectedType)
             pure
             ret
-    Variable v -> maybe expectedType varType <$> analyzeVariable v
+    Variable _ v -> maybe expectedType varType <$> analyzeVariable v
 
 analyzeApply :: Name -> [Type] -> Type -> Analyzer Type
 analyzeApply name arguments (FunctionType argTypes ret) = do
@@ -466,7 +466,7 @@ analyzeVariable name = do
     whenNothing_ infoMaybe $ addError (UndefinedVariable name)
     pure infoMaybe
 
-analyzeArray :: [Expression] -> Analyzer (Maybe Type)
+analyzeArray :: [Expression metadata] -> Analyzer (Maybe Type)
 analyzeArray [] = pure Nothing
 analyzeArray (x : xs) = do
     xTypeMaybe <- analyzeExpr x
@@ -480,8 +480,8 @@ analyzeArray (x : xs) = do
             traverse_ (analyzeExprWithHint xType) xs
             pure xTypeMaybe
 
--- TODO: Stil not properly typechecking!
-analyzeArrayWithHint :: Type -> [Expression] -> Analyzer Type
+-- FIXME: Stil not properly typechecking!
+analyzeArrayWithHint :: Type -> [Expression metadata] -> Analyzer Type
 analyzeArrayWithHint expectedType [] = pure $ ArrayType $ unnestArray expectedType
 analyzeArrayWithHint expectedType (x : xs) = do
     let expectedType' = unnestArray expectedType
@@ -503,7 +503,7 @@ analyzeDuplicates origin names =
     sorted = sort names
     dups = filter (uncurry (==)) $ zip sorted (drop 1 sorted)
 
-analyzeRecord :: Name -> [(Name, Expression)] -> Analyzer (Maybe Type)
+analyzeRecord :: Name -> [(Name, Expression metadata)] -> Analyzer (Maybe Type)
 analyzeRecord name fields = do
     let (names, exprs) = unzip fields
     sorted <- analyzeDuplicates name names
@@ -525,11 +525,11 @@ analyzeRecord name fields = do
             traverse_ (uncurry analyzeExprWithHint) $ zip templateTypes exprs
             pure $ Just $ RecordType templateFields
 
-analyzeRecordWithHint :: Type -> Name -> [(Name, Expression)] -> Analyzer Type
+analyzeRecordWithHint :: Type -> Name -> [(Name, Expression metadata)] -> Analyzer Type
 analyzeRecordWithHint expectedType name fields =
     fromMaybe expectedType <$> analyzeRecord name fields
 
-analyzeAlgebraic :: Name -> [Expression] -> Analyzer (Maybe Type)
+analyzeAlgebraic :: Name -> [Expression metadata] -> Analyzer (Maybe Type)
 analyzeAlgebraic name exprs = do
     adts <- asks $ adtTemplates . environment
     case findMap findAdt $ Map.toList adts of
@@ -546,7 +546,7 @@ analyzeAlgebraic name exprs = do
     findAdt (adtName, adtConstructors) =
         (adtName, adtConstructors,) <$> find ((== name) . constructorName) adtConstructors
 
-analyzeType :: Literal -> Analyzer (Maybe Type)
+analyzeType :: Literal metadata -> Analyzer (Maybe Type)
 analyzeType = \case
     Algebraic name fields -> analyzeAlgebraic name fields
     Array elements        -> analyzeArray elements
@@ -556,7 +556,7 @@ analyzeType = \case
     Record name fields    -> analyzeRecord name fields
     Text _                -> pure $ Just TextType
 
-analyzeTypeWithHint :: Type -> Literal -> Analyzer Type
+analyzeTypeWithHint :: Type -> Literal metadata -> Analyzer Type
 analyzeTypeWithHint expectedType = \case
     Array es    -> analyzeArrayWithHint expectedType es
     Record r fs -> analyzeRecordWithHint expectedType r fs

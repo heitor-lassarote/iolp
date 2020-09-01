@@ -47,7 +47,7 @@ mkBundleZip tempFolderName name files = do
 data PageCssHtmlLogic = PageCssHtmlLogic
     { css   :: CSS.AST
     , html  :: [HTML.AST]
-    , logic :: [L.AST L.Metadata]
+    , logic :: [L.AST () L.Metadata]
     , name  :: Name
     } deriving (Generic, FromJSON, ToJSON)
 

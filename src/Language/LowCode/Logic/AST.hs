@@ -61,30 +61,30 @@ newtype Metadata = Metadata
     { position :: Double2
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
-data AST metadata
+data AST expressionMetadata metadata
     -- | Assigns a new value to the first expression, and what follows after.
-    = Assign metadata Expression Expression (AST metadata)
+    = Assign metadata (Expression expressionMetadata) (Expression expressionMetadata) (AST expressionMetadata metadata)
     -- | Represents the end of a cycle.
     | End
     -- | Executes a raw expression. Useful for Call.
-    | Expression metadata Expression (AST metadata)
+    | Expression metadata (Expression expressionMetadata) (AST expressionMetadata metadata)
     -- | Allows a condition to be tested, and contains the true branch, false
     -- branch and what follows after the branches.
-    | If metadata Expression (AST metadata) (AST metadata) (AST metadata)
+    | If metadata (Expression expressionMetadata) (AST expressionMetadata metadata) (AST expressionMetadata metadata) (AST expressionMetadata metadata)
     -- | Exits the function, optionally returning a value.
-    | Return metadata (Maybe Expression)
+    | Return metadata (Maybe (Expression expressionMetadata))
     -- | Represents the start of a cycle with a given name and a list of
     -- parameters.
-    | Start metadata Name !Type [Name] (AST metadata)
+    | Start metadata Name !Type [Name] (AST expressionMetadata metadata)
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var metadata Name !Type Expression (AST metadata)
+    | Var metadata Name !Type (Expression expressionMetadata) (AST expressionMetadata metadata)
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
-    | While metadata Expression (AST metadata) (AST metadata)
+    | While metadata (Expression expressionMetadata) (AST expressionMetadata metadata) (AST expressionMetadata metadata)
     deriving (Eq, Functor, Show)
 
-instance (FromJSON metadata) => FromJSON (AST metadata) where
+instance (FromJSON metadata) => FromJSON (AST () metadata) where
     parseJSON = withObject "Language.LowCode.Logic.AST.AST" \o -> o .: "tag" >>= \case
         "assign"      -> Assign     <$> o .:  "metadata"
                                     <*> o .:  "leftExpression"
@@ -119,7 +119,7 @@ instance (FromJSON metadata) => FromJSON (AST metadata) where
                             \ 'assign', 'expression', 'if', 'return', 'start',\
                             \ 'var' and 'while'."
 
-instance (ToJSON metadata) => ToJSON (AST metadata) where
+instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (AST expressionMetadata metadata) where
     toJSON = \case
         Assign metadata left right ast -> object
             [ "metadata"         .= metadata
@@ -172,134 +172,134 @@ instance (ToJSON metadata) => ToJSON (AST metadata) where
             , "nextAst"          .= ast
             ]
 
-data Expression
-    = Access Expression Name
-    | BinaryOp Expression !BinarySymbol Expression
-    | Call Expression [Expression]
-    | Index Expression Expression
-    | Literal Literal
-    | Parenthesis Expression
-    | UnaryOp !UnarySymbol Expression
-    | Variable Name
-    deriving (Eq, Show)
+data Expression metadata
+    = Access metadata (Expression metadata) Name
+    | BinaryOp metadata (Expression metadata) !BinarySymbol (Expression metadata)
+    | Call metadata (Expression metadata) [(Expression metadata)]
+    | Index metadata (Expression metadata) (Expression metadata)
+    | Literal metadata (Literal metadata)
+    | Parenthesis metadata (Expression metadata)
+    | UnaryOp metadata !UnarySymbol (Expression metadata)
+    | Variable metadata Name
+    deriving (Eq, Functor, Show)
 
-instance FromJSON Expression where
+instance FromJSON (Expression ()) where
     parseJSON (String s) = either (fail . toString) pure $ parseExpression s
     parseJSON (Object o) = o .: "tag" >>= \case
-        "access"      -> Access      <$> o .: "expression"
-                                     <*> o .: "name"
-        "binaryOp"    -> BinaryOp    <$> o .: "leftExpression"
-                                     <*> o .: "symbol"
-                                     <*> o .: "rightExpression"
-        "call"        -> Call        <$> o .: "expression"
-                                     <*> o .: "arguments"
-        "index"       -> Index       <$> o .: "leftExpression"
-                                     <*> o .: "rightExpression"
-        "literal"     -> Literal     <$> o .: "value"
-        "parenthesis" -> Parenthesis <$> o .: "expression"
-        "unaryOp"     -> UnaryOp     <$> o .: "symbol"
-                                     <*> o .: "expression"
-        "variable"    -> Variable    <$> o .: "name"
+        "access"      -> Access ()      <$> o .: "expression"
+                                        <*> o .: "name"
+        "binaryOp"    -> BinaryOp ()    <$> o .: "leftExpression"
+                                        <*> o .: "symbol"
+                                        <*> o .: "rightExpression"
+        "call"        -> Call ()        <$> o .: "expression"
+                                        <*> o .: "arguments"
+        "index"       -> Index ()       <$> o .: "leftExpression"
+                                        <*> o .: "rightExpression"
+        "literal"     -> Literal ()     <$> o .: "value"
+        "parenthesis" -> Parenthesis () <$> o .: "expression"
+        "unaryOp"     -> UnaryOp ()     <$> o .: "symbol"
+                                        <*> o .: "expression"
+        "variable"    -> Variable ()    <$> o .: "name"
         other         -> fail $
                             "Expected 'access', 'binaryOp', 'call', 'index', 'literal',\
                             \ 'parenthesis', 'unaryOp' or 'variable', but got '"
                             <> other <> "'."
     parseJSON other = prependFailure "Expected String or Object, but got " (unexpected other)
 
-instance ToJSON Expression where
+instance ToJSON (Expression metadata) where
     toJSON = \case
-        Access expression name -> object
+        Access _ expression name -> object
             [ "tag"             .= String "access"
             , "expression"      .= expression
             , "name"            .= name
             ]
-        BinaryOp left symbol' right -> object
+        BinaryOp _ left symbol' right -> object
             [ "tag"             .= String "binaryOp"
             , "leftExpression"  .= left
             , "symbol"          .= symbol'
             , "rightExpression" .= right
             ]
-        Call expression arguments -> object
+        Call _ expression arguments -> object
             [ "tag"             .= String "call"
             , "expression"      .= expression
             , "arguments"       .= arguments
             ]
-        Index left right -> object
+        Index _ left right -> object
             [ "tag"             .= String "index"
             , "leftExpression"  .= left
             , "rightExpression" .= right
             ]
-        Literal value' -> object
+        Literal _ value' -> object
             [ "tag"             .= String "literal"
             , "value"           .= value'
             ]
-        Parenthesis expression -> object
+        Parenthesis _ expression -> object
             [ "tag"             .= String "parenthesis"
             , "expression"      .= expression
             ]
-        UnaryOp symbol' expression -> object
+        UnaryOp _ symbol' expression -> object
             [ "tag"             .= String "unaryOp"
             , "symbol"          .= symbol'
             , "expression"      .= expression
             ]
-        Variable name -> object
+        Variable _ name -> object
             [ "tag"             .= String "variable"
             , "name"            .= name
             ]
 
 -- Codegen for Expression never fails, so this function is safe.
-codegenE :: Expression -> Text
+codegenE :: Expression metadata -> Text
 codegenE = Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
 
-instance Codegen Expression where
-    type GeneratorState Expression = ()
+instance Codegen (Expression metadata) where
+    type GeneratorState (Expression metadata) = ()
 
     codegen = \case
-        Access expr name -> mconcat <$> sequence
+        Access _ expr name -> mconcat <$> sequence
             [ codegen expr
             , emitM "."
             , emitM name
             ]
-        BinaryOp left symbol' right -> mconcat <$> sequence
+        BinaryOp _ left symbol' right -> mconcat <$> sequence
             [ codegen left
             , emitM " "
             , emitM (binaryToText symbol')
             , emitM " "
             , codegen right
             ]
-        Call expr exprs -> mconcat <$> sequence
+        Call _ expr exprs -> mconcat <$> sequence
             [ codegen expr
             , emitBetween' "(" ")" $ exprs `separatedBy'` ", "
             ]
-        Index expr inner -> mconcat <$> sequence
+        Index _ expr inner -> mconcat <$> sequence
             [ codegen expr
             , emitBetween' "[" "]" $ codegen inner
             ]
-        Literal value' -> codegen value'
-        Parenthesis expr -> emitBetween' "(" ")" $ codegen expr
-        UnaryOp symbol' expr -> mconcat <$> sequence
+        Literal _ value' -> codegen value'
+        Parenthesis _ expr -> emitBetween' "(" ")" $ codegen expr
+        UnaryOp _ symbol' expr -> mconcat <$> sequence
             [ emitM $ unaryToText symbol'
             , codegen expr
             ]
-        Variable name' -> emitM name'
+        Variable _ name' -> emitM name'
 
 -- TODO: Add let ... in ... so that we can declare variables and functions?
-data Literal
-    = Algebraic Name [Expression]
-    | Array [Expression]
+data Literal metadata
+    = Algebraic Name [Expression metadata]
+    | Array [Expression metadata]
     | Char Char
     | Double Double
     | Integer Integer
-    | Record Name [(Name, Expression)]
+    | Record Name [(Name, Expression metadata)]
     | Text Text
-    deriving (Eq, Show)
+    deriving (Eq, Functor, Show)
 
 -- Codegen for Literal never fails, so this function is safe.
-codegenL :: Literal -> Text
+codegenL :: Literal a -> Text
 codegenL = Unsafe.fromJust . rightToMaybe . evalCodegenT () . codegen
 
-instance Codegen Literal where
-    type GeneratorState Literal = ()
+instance Codegen (Literal metadata) where
+    type GeneratorState (Literal metadata) = ()
 
     codegen = \case
         Algebraic name fields -> codegenAlgebraic name fields
@@ -326,7 +326,7 @@ instance Codegen Literal where
             , emitBetween' "{" "}" $ separatedByF (uncurry codegenField) (emit ", ") fields
             ]
 
-instance FromJSON Literal where
+instance FromJSON (Literal ()) where
     parseJSON = withObject "Language.LowCode.Logic.AST.Variable" \o -> o .: "type" >>= \case
         "adt"    -> Algebraic <$> o .: "name"  <*> o .: "fields"
         "record" -> Record    <$> o .: "name"  <*> o .: "fields"
@@ -339,7 +339,7 @@ instance FromJSON Literal where
             "Expected 'algebraic', 'array', 'char', 'double', 'function',\
             \ 'integer', 'record' or 'text', but got '" <> other <> "'."
 
-instance ToJSON Literal where
+instance ToJSON (Literal metadata) where
     toJSON = \case
         Algebraic name constructors -> object
             [ "type"   .= String "adt"
@@ -457,15 +457,15 @@ binarySymbolToOperator = \case
 
 type Parser = Parsec Void Text
 
-parseExpression :: Text -> Either Text Expression
+parseExpression :: Text -> Either Text (Expression ())
 parseExpression = first (toText . errorBundlePretty) . parse (expression0 <* eof) ""
 
 -- Reference:
 -- https://en.wikipedia.org/wiki/Operator-precedence_parser#Precedence_climbing_method
-expression0 :: Parser Expression
+expression0 :: Parser (Expression ())
 expression0 = expression1 0 =<< primary
 
-expression1 :: Int -> Expression -> Parser Expression
+expression1 :: Int -> Expression () -> Parser (Expression ())
 expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
   where
     loop lhs' op
@@ -475,10 +475,10 @@ expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
             rhs <- primary
             lookaheadMaybe <- peek
             case lookaheadMaybe of
-                Nothing -> pure $ BinaryOp lhs' symbol rhs
+                Nothing -> pure $ BinaryOp () lhs' symbol rhs
                 Just lookahead -> do
                     (rhs', lookaheadMaybe') <- loop' rhs op lookahead
-                    let result = BinaryOp lhs' symbol rhs'
+                    let result = BinaryOp () lhs' symbol rhs'
                     maybe (pure result) (loop result) lookaheadMaybe'
         | otherwise = pure lhs'
 
@@ -493,18 +493,18 @@ expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
 
     peek = optional $ lookAhead $ binarySymbolToOperator <$> binaryOperator
 
-primary :: Parser Expression
+primary :: Parser (Expression ())
 primary = space *> (secondary =<< choice [value, unary, parenthesis]) <* space
 
-secondary :: Expression -> Parser Expression
+secondary :: Expression () -> Parser (Expression ())
 secondary lhs = do
     space
     rhs <- optional (secondary =<< choice [access' lhs, call' lhs, index' lhs])
     pure $ fromMaybe lhs rhs
   where
-    access' lhs' = Access lhs' <$> access
-    call' lhs' = Call lhs' <$> tuple
-    index' lhs' = Index lhs' <$> index
+    access' lhs' = Access () lhs' <$> access
+    call' lhs' = Call () lhs' <$> tuple
+    index' lhs' = Index () lhs' <$> index
 
 access :: Parser Name
 access = char '.' *> space *> variableName
@@ -512,17 +512,17 @@ access = char '.' *> space *> variableName
 bracket :: Char -> Char -> Parser a -> Parser a
 bracket left right = between (char left) (space *> char right)
 
-tuple :: Parser [Expression]
+tuple :: Parser [Expression ()]
 tuple = bracket '(' ')' (expression0 `sepBy` char ',')
 
-index :: Parser Expression
+index :: Parser (Expression ())
 index = bracket '[' ']' expression0
 
-array :: Parser [Expression]
+array :: Parser [Expression ()]
 array = bracket '[' ']' (expression0 `sepEndBy` char ',')
 
-unary :: Parser Expression
-unary = liftA2 UnaryOp unaryOperator primary
+unary :: Parser (Expression ())
+unary = liftA2 (UnaryOp ()) unaryOperator primary
 
 integer :: Parser Integer
 integer = do
@@ -547,11 +547,11 @@ integer = do
         | Char.isAsciiUpper c = Char.ord c - Char.ord 'A' + 10
         | otherwise           = error $ "Panic in integer: Unknown digit: " <> Text.singleton c
 
-value :: Parser Expression
+value :: Parser (Expression ())
 value = constant <|> variable
 
-constant :: Parser Expression
-constant = Literal <$> choice
+constant :: Parser (Expression ())
+constant = Literal () <$> choice
     [ Array   <$> array
     , Char    <$> char''
     , Double  <$> try Lexer.float
@@ -562,11 +562,11 @@ constant = Literal <$> choice
   where
     record' = uncurry Record
 
-variable :: Parser Expression
-variable = Variable <$> variableName
+variable :: Parser (Expression ())
+variable = Variable () <$> variableName
 
-parenthesis :: Parser Expression
-parenthesis = bracket '(' ')' (Parenthesis <$> expression0)
+parenthesis :: Parser (Expression ())
+parenthesis = bracket '(' ')' (Parenthesis () <$> expression0)
 
 char'' :: Parser Char
 char'' = between (char '\'') (char '\'') Lexer.charLiteral
@@ -580,7 +580,7 @@ variableName = do
     tail' <- takeWhileP Nothing (\c -> Char.isAlphaNum c || c == '_')
     pure $ Text.cons head' tail'
 
-record :: Parser (Name, [(Name, Expression)])
+record :: Parser (Name, [(Name, Expression ())])
 record = do
     recordName <- variableName
     space

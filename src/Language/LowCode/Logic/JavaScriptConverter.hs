@@ -12,10 +12,10 @@ import qualified Language.JavaScript.AST as JS
 import           Language.LanguageConverter
 import qualified Language.LowCode.Logic.AST   as L
 
-instance LanguageConverter (L.AST metadata) JS.AST where
+instance LanguageConverter (L.AST expressionMetadata metadata) JS.AST where
     convert ast = convert [ast]
 
-instance LanguageConverter [L.AST metadata] JS.AST where
+instance LanguageConverter [L.AST expressionMetadata metadata] JS.AST where
     convert = JS.NonScopedBlock . concatMap convert'
       where
         convert' = \case
@@ -42,25 +42,25 @@ instance LanguageConverter [L.AST metadata] JS.AST where
         tryElse L.End = Nothing
         tryElse ast   = Just $ JS.Block $ convert' ast
 
-instance LanguageConverter L.Expression JS.Expression where
+instance LanguageConverter (L.Expression metadata) JS.Expression where
     convert = \case
-        L.Access expr name -> JS.Access (convert expr) name
-        L.BinaryOp left op right -> JS.BinaryOp (convert left) op (convert right)
-        L.Call expr exprs -> JS.Call (convert expr) (convert <$> exprs)
-        L.Index expr inner -> JS.Index (convert expr) (convert inner)
-        L.Literal literal -> convert literal
-        L.Parenthesis expr -> JS.Parenthesis $ convert expr
-        L.UnaryOp op expr -> JS.UnaryOp op (convert expr)
-        L.Variable name -> JS.Variable name
+        L.Access _ expr name -> JS.Access (convert expr) name
+        L.BinaryOp _ left op right -> JS.BinaryOp (convert left) op (convert right)
+        L.Call _ expr exprs -> JS.Call (convert expr) (convert <$> exprs)
+        L.Index _ expr inner -> JS.Index (convert expr) (convert inner)
+        L.Literal _ literal -> convert literal
+        L.Parenthesis _ expr -> JS.Parenthesis $ convert expr
+        L.UnaryOp _ op expr -> JS.UnaryOp op (convert expr)
+        L.Variable _ name -> JS.Variable name
 
-convertAlgebraic :: L.Name -> [L.Expression] -> JS.Expression
+convertAlgebraic :: L.Name -> [L.Expression metadata] -> JS.Expression
 convertAlgebraic "False" [] = JS.Literal $ JS.Boolean False
 convertAlgebraic "True" [] = JS.Literal $ JS.Boolean True
 convertAlgebraic "Unit" [] = JS.Literal $ JS.Record []
 convertAlgebraic name fields =
     JS.Function Nothing ["visitor"] (JS.Expression $ JS.Call (JS.Access (JS.Variable "visitor") ("visit" <> name)) (convert <$> fields))
 
-instance LanguageConverter L.Literal JS.Expression where
+instance LanguageConverter (L.Literal metadata) JS.Expression where
     convert = \case
         L.Algebraic name fields -> convertAlgebraic name fields
         L.Array a -> JS.Literal $ JS.Array (convert <$> a)
