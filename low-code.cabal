@@ -97,6 +97,7 @@ library
     , filepath              >=1 && <2
     , formatting            >=6 && <7
     , megaparsec            >=8 && <9
+    , mmorph                >=1 && <2
     , temporary             >=1 && <2
     , text                  >=1 && <2
     , transformers          >=0 && <1
@@ -125,6 +126,7 @@ library
     , Language.LowCode.Logic
     , Language.LowCode.Logic.Analyzer
     , Language.LowCode.Logic.AST
+    , Language.LowCode.Logic.Error
     , Language.LowCode.Logic.JavaScriptConverter
     , Language.LowCode.UI
     , Language.LowCode.UI.AST

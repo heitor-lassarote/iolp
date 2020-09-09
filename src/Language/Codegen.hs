@@ -1,6 +1,7 @@
 module Language.Codegen where
 
-import Universum
+import           Universum
+import qualified Universum.Unsafe as Unsafe
 
 import qualified Data.Text as T
 
@@ -20,6 +21,19 @@ class HasIndentation a where
     modifyCurrentIndentation f a =
         let i = getCurrentIndentation a
          in setCurrentIndentation (f i) a
+
+unsafeCodegen
+    :: (Codegen ast, Emit gen, Monoid gen)
+    => GeneratorState ast
+    -> ast
+    -> gen
+unsafeCodegen st = Unsafe.fromJust . rightToMaybe . evalCodegenT st . codegen
+
+unsafeCodegen'
+    :: (GeneratorState ast ~ (), Codegen ast, Emit gen, Monoid gen)
+    => ast
+    -> gen
+unsafeCodegen' = unsafeCodegen ()
 
 evalCodegenT
     :: (Emit gen, Monoid gen)

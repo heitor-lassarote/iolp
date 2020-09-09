@@ -47,7 +47,7 @@ mkBundleZip tempFolderName name files = do
 data PageCssHtmlLogic = PageCssHtmlLogic
     { css   :: CSS.AST
     , html  :: [HTML.AST]
-    , logic :: [L.AST () L.Metadata]
+    , logic :: [L.TopLevel () L.Metadata]
     , name  :: Name
     } deriving (Generic, FromJSON, ToJSON)
 
@@ -70,13 +70,15 @@ instance FromJSON BundleCssHtmlLogic where
                            <*> o .:  "pages"
 
 instance Bundle BundleCssHtmlLogic where
-    generate BundleCssHtmlLogic {..}
-        | null (L.errors analysis) && null errors = OK files
-        | null (L.errors analysis) = CodegenError errors
-        | otherwise = LogicError $ L.prettyError <$> L.errors analysis
+    generate BundleCssHtmlLogic {..} = case analysis of
+        Nothing -> undefined
+        Just analysis'
+            | null (L.errors $ snd analysis') && null errors -> OK files
+            | null (L.errors $ snd analysis') -> CodegenError errors
+            | otherwise -> LogicError $ L.prettyError <$> L.errors (snd analysis')
       where
         logics = concatMap logic pages
-        analysis = snd $ L.evalAnalyzer' $ L.analyzeMany logicEnvironment logics
+        analysis = L.evalAnalyzer' $ L.analyzeMany logicEnvironment logics
 
         result = map linkHtml pages
         errors = lefts result

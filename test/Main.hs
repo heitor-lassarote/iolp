@@ -41,19 +41,19 @@ counterHtml =
 counterCss :: CSS.AST
 counterCss = CSS.CSS []
 
-element :: L.VariableType
+element :: L.Type
 element = L.RecordType
-    [ ("innerHTML", L.TextType)
+    [ L.Field "innerHTML" L.TextType
     ]
 
-document :: L.VariableType
+document :: L.Type
 document = L.RecordType
-    [ ("getElementById", L.FunctionType [L.TextType] element)
+    [ L.Field "getElementById" (L.FunctionType [L.TextType] element)
     ]
 
-counterExterns :: Map Name L.VariableType
+counterExterns :: Map Name L.Type
 counterExterns = Map.fromList
-    [ ("printInt", L.FunctionType [L.IntegerType] L.TextType)
+    [ ("intToString", L.FunctionType [L.IntegerType] L.TextType)
     , ("parseInt", L.FunctionType [L.TextType, L.IntegerType] L.IntegerType)
     , ("element", element)
     , ("document", document)
@@ -65,19 +65,23 @@ counterEnvironment = L.Environment
     , recordTemplates = Map.empty
     }
 
-counterLogic :: [L.AST]
+counterLogic :: [L.AST () L.Metadata]
 counterLogic =
-    [ L.Start m "updateLabel" (L.FunctionType [L.IntegerType] L.UnitType) ["increment"] $
-        L.Assign m access count $
+    [ L.Start m "updateLabel" (L.FunctionType [L.IntegerType] L.unitType) ["increment"] $
+        L.Var m "element" L.TextType element $
+        L.Var m "counter" L.IntegerType count $
+        L.Expression m setCount
         L.End
-    , L.Start m "resetLabel" (L.FunctionType [] L.UnitType) [] $
-        L.Assign m access (L.Value (Constant $ L.Text "0")) $
+    , L.Start m "resetLabel" (L.FunctionType [] L.unitType) [] $
+        L.Expression m resetCount
         L.End
     ]
   where
     m = L.Metadata (0, 0)
-    Right access = L.parseExpression "document.getElementById(\"counter\").innerHTML"
-    Right count = L.parseExpression "printInt(parseInt(document.getElementById(\"counter\").innerHTML, 10) + increment)"
+    Right element = L.parseExpression "getElement(\"counter\")"
+    Right count = L.parseExpression "stringToInt(element.getText(), 10) + increment"
+    Right setCount = L.parseExpression "element.setText(intToString(counter))"
+    Right resetCount = L.parseExpression "element.setText(0)"
 
 counter :: BundleCssHtmlLogic
 counter = BundleCssHtmlLogic
