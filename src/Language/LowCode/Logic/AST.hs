@@ -3,9 +3,7 @@ module Language.LowCode.Logic.AST
     , HasMetadata (..)
     , Field (..)
     , Constructor (..)
-    , Environment (..)
-    , Metadata (..)
-    , TopLevel (..)
+    , Function (..)
     , AST (..)
     , Expression (..)
     , Literal (..)
@@ -28,7 +26,6 @@ import           Universum hiding (Type, bool, bracket, many, take, takeWhile, t
 import           Data.Aeson hiding (Array, Bool)
 import           Data.Aeson.Types (prependFailure, unexpected)
 import qualified Data.Char as Char
-import           Data.Default.Class
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 import           Text.Megaparsec hiding (unexpected)
@@ -53,43 +50,27 @@ data Constructor = Constructor
     , constructorTypes :: [Type]
     } deriving (Eq, Generic, Ord, Show, FromJSON, ToJSON)
 
-data Environment = Environment
-    { externs         :: Map Name Type
-    , recordTemplates :: Map Name [Field]
-    , adtTemplates    :: Map Name [Constructor]
-    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
+data Function exprMetadata metadata
+    = Function !metadata !Name !Type ![Name] !(AST exprMetadata metadata)
+    deriving (Eq, Functor, Show)
 
-instance Default Environment where
-    def = Environment Map.empty Map.empty Map.empty
+instance (FromJSON metadata) => FromJSON (Function () metadata) where
+    parseJSON = withObject "Language.LowCode.Logic.AST.Function" \o ->
+        Function <$> o .: "metadata"
+                 <*> o .: "name"
+                 <*> o .: "returnType"
+                 <*> o .: "arguments"
+                 <*> o .: "nextAst"
 
-newtype Metadata = Metadata
-    { position :: Double2
-    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
-
-data TopLevel expressionMetadata metadata
-    -- | Represents the start of a cycle with a given name and a list of
-    -- parameters.
-    = Start metadata Name !Type [Name] (AST expressionMetadata metadata)
-
-instance (FromJSON metadata) => FromJSON (TopLevel () metadata) where
-    parseJSON = withObject "Language.LowCode.Logic.AST.TopLevel" \o -> o .: "tag" >>= \case
-        "start" -> Start <$> o .: "metadata"
-                         <*> o .: "name"
-                         <*> o .: "returnType"
-                         <*> o .: "arguments"
-                         <*> o .: "nextAst"
-        other   -> fail $ "Unknown tag '" <> other <> "'. Available tags are: 'start'."
-
-instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (TopLevel expressionMetadata metadata) where
-    toJSON = \case
-        Start metadata name returnType arguments ast -> object
-            [ "metadata"   .= metadata
-            , "tag"        .= String "start"
-            , "name"       .= String name
-            , "returnType" .= returnType
-            , "arguments"  .= arguments
-            , "nextAst"    .= ast
-            ]
+instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (Function expressionMetadata metadata) where
+    toJSON ( Function metadata name returnType arguments ast) = object
+        [ "metadata"   .= metadata
+        , "tag"        .= String "start"
+        , "name"       .= String name
+        , "returnType" .= returnType
+        , "arguments"  .= arguments
+        , "nextAst"    .= ast
+        ]
 
 data AST expressionMetadata metadata
     -- | Assigns a new value to the first expression, and what follows after.
@@ -589,7 +570,7 @@ unary = liftA2 (UnaryOp ()) unaryOperator primary
 
 integer :: Parser Integer
 integer = do
-    radixMaybe <- optional (mkRadix <* char' 'r')
+    radixMaybe <- optional $ try (mkRadix <* char' 'r')
     let radix = fromMaybe 10 radixMaybe
     when (radix < 1 || radix > 36) $
         fail "Radix must be a natural number in [1, 36] range."

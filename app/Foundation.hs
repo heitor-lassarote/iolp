@@ -122,11 +122,10 @@ getBuildR pid = do
         Error err -> sendResponseStatus status500 err
         Success bundle' -> pure $ generate bundle'
     case status of
-        OK files -> do
+        Ok files -> do
             zipPath <- mkBundleZip (show $ fromSqlKey pid) (toString $ projectName project) files
             sendFile "application/zip" zipPath
-        LogicError errors -> sendResponseStatus status500 $ toJSON errors
-        CodegenError errors -> sendResponseStatus status500 $ toJSON errors
+        Err errors -> sendResponseStatus status500 $ toJSON errors
 
 getUserR :: Handler Value
 getUserR = do

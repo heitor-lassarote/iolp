@@ -3,8 +3,10 @@ module Language.Bundles where
 import Universum
 
 import qualified Codec.Archive.Zip as Zip
-import           Data.Aeson
+import           Data.Aeson hiding (Error)
 import           Data.Default.Class
+import qualified Data.Map.Strict as Map
+import           Data.These
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath
 import qualified System.IO.Temp as Temp
@@ -18,15 +20,13 @@ import qualified Language.HTML as HTML
 import qualified Language.JavaScript as JS
 import qualified Language.LowCode.Logic as L
 
-data Status gen
-    = OK [(FilePath, gen)]
-    -- TODO: In the future, unify these two error types.
-    | LogicError [Text]
-    | CodegenError [(FilePath, Text)]
+data Status e a
+    = Ok  e
+    | Err a
     deriving (Eq, Show)
 
 class Bundle bundle where
-    generate :: (Emit gen, Monoid gen) => bundle -> Status gen
+    generate :: (Emit gen, Monoid gen) => bundle -> Status [(FilePath, gen)] [(FilePath, Text)]
 
 mkBundleZip
     :: (MonadIO m, MonadThrow m)
@@ -47,57 +47,70 @@ mkBundleZip tempFolderName name files = do
 data PageCssHtmlLogic = PageCssHtmlLogic
     { css   :: CSS.AST
     , html  :: [HTML.AST]
-    , logic :: [L.TopLevel () L.Metadata]
+    , logic :: [L.Module () L.Metadata]
     , name  :: Name
     } deriving (Generic, FromJSON, ToJSON)
 
 data BundleCssHtmlLogic = BundleCssHtmlLogic
-    { cssOptions       :: CSS.Options
-    , extraJsFiles     :: [(Name, Text)]
-    , htmlOptions      :: HTML.Options
-    , jsOptions        :: JS.Options
-    , logicEnvironment :: L.Environment
-    , pages            :: [PageCssHtmlLogic]
+    { cssOptions   :: CSS.Options
+    , extraJsFiles :: [(Name, Text)]
+    , htmlOptions  :: HTML.Options
+    , jsOptions    :: JS.Options
+    , mainFunction :: L.Module () L.Metadata
+    , pages        :: [PageCssHtmlLogic]
     } deriving (Generic, ToJSON)
 
 instance FromJSON BundleCssHtmlLogic where
     parseJSON = withObject "Language.Bundles.BundleCssHtmlLogic" \o ->
-        BundleCssHtmlLogic <$> o .:? "cssOptions"       .!= def
-                           <*> o .:? "extraJsFiles"     .!= []
-                           <*> o .:? "htmlOptions"      .!= def
-                           <*> o .:? "jsOptions"        .!= def
-                           <*> o .:? "logicEnvironment" .!= def
+        BundleCssHtmlLogic <$> o .:? "cssOptions"   .!= def
+                           <*> o .:? "extraJsFiles" .!= []
+                           <*> o .:? "htmlOptions"  .!= def
+                           <*> o .:? "jsOptions"    .!= def
+                           <*> o .:  "mainFunction"
                            <*> o .:  "pages"
 
+-- Analyze the main, giving back a tree of modules and map of modules.
+-- Iterate through the pages, codegen CSS and HTML.
+--   Then get all modules in logic from dictionary, doing their codegen.
 instance Bundle BundleCssHtmlLogic where
-    generate BundleCssHtmlLogic {..} = case analysis of
-        Nothing -> undefined
-        Just analysis'
-            | null (L.errors $ snd analysis') && null errors -> OK files
-            | null (L.errors $ snd analysis') -> CodegenError errors
-            | otherwise -> LogicError $ L.prettyError <$> L.errors (snd analysis')
+    generate BundleCssHtmlLogic {..}
+        | null errors = Ok files
+        | otherwise   = Err errors
       where
         logics = concatMap logic pages
-        analysis = L.evalAnalyzer' $ L.analyzeMany logicEnvironment logics
+        analysis = L.evalAnalyzer (L.analyze mainFunction logics) (L.AnalyzerReader mainFunction L.unitType) def
 
-        result = map linkHtml pages
         errors = lefts result
         files = join $ rights result
+        -- FIXME: It's completely ignoring the generation of the main function!
+        result = case analysis of
+            This writer       -> mkLeft writer
+            That (_, imports) -> linkHtml imports <$> pages
+            -- FIXME: It may simply return warnings.
+            These writer _    -> mkLeft writer
+          where
+            mkLeft = map (Left . first (toString . L.prettyError) . swap) . L.errors
 
         jsFiles :: (Emit gen, Monoid gen) => [(String, gen)]
         jsFiles = bimap toString emit <$> extraJsFiles
 
-        linkHtml :: (Emit gen, Monoid gen) => PageCssHtmlLogic -> Either (String, Text) [(String, gen)]
-        linkHtml page = do
-            js' <- withName jsName $ evalCodegenT (JS.withOptions jsOptions) $ codegen $ (convert $ logic page :: JS.AST)
+        linkHtml
+            :: (Emit gen, Monoid gen)
+            => Map Name (L.Module L.Type a)
+            -> PageCssHtmlLogic
+            -> Either (String, Text) [(String, gen)]
+        linkHtml allMods page = do
+            let mods = (allMods Map.!) . L.moduleName <$> logic page
+                jsNames = jsName . L.moduleName <$> mods
+                logicGens = evalCodegenT (JS.withOptions jsOptions) . codegen . (convert :: L.Module L.Type a -> JS.AST) <$> mods
+            js' <- sequence $ zipWith withName jsNames logicGens
             css' <- withName cssName $ evalCodegenT (CSS.withOptions cssOptions) $ codegen $ css page
             html' <- withName htmlName $ evalCodegenT (HTML.withOptions htmlOptions) $ codegen $ HTML.link cssNames (map fst extraJsFiles <> jsNames) $ html page
-            pure (jsFiles <> [js', css', html'])
+            pure (css' : html' : jsFiles <> js')
           where
             pName = name page
             cssName = pName <> ".css"
             cssNames = if css page == CSS.CSS [] then [] else [cssName]
-            jsName = pName <> ".js"
-            jsNames = if null (logic page) then [] else [jsName]
+            jsName = (<> ".js")
             htmlName = pName <> ".html"
             withName name = bimap (toString name,) (toString name,)

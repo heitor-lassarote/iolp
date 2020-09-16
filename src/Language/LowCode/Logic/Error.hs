@@ -16,12 +16,15 @@ import Language.LowCode.Logic.AST
 -- Or even better: Should TypeMismatch instead have info about the node instead
 -- of simply a Text?
 data Error
-    = DuplicateRecord Name Name
+    = CyclicImports (NonEmpty Name)
+    | DuplicateModule Name
+    | DuplicateRecord Name Name
     | IncompatibleRecord Name [Name] [Name]
     | IncompatibleSignatures Name Int Int
     | IncompatibleTypes1 UnarySymbol (Expression ())
     | IncompatibleTypes2 (Expression ()) BinarySymbol (Expression ())
     | NoSuchConstructor Name
+    | NoSuchModule Name
     | NoSuchRecord Name
     | NotAFunction Name
     | NotAMember Type Name
@@ -29,10 +32,19 @@ data Error
     | ShadowedVariable Name
     | TypeMismatch Text Type Type
     | UndefinedVariable Name
+    | UnknownArray
     deriving (Eq, Show)
+
+prettyCyclic :: NonEmpty Name -> Text
+prettyCyclic (f :| c) = sformat ("'" % stext % "' imports '" % stext) f (go c)
+  where
+    go (x : xs) = sformat ("'" % stext % "', which imports\n" % stext) x (go xs)
+    go []       = sformat ("'" % stext % "'.") f
 
 prettyError :: Error -> Text
 prettyError = \case
+    CyclicImports cycles -> prettyCyclic cycles
+    DuplicateModule name -> sformat ("Duplicate module '" % stext % "'.") name
     DuplicateRecord recordName fieldName -> sformat
         ("Duplicate field '" % stext % "' on record '" % stext % "'.")
         fieldName
@@ -59,13 +71,10 @@ prettyError = \case
     NoSuchConstructor name -> sformat
         ("Could not find ADT containing a constuctor called '" % stext % "'.")
         name
-    NoSuchRecord name -> sformat
-        ("Could not find record '" % stext % "'.")
-        name
-    NotAFunction name -> sformat
+    NoSuchModule name -> sformat ("Could not find module '" % stext % "'.") name
+    NoSuchRecord name -> sformat ("Could not find record '" % stext % "'.") name
         -- TODO: Add types/expressions being applied? And maybe the inferred type?
-        ("Can't use '" % stext % "' as function.")
-        name
+    NotAFunction name -> sformat ("Can't use '" % stext % "' as function.") name
     NotAMember record memberName -> sformat
         ("'" % stext % "' is not a member of the record '" % shown % "'.")
         memberName
@@ -87,6 +96,8 @@ prettyError = \case
         -- TODO: Scan for similarly named variables.
         ("'" % stext % "' was used but it was not defined. Perhaps you forgot to declare it or made a typo?")
         name
+    UnknownArray -> sformat
+        ("Could not deduce type for array.")
 
 data Warning
     = UnusedVariable Name

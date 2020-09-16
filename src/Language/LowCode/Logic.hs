@@ -10,9 +10,20 @@ module Language.LowCode.Logic
     , module Language.LowCode.Logic.AST
     , module Language.LowCode.Logic.Error
     , module Language.LowCode.Logic.JavaScriptConverter
+    , module Language.LowCode.Logic.Module
+    , Metadata (..)
     ) where
+
+import Universum
+
+import Data.Aeson
 
 import Language.LowCode.Logic.Analyzer
 import Language.LowCode.Logic.AST
 import Language.LowCode.Logic.Error
 import Language.LowCode.Logic.JavaScriptConverter
+import Language.LowCode.Logic.Module
+
+newtype Metadata = Metadata
+    { position :: Double2
+    } deriving (Eq, Generic, Show, FromJSON, ToJSON)

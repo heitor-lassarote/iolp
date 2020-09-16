@@ -43,45 +43,45 @@ counterCss = CSS.CSS []
 
 element :: L.Type
 element = L.RecordType
-    [ L.Field "innerHTML" L.TextType
-    ]
-
-document :: L.Type
-document = L.RecordType
-    [ L.Field "getElementById" (L.FunctionType [L.TextType] element)
+    [ L.Field "getText" (L.FunctionType [] L.TextType)
+    , L.Field "setText" (L.FunctionType [L.TextType] L.unitType)
     ]
 
 counterExterns :: Map Name L.Type
 counterExterns = Map.fromList
-    [ ("intToString", L.FunctionType [L.IntegerType] L.TextType)
+    [ ("printInt", L.FunctionType [L.IntegerType] L.TextType)
     , ("parseInt", L.FunctionType [L.TextType, L.IntegerType] L.IntegerType)
     , ("element", element)
-    , ("document", document)
+    , ("getElement", L.FunctionType [L.TextType] element)
     ]
 
-counterEnvironment :: L.Environment
-counterEnvironment = L.Environment
-    { externs         = counterExterns
-    , recordTemplates = Map.empty
-    }
-
-counterLogic :: [L.AST () L.Metadata]
+counterLogic :: [L.Module () L.Metadata]
 counterLogic =
-    [ L.Start m "updateLabel" (L.FunctionType [L.IntegerType] L.unitType) ["increment"] $
-        L.Var m "element" L.TextType element $
-        L.Var m "counter" L.IntegerType count $
-        L.Expression m setCount
-        L.End
-    , L.Start m "resetLabel" (L.FunctionType [] L.unitType) [] $
-        L.Expression m resetCount
-        L.End
+    [ L.Module
+        { adtTemplates = Map.empty
+        , externs = counterExterns
+        , functions =
+            [ L.Function m "updateLabel" (L.FunctionType [L.IntegerType] L.unitType) ["increment"]
+              $ L.Var m "counter" element getElement
+              $ L.Var m "count" L.IntegerType count
+              $ L.Expression m setCount
+              $ L.End m
+            , L.Function m "resetLabel" (L.FunctionType [] L.unitType) []
+              $ L.Var m "counter" element getElement
+              $ L.Expression m resetCount
+              $ L.End m
+            ]
+        , importedModules = []
+        , moduleName = "Counter"
+        , recordTemplates = Map.empty
+        }
     ]
   where
     m = L.Metadata (0, 0)
-    Right element = L.parseExpression "getElement(\"counter\")"
-    Right count = L.parseExpression "stringToInt(element.getText(), 10) + increment"
-    Right setCount = L.parseExpression "element.setText(intToString(counter))"
-    Right resetCount = L.parseExpression "element.setText(0)"
+    Right getElement = L.parseExpression "getElement(\"counter\")"
+    Right count = L.parseExpression "parseInt(counter.getText(), 10) + increment"
+    Right setCount = L.parseExpression "counter.setText(printInt(count))"
+    Right resetCount = L.parseExpression "counter.setText(\"0\")"
 
 counter :: BundleCssHtmlLogic
 counter = BundleCssHtmlLogic
@@ -89,7 +89,7 @@ counter = BundleCssHtmlLogic
     , extraJsFiles     = [("printInt.js", "printInt = x => x.toString();")]
     , htmlOptions      = def
     , jsOptions        = def
-    , logicEnvironment = counterEnvironment
+    , mainFunction     = (L.mkModule "main") {L.importedModules = ["Counter"]}
     , pages            =
         [ PageCssHtmlLogic
             { css   = counterCss
@@ -102,4 +102,4 @@ counter = BundleCssHtmlLogic
 
 main :: IO ()
 main = do
-    print (generate counter :: Status Text)
+    print (generate counter :: Status [(FilePath, Text)] [(FilePath, Text)])

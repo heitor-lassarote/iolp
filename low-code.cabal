@@ -91,15 +91,17 @@ library
   import:               shared-properties
   build-depends:
       aeson                 >=1 && <2
+    , algebraic-graphs      >=0 && <1
     , containers            >=0 && <1
     , data-default-class    >=0 && <1
     , directory             >=1 && <2
     , filepath              >=1 && <2
     , formatting            >=6 && <7
     , megaparsec            >=8 && <9
-    , mmorph                >=1 && <2
+    , monad-chronicle       >=1 && <2
     , temporary             >=1 && <2
     , text                  >=1 && <2
+    , these                 >=1 && <2
     , transformers          >=0 && <1
     , zip                   >=1 && <2
   default-extensions:
@@ -128,6 +130,7 @@ library
     , Language.LowCode.Logic.AST
     , Language.LowCode.Logic.Error
     , Language.LowCode.Logic.JavaScriptConverter
+    , Language.LowCode.Logic.Module
     , Language.LowCode.UI
     , Language.LowCode.UI.AST
     , Language.LowCode.UI.HTMLConverter
