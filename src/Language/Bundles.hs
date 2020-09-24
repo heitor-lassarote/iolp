@@ -56,7 +56,7 @@ data BundleCssHtmlLogic = BundleCssHtmlLogic
     , extraJsFiles :: [(Name, Text)]
     , htmlOptions  :: HTML.Options
     , jsOptions    :: JS.Options
-    , mainFunction :: L.Module () L.Metadata
+    , mainModule   :: L.Module () L.Metadata
     , pages        :: [PageCssHtmlLogic]
     } deriving (Generic, ToJSON)
 
@@ -66,19 +66,16 @@ instance FromJSON BundleCssHtmlLogic where
                            <*> o .:? "extraJsFiles" .!= []
                            <*> o .:? "htmlOptions"  .!= def
                            <*> o .:? "jsOptions"    .!= def
-                           <*> o .:  "mainFunction"
+                           <*> o .:  "mainModule"
                            <*> o .:  "pages"
 
--- Analyze the main, giving back a tree of modules and map of modules.
--- Iterate through the pages, codegen CSS and HTML.
---   Then get all modules in logic from dictionary, doing their codegen.
 instance Bundle BundleCssHtmlLogic where
     generate BundleCssHtmlLogic {..}
         | null errors = Ok files
         | otherwise   = Err errors
       where
         logics = concatMap logic pages
-        analysis = L.evalAnalyzer (L.analyze mainFunction logics) (L.AnalyzerReader mainFunction L.unitType) def
+        analysis = L.evalAnalyzer (L.analyze logics) (L.AnalyzerReader mainModule L.unitType) def
 
         errors = lefts result
         files = join $ rights result
@@ -102,7 +99,7 @@ instance Bundle BundleCssHtmlLogic where
         linkHtml allMods page = do
             let mods = (allMods Map.!) . L.moduleName <$> logic page
                 jsNames = jsName . L.moduleName <$> mods
-                logicGens = evalCodegenT (JS.withOptions jsOptions) . codegen . (convert :: L.Module L.Type a -> JS.AST) <$> mods
+                logicGens = evalCodegenT (JS.withOptions jsOptions) . codegen . (convert :: L.Module L.Type a -> JS.Module) <$> mods
             js' <- sequence $ zipWith withName jsNames logicGens
             css' <- withName cssName $ evalCodegenT (CSS.withOptions cssOptions) $ codegen $ css page
             html' <- withName htmlName $ evalCodegenT (HTML.withOptions htmlOptions) $ codegen $ HTML.link cssNames (map fst extraJsFiles <> jsNames) $ html page

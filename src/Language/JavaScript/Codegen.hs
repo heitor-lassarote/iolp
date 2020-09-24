@@ -20,15 +20,25 @@ import Language.JavaScript.AST
 
 type JavaScriptCodegen = CodegenT JSGeneratorState
 
+instance Codegen Module where
+    type GeneratorState Module = JSGeneratorState
+
+    codegen = javaScriptCodegen
+
 instance Codegen AST where
     type GeneratorState AST = JSGeneratorState
 
-    codegen = javaScriptCodegen
+    codegen = genAst
 
 instance Codegen Expression where
     type GeneratorState Expression = JSGeneratorState
 
     codegen = genExpression
+
+instance Codegen Literal where
+    type GeneratorState Literal = JSGeneratorState
+
+    codegen = genLiteral
 
 data Options = Options
     { bracesOnNewLine :: Bool
@@ -78,6 +88,7 @@ genLiteral
 genLiteral = \case
     Array xs -> emitBetween' "[" "]" (separatedBy xs =<< commaSpace)
     Boolean x -> emitM if x then "true" else "false"
+    Int x -> emitM $ show x
     Number x -> emitM $ show x
     Record fs -> do
         cs <- commaSpace
@@ -100,7 +111,7 @@ genBlock asts = mconcat <$> sequence
     [ nlIndent
     , emitM "{"
     , nl
-    , separatedByF (withIndent . javaScriptCodegenInternal) mempty asts
+    , separatedByF (withIndent . genAst) mempty asts
     , indentCompact
     , emitM "}"
     , nl
@@ -126,7 +137,7 @@ genFunction name args body = case name of
         , emitM "("
         , pure $ mconcat $ map emit args
         , emitM ")"
-        , javaScriptCodegenInternal body
+        , genAst body
         ]
     Nothing -> mconcat <$> sequence
         [ indentCompact
@@ -136,7 +147,7 @@ genFunction name args body = case name of
         , space
         , emitM "=>"
         , space
-        , javaScriptCodegenInternal body
+        , genAst body
         ]
 
 genAssignment
@@ -204,21 +215,16 @@ genExpression = \case
         ]
     Variable name -> emitIfValid name
 
-javaScriptCodegen
-    :: (Emit gen, Monoid gen)
-    => AST
-    -> JavaScriptCodegen gen
-javaScriptCodegen ast = do
+javaScriptCodegen :: (Emit gen, Monoid gen) => Module -> JavaScriptCodegen gen
+javaScriptCodegen m = do
     strict' <- gets (strict . options)
     let useStrict = emit if strict' then "\"use strict\";\n" else ""
-    body <- javaScriptCodegenInternal ast
-    pure $ useStrict <> body
+    bodies <- traverse genAst (functions m)
+    pure $ useStrict <> mconcat bodies
 
-javaScriptCodegenInternal
-    :: (Emit gen, Monoid gen)
-    => AST
-    -> JavaScriptCodegen gen
-javaScriptCodegenInternal = \case
+-- TODO: Generate else if instead of ifs inside else blocks.
+genAst :: (Emit gen, Monoid gen) => AST -> JavaScriptCodegen gen
+genAst = \case
     Assign left right -> genAssignment left right
     Block asts -> genBlock asts
     Expression expression -> mconcat <$> sequence
@@ -230,11 +236,11 @@ javaScriptCodegenInternal = \case
     If expression t f -> do
         indent' <- indentCompact
         space' <- space
-        trueBranch <- go t
+        trueBranch <- genAst t
         falseBranch <- case f of
             Nothing -> emitM mempty
             Just f' -> do
-                falseBranch <- go f'
+                falseBranch <- genAst f'
                 pure $ mconcat [indent', emit "else", falseBranch]
 
         expression' <- genExpression expression
@@ -248,7 +254,6 @@ javaScriptCodegenInternal = \case
             , trueBranch
             , falseBranch
             ]
-    NonScopedBlock asts -> mconcat <$> traverse javaScriptCodegenInternal asts
     Return Nothing -> mconcat <$> sequence
         [ indentCompact
         , emitM "return;"
@@ -267,7 +272,5 @@ javaScriptCodegenInternal = \case
         , emitM "while"
         , space
         , emitBetween' "(" ")" $ genExpression expression
-        , go body
+        , genAst body
         ]
-  where
-    go = javaScriptCodegenInternal

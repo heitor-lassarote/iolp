@@ -144,17 +144,23 @@ withScope action = do
         | unused info = (currentMod, UnusedVariable var) : acc
         | otherwise   = acc
 
+currentModuleName :: (Monad m) => AnalyzerT exprMetadata astMetadata m Name
+currentModuleName = asks (moduleName . currentModule)
+
 newError :: Name -> Error -> AnalyzerWriter
 newError moduleName e = mempty { errors = [(moduleName, e)] }
 
 addError :: (Monad m) => Error -> AnalyzerT exprMetadata astMetadata m ()
-addError err = asks (moduleName . currentModule) >>= \name -> dictate $ newError name err
+addError e = currentModuleName >>= \name -> dictate $ newError name e
 
 fatalError :: (Monad m) => Error -> AnalyzerT exprMetadata astMetadata m a
-fatalError err = asks (moduleName . currentModule) >>= \name -> confess $ newError name err
+fatalError e = currentModuleName >>= \name -> confess $ newError name e
 
---addWarning :: (Monad m) => Warning -> AnalyzerT exprMetadata astMetadata m ()
---addWarning w = dictate $ mempty { warnings = [w] }
+newWarning :: Name -> Warning -> AnalyzerWriter
+newWarning moduleName w = mempty { warnings = [(moduleName, w)] }
+
+addWarning :: (Monad m) => Warning -> AnalyzerT exprMetadata astMetadata m ()
+addWarning w = currentModuleName >>= \name -> dictate $ newWarning name w
 
 analyzeAssign
     :: Expression metadata
@@ -215,11 +221,28 @@ linkModules mods = do
         pure $ Map.fromList trees
 
 -- TODO: Unions with modules.
--- TODO: Unions with externs.
 collect :: Module exprMetadata astMetadata -> Map Name VariableInfo
 collect mod' = foldr mkSymbol (fmap mkInfo (externs mod')) $ functions mod'
   where
     mkSymbol (Function _ name ret _ _) acc = Map.insert name (mkInfo ret) acc
+
+algebraicToFunctions :: Name -> Map Name Constructor -> Map Name VariableInfo
+algebraicToFunctions adtName constructors = Map.map fromConstructor constructors
+  where
+    adtType = AlgebraicType adtName (Map.elems constructors)
+    fromConstructor (Constructor _ cTypes) = mkInfo (FunctionType cTypes adtType)
+
+--algebraicToFunctions :: (Default a) => Name -> Map Name Constructor -> Map Name (Function Type a)
+--algebraicToFunctions adtName constructors = Map.map fromConstructor constructors
+--  where
+--    adtType = AlgebraicType adtName (Map.elems constructors)
+--    fromConstructor (Constructor cName cTypes) =
+--        Function def cName (FunctionType cTypes adtType) mkNames mkReturn
+--      where
+--        mkReturn = Return def (Just mkStructure)
+--        mkStructure = Structure adtType (Algebraic adtType cName mkVariables)
+--        mkNames = Text.cons '_' <$> (show <$> [0 .. length cTypes - 1])
+--        mkVariables = zipWith Variable cTypes mkNames
 
 analyze' :: Module e a -> Map Name (ModuleImports e a) -> Analyzer e a (ModuleImports Type a)
 analyze' root mods = do
@@ -227,14 +250,15 @@ analyze' root mods = do
     funcs <- withAnalyzerT
         (\r -> r { currentModule = root })
         (\s -> s { analyzerSymbols = collect root })
-        (traverse (withScope . analyzeStart) $ functions root)
+        (traverse (withScope . analyzeFunction) $ functions root)
     pure ModuleImports
         { moduleImports = Map.fromList $ zip (Map.keys mods) mods'
         , rootModule    = root { functions = funcs }
         }
 
-analyze :: Module e a -> [Module e a] -> Analyzer e a (ModuleImports Type a, Map Name (Module Type a))
-analyze root mods = do
+analyze :: [Module e a] -> Analyzer e a (ModuleImports Type a, Map Name (Module Type a))
+analyze mods = do
+    root <- asks currentModule
     linked <- linkModules mods
     tree <- analyze' root linked
     pure (tree, getMods tree)
@@ -243,8 +267,8 @@ analyze root mods = do
     getMods (ModuleImports ms m) = Map.foldr go (mkMap m) ms
     go (ModuleImports ms m) acc = Map.unions (mkMap m : acc : (getMods <$> Map.elems ms))
 
-analyzeStart :: Function expressionMetadata metadata -> Analyzer e a (Function Type metadata)
-analyzeStart (Function _ name (FunctionType argTypes ret) arguments next) = do
+analyzeFunction :: Function e a -> Analyzer e a (Function Type a)
+analyzeFunction (Function _ name (FunctionType argTypes ret) arguments next) = do
     let nArgs = length arguments
         nTypes = length argTypes
     when (nArgs /= nTypes) $
@@ -255,9 +279,9 @@ analyzeStart (Function _ name (FunctionType argTypes ret) arguments next) = do
         (\s -> s { analyzerSymbols = Map.union argsInfo (analyzerSymbols s) })
         (analyzeImpl next)
     pure $ Function (getMetadata ast) name (FunctionType argTypes ret) arguments ast
-analyzeStart (Function _ name _ _ _) = fatalError (NotAFunction name)
+analyzeFunction (Function _ name _ _ _) = fatalError (NotAFunction name)
 
-analyzeReturn :: Maybe (Expression metadata) -> Analyzer e a (Expression Type)
+analyzeReturn :: Maybe (Expression e) -> Analyzer e a (Expression Type)
 analyzeReturn Nothing = do
     ret <- asks returnType
     when (ret /= unitType) $
@@ -271,7 +295,67 @@ analyzeReturn (Just expr) = do
         addError $ TypeMismatch (unsafeCodegen' expr) ret typeE
     pure exprE
 
-analyzeImpl :: AST expressionMetadata metadata -> Analyzer e a (AST Type metadata)
+findAdt :: Name -> Analyzer e a (Maybe (Name, [Constructor], Constructor))
+findAdt cName = do
+    adts <- asks (adtTemplates . currentModule)
+    pure $ findMap go $ Map.toList adts
+  where
+    go (adtName, adtConstructors) =
+        (adtName, adtConstructors,) <$> find ((== cName) . constructorName) adtConstructors
+
+findRecord :: Name -> Analyzer e a (Maybe [Field])
+findRecord name = do
+    recs <- asks (recordTemplates . currentModule)
+    pure $ Map.lookup name recs
+
+analyzePattern :: Type -> MatchPattern -> Analyzer e a (Map Name VariableInfo)
+analyzePattern expectedType = \case
+    AlgebraicPattern cName fields -> findAdt cName >>= \case
+        Just (adtName, constructors, Constructor _cName cTypes)
+            | AlgebraicType adtName constructors == expectedType ->
+                Map.unions <$> sequence (zipWith analyzePattern cTypes fields)
+            | otherwise -> mismatch cName (AlgebraicType adtName constructors)
+        Nothing -> addError (NoSuchConstructor cName) *> pure Map.empty
+    ArrayPattern positions -> case expectedType of
+        ArrayType t -> Map.unions <$> traverse (analyzePattern t) positions
+        _           -> addError UnknownArray *> pure Map.empty
+    LiteralPattern lit
+        | literalType lit == expectedType -> do
+            when (expectedType == DoubleType) $
+                addWarning (FloatingPointEquality (getDouble lit))
+            pure Map.empty
+        | otherwise -> mismatch (unsafeCodegen' lit) (literalType lit)
+    NamePattern name -> pure (Map.singleton name (mkInfo expectedType))
+    RecordPattern name fields -> findRecord name >>= \case
+        Just fields'
+            | RecordType fields' == expectedType ->
+                Map.unions <$> sequence (zipWith analyzePattern (fieldType <$> fields') fields)
+            | otherwise -> mismatch name (RecordType fields')
+        Nothing -> addError (NoSuchConstructor name) *> pure Map.empty
+  where
+    mismatch name actualType = do
+        addError (TypeMismatch name expectedType actualType)
+        pure Map.empty
+
+    getDouble (Double d) = d
+    getDouble _          = error "Panic: error in analyzePattern.getDouble. This is likely a bug. Please report it."
+
+-- TODO: Check for non-exhaustive patterns.
+-- TODO: Check for repeated patterns.
+-- TODO: Check for unreachable patterns.
+analyzeMatch :: Expression e -> [(MatchPattern, AST e a)] -> Analyzer e a (Expression Type, [(MatchPattern, AST Type a)])
+analyzeMatch expr branches = do
+    exprWithMetadata <- analyzeExpr expr
+    branches' <- traverse (go exprWithMetadata []) branches
+    pure (exprWithMetadata, branches')
+  where
+    go e _patterns (p, a) = withScope do
+        infos <- analyzePattern (getMetadata e) p
+        modify \s -> s { analyzerSymbols = Map.union infos (analyzerSymbols s) }
+        ast' <- analyzeImpl a
+        pure (p, ast')
+
+analyzeImpl :: AST e a -> Analyzer e a (AST Type a)
 analyzeImpl = \case
     Assign m left right next -> do
         (left', right') <- analyzeAssign left right
@@ -284,6 +368,9 @@ analyzeImpl = \case
         true'  <- withScope $ analyzeImpl true
         false' <- withScope $ analyzeImpl false
         If m cond' true' false' <$> analyzeImpl next
+    Match m expr branches next -> do
+        (expr', branches') <- analyzeMatch expr branches
+        Match m expr' branches' <$> analyzeImpl next
     Return m exprMaybe -> Return m <$> (Just <$> analyzeReturn exprMaybe)
     Var m var type' expr next -> do
         Var m var type' <$> analyzeVar var type' expr <*> analyzeImpl next
@@ -309,7 +396,6 @@ analyzeExpr = \case
                     Just (Field _ fieldType) -> pure $ Access fieldType exprL right
             _ -> do
                 addError (NotARecord typeL right)
-                -- TODO: Should we return Nothing?
                 pure $ Access typeL exprL right
     BinaryOp _ left symbol' right -> do
         exprL <- analyzeExpr left
@@ -517,45 +603,38 @@ analyzeRecord name fields = do
     let (names, exprs) = unzip fields
     sorted <- analyzeDuplicates name names
 
-    recs <- asks $ recordTemplates . currentModule
-    case Map.lookup name recs of
+    fieldsLookup <- findRecord name
+    case fieldsLookup of
         Nothing -> do
             addError $ NoSuchRecord name
             exprsWithMetadata <- traverse analyzeExpr exprs
             let types = getMetadata <$> exprsWithMetadata
             pure $ Record (RecordType (zipWith Field names types)) name (zip names exprsWithMetadata)
-        Just templateFields ->
-            analyzeRecordFields sorted templateFields name fields
+        Just templateFields -> analyzeRecordFields sorted templateFields name fields
 
 analyzeRecordWithHint :: [Field] -> Name -> [(Name, Expression metadata)] -> Analyzer e a (Structure Type)
 analyzeRecordWithHint expectedFields name fields = do
     let (names, exprs) = unzip fields
     sorted <- analyzeDuplicates name names
 
-    recs <- asks $ recordTemplates . currentModule
-    case Map.lookup name recs of
+    fieldsLookup <- findRecord name
+    case fieldsLookup of
         Nothing -> do
             addError $ NoSuchRecord name
             exprsWithMetadata <- sequence $ zipWith analyzeExprWithHint (fieldType <$> expectedFields) exprs
             let types = getMetadata <$> exprsWithMetadata
             pure $ Record (RecordType (zipWith Field names types)) name (zip names exprsWithMetadata)
-        Just templateFields -> do
-            analyzeRecordFields sorted templateFields name fields
+        Just templateFields -> analyzeRecordFields sorted templateFields name fields
 
 analyzeAlgebraic :: Name -> [Expression metadata] -> Analyzer e a (Structure Type)
-analyzeAlgebraic name exprs = do
-    adts <- asks $ adtTemplates . currentModule
-    case findMap findAdt $ Map.toList adts of
-        Nothing -> do
-            traverse_ analyzeExpr exprs
-            fatalError $ NoSuchConstructor name
-        Just (adtName, adtConstructors, adtConstructor) -> do
-            -- TODO: Check whether exprs and adtConstructors have the same length.
-            fields <- sequence $ zipWith analyzeExprWithHint (constructorTypes adtConstructor) exprs
-            pure $ Algebraic (AlgebraicType adtName adtConstructors) name fields
-  where
-    findAdt (adtName, adtConstructors) =
-        (adtName, adtConstructors,) <$> find ((== name) . constructorName) adtConstructors
+analyzeAlgebraic name exprs = findAdt name >>= \case
+    Nothing -> do
+        traverse_ analyzeExpr exprs
+        fatalError $ NoSuchConstructor name
+    Just (adtName, adtConstructors, adtConstructor) -> do
+        -- TODO: Check whether exprs and adtConstructors have the same length.
+        fields <- sequence $ zipWith analyzeExprWithHint (constructorTypes adtConstructor) exprs
+        pure $ Algebraic (AlgebraicType adtName adtConstructors) name fields
 
 literalType :: Literal -> Type
 literalType = \case

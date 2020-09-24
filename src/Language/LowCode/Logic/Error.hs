@@ -7,7 +7,7 @@ module Language.LowCode.Logic.Error
 
 import Universum hiding (Type)
 
-import Formatting (int, sformat, shown, stext, (%))
+import Formatting (float, int, sformat, shown, stext, (%))
 
 import Language.Codegen (unsafeCodegen')
 import Language.LowCode.Logic.AST
@@ -100,11 +100,16 @@ prettyError = \case
         ("Could not deduce type for array.")
 
 data Warning
-    = UnusedVariable Name
+    = FloatingPointEquality Double
+    | UnusedVariable Name
     deriving (Eq, Show)
 
 prettyWarning :: Warning -> Text
 prettyWarning = \case
+    FloatingPointEquality value -> sformat
+        ("Floating point is imprecise and equality may fail. Test for delta " % float % " - ε < x < " % float % " + ε instead.")
+        value
+        value
     UnusedVariable name -> sformat
         ("Declared but not used: '" % stext % "'.")
         name

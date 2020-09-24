@@ -4,6 +4,7 @@ module Language.LowCode.Logic.AST
     , Field (..)
     , Constructor (..)
     , Function (..)
+    , MatchPattern (..)
     , AST (..)
     , Expression (..)
     , Literal (..)
@@ -35,7 +36,7 @@ import qualified Text.Megaparsec.Char.Lexer as Lexer
 import           Language.Codegen
 import           Language.Common
 import           Language.Emit
-import           Utility (biject)
+import           Utility (biject, withTag)
 
 class HasMetadata f where
     getMetadata  :: f a -> a
@@ -63,33 +64,73 @@ instance (FromJSON metadata) => FromJSON (Function () metadata) where
                  <*> o .: "nextAst"
 
 instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (Function expressionMetadata metadata) where
-    toJSON ( Function metadata name returnType arguments ast) = object
+    toJSON (Function metadata name returnType arguments ast) = object
         [ "metadata"   .= metadata
-        , "tag"        .= String "start"
         , "name"       .= String name
         , "returnType" .= returnType
         , "arguments"  .= arguments
         , "nextAst"    .= ast
         ]
 
-data AST expressionMetadata metadata
+data MatchPattern
+    = AlgebraicPattern Name [MatchPattern]
+    | ArrayPattern [MatchPattern]
+    | LiteralPattern Literal
+    | NamePattern Name
+    | RecordPattern Name [MatchPattern]
+    deriving (Eq, Show)
+
+instance FromJSON MatchPattern where
+    parseJSON = withObject "Language.LowCode.Logic.AST.MatchExpr" \o -> o .: "tag" >>= \case
+        "adt"     -> AlgebraicPattern <$> o .: "constructorName" <*> o .: "fields"
+        "array"   -> ArrayPattern <$> o .: "positions"
+        "literal" -> LiteralPattern <$> o .: "value"
+        "name"    -> NamePattern <$> o .: "name"
+        "record"  -> RecordPattern <$> o .: "recordName" <*> o .: "fields"
+        other     -> fail $
+            "Expected 'adt', 'array', 'default', 'literal' or 'record', but got\
+            \ '" <> other <> "'."
+
+instance ToJSON MatchPattern where
+    toJSON = \case
+        AlgebraicPattern name fields -> withTag "adt"
+            [ "constructorName" .= name
+            , "fields"          .= fields
+            ]
+        ArrayPattern positions -> withTag "array"
+            [ "positions"       .= positions
+            ]
+        LiteralPattern value' -> withTag "literal"
+            [ "value"           .= value'
+            ]
+        NamePattern name -> withTag "name"
+            [ "name"            .= name
+            ]
+        RecordPattern name fields -> withTag "record"
+            [ "recordName"      .= name
+            , "fields"          .= fields
+            ]
+
+data AST exprMetadata metadata
     -- | Assigns a new value to the first expression, and what follows after.
-    = Assign metadata (Expression expressionMetadata) (Expression expressionMetadata) (AST expressionMetadata metadata)
+    = Assign metadata (Expression exprMetadata) (Expression exprMetadata) (AST exprMetadata metadata)
     -- | Represents the end of a cycle.
     | End metadata
     -- | Executes a raw expression. Useful for Call.
-    | Expression metadata (Expression expressionMetadata) (AST expressionMetadata metadata)
+    | Expression metadata (Expression exprMetadata) (AST exprMetadata metadata)
     -- | Allows a condition to be tested, and contains the true branch, false
     -- branch and what follows after the branches.
-    | If metadata (Expression expressionMetadata) (AST expressionMetadata metadata) (AST expressionMetadata metadata) (AST expressionMetadata metadata)
+    | If metadata (Expression exprMetadata) (AST exprMetadata metadata) (AST exprMetadata metadata) (AST exprMetadata metadata)
+    -- | Represents a match pattern, similar to a "case of" or a "switch" structure.
+    | Match metadata (Expression exprMetadata) [(MatchPattern, AST exprMetadata metadata)] (AST exprMetadata metadata)
     -- | Exits the function, optionally returning a value.
-    | Return metadata (Maybe (Expression expressionMetadata))
+    | Return metadata (Maybe (Expression exprMetadata))
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var metadata Name !Type (Expression expressionMetadata) (AST expressionMetadata metadata)
+    | Var metadata Name !Type (Expression exprMetadata) (AST exprMetadata metadata)
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
-    | While metadata (Expression expressionMetadata) (AST expressionMetadata metadata) (AST expressionMetadata metadata)
+    | While metadata (Expression exprMetadata) (AST exprMetadata metadata) (AST exprMetadata metadata)
     deriving (Eq, Functor, Show)
 
 instance HasMetadata (AST expressionMetadata) where
@@ -98,6 +139,7 @@ instance HasMetadata (AST expressionMetadata) where
         End m -> m
         Expression m _ _ -> m
         If m _ _ _ _ -> m
+        Match m _ _ _ -> m
         Return m _ -> m
         Var m _ _ _ _ -> m
         While m _ _ _ -> m
@@ -117,6 +159,10 @@ instance (FromJSON metadata) => FromJSON (AST () metadata) where
                                     <*> o .: "trueBranchAst"
                                     <*> o .: "falseBranchAst"
                                     <*> o .: "nextAst"
+        "match"       -> Match      <$> o .: "metadata"
+                                    <*> o .: "expression"
+                                    <*> o .: "branches"
+                                    <*> o .: "nextAst"
         "return"      -> Return     <$> o .: "metadata"
                                     <*> o .: "expression"
         "var"         -> Var        <$> o .: "metadata"
@@ -129,56 +175,54 @@ instance (FromJSON metadata) => FromJSON (AST () metadata) where
                                     <*> o .: "whileAst"
                                     <*> o .: "nextAst"
         other         -> fail $
-                            "Unknown tag '" <> other <> "'. Available tags are:\
-                            \ 'assign', 'end', 'expression', 'if', 'return', 'start',\
-                            \ 'var' and 'while'."
+            "Unknown tag '" <> other <> "'. Available tags are: 'assign', 'end',\
+            \ 'expression', 'if', 'match', 'return', 'start', 'var' and 'while'."
 
 instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (AST expressionMetadata metadata) where
     toJSON = \case
-        Assign metadata left right ast -> object
-            [ "metadata"         .= metadata
-            , "tag"              .= String "assign"
-            , "leftExpression"   .= left
-            , "rightExpression"  .= right
-            , "nextAst"          .= ast
+        Assign metadata left right ast -> withTag "assign"
+            [ "metadata"        .= metadata
+            , "leftExpression"  .= left
+            , "rightExpression" .= right
+            , "nextAst"         .= ast
             ]
-        End metadata -> object
-            [ "metadata"         .= metadata
-            , "tag"              .= String "end"
+        End metadata -> withTag "end"
+            [ "metadata"        .= metadata
             ]
-        Expression metadata expression ast -> object
-            [ "metadata"         .= metadata
-            , "tag"              .= String "expression"
-            , "expression"       .= expression
-            , "nextAst"          .= ast
+        Expression metadata expression ast -> withTag "expression"
+            [ "metadata"        .= metadata
+            , "expression"      .= expression
+            , "nextAst"         .= ast
             ]
-        If metadata expression true false ast -> object
-            [ "metadata"         .= metadata
-            , "tag"              .= String "if"
-            , "expression"       .= expression
-            , "trueBranchAst"    .= true
-            , "falseBranchAst"   .= false
-            , "nextAst"          .= ast
+        If metadata expression true false ast -> withTag "if"
+            [ "metadata"        .= metadata
+            , "expression"      .= expression
+            , "trueBranchAst"   .= true
+            , "falseBranchAst"  .= false
+            , "nextAst"         .= ast
             ]
-        Return metadata expression -> object
-            [ "metadata"         .= metadata
-            , "tag"              .= String "return"
-            , "expression"       .= expression
+        Match metadata expr branches ast -> withTag "match"
+            [ "metadata"        .= metadata
+            , "expression"      .= expr
+            , "branches"        .= branches
+            , "nextAst"         .= ast
             ]
-        Var metadata name type' expression ast -> object
-            [ "metadata"         .= metadata
-            , "tag"              .= String "var"
-            , "name"             .= String name
-            , "type"             .= type'
-            , "expression"       .= expression
-            , "nextAst"          .= ast
+        Return metadata expression -> withTag "return"
+            [ "metadata"        .= metadata
+            , "expression"      .= expression
             ]
-        While metadata expression body ast -> object
-            [ "metadata"         .= metadata
-            , "tag"              .= String "while"
-            , "expression"       .= expression
-            , "whileAst"         .= body
-            , "nextAst"          .= ast
+        Var metadata name type' expression ast -> withTag "var"
+            [ "metadata"        .= metadata
+            , "name"            .= name
+            , "type"            .= type'
+            , "expression"      .= expression
+            , "nextAst"         .= ast
+            ]
+        While metadata expression body ast -> withTag "while"
+            [ "metadata"        .= metadata
+            , "expression"      .= expression
+            , "whileAst"        .= body
+            , "nextAst"         .= ast
             ]
 
 instance HasMetadata Expression where
@@ -224,54 +268,45 @@ instance FromJSON (Expression ()) where
                                         <*> o .: "expression"
         "variable"    -> Variable ()    <$> o .: "name"
         other         -> fail $
-                            "Expected 'access', 'binaryOp', 'call', 'index', 'literal',\
-                            \ 'parenthesis', 'structure', 'unaryOp' or 'variable', but got '"
-                            <> other <> "'."
+            "Expected 'access', 'binaryOp', 'call', 'index', 'literal',\
+            \ 'parenthesis', 'structure', 'unaryOp' or 'variable', but got '"
+            <> other <> "'."
     parseJSON other = prependFailure "Expected String or Object, but got " (unexpected other)
 
 instance ToJSON (Expression metadata) where
     toJSON = \case
-        Access _ expression name -> object
-            [ "tag"             .= String "access"
-            , "expression"      .= expression
+        Access _ expression name -> withTag "access"
+            [ "expression"      .= expression
             , "name"            .= name
             ]
-        BinaryOp _ left symbol' right -> object
-            [ "tag"             .= String "binaryOp"
-            , "leftExpression"  .= left
+        BinaryOp _ left symbol' right -> withTag "binaryOp"
+            [ "leftExpression"  .= left
             , "symbol"          .= symbol'
             , "rightExpression" .= right
             ]
-        Call _ expression arguments -> object
-            [ "tag"             .= String "call"
-            , "expression"      .= expression
+        Call _ expression arguments -> withTag "call"
+            [ "expression"      .= expression
             , "arguments"       .= arguments
             ]
-        Index _ left right -> object
-            [ "tag"             .= String "index"
-            , "leftExpression"  .= left
+        Index _ left right -> withTag "index"
+            [ "leftExpression"  .= left
             , "rightExpression" .= right
             ]
-        Literal _ value' -> object
-            [ "tag"             .= String "literal"
-            , "value"           .= value'
+        Literal _ value' -> withTag "literal"
+            [ "value"           .= value'
             ]
-        Parenthesis _ expression -> object
-            [ "tag"             .= String "parenthesis"
+        Parenthesis _ expression -> withTag "parenthesis"
+            [ "expression"      .= expression
+            ]
+        Structure _ structure' -> withTag "structure"
+            [ "structure"       .= structure'
+            ]
+        UnaryOp _ symbol' expression -> withTag "unaryOp"
+            [ "symbol"          .= symbol'
             , "expression"      .= expression
             ]
-        Structure _ structure' -> object
-            [ "tag"             .= String "structure"
-            , "structure"       .= structure'
-            ]
-        UnaryOp _ symbol' expression -> object
-            [ "tag"             .= String "unaryOp"
-            , "symbol"          .= symbol'
-            , "expression"      .= expression
-            ]
-        Variable _ name -> object
-            [ "tag"             .= String "variable"
-            , "name"            .= name
+        Variable _ name -> withTag "variable"
+            [ "name"            .= name
             ]
 
 instance Codegen (Expression metadata) where
@@ -325,7 +360,7 @@ instance Codegen Literal where
         Text t -> emitBetween' "\""  "\"" $ emitM t
 
 instance FromJSON Literal where
-    parseJSON = withObject "Language.LowCode.Logic.AST.Literal" \o -> o .: "type" >>= \case
+    parseJSON = withObject "Language.LowCode.Logic.AST.Literal" \o -> o .: "tag" >>= \case
         "char"   -> Char       <$> o .: "value"
         "double" -> Double     <$> o .: "value"
         "integer"-> Integer    <$> o .: "value"
@@ -335,22 +370,10 @@ instance FromJSON Literal where
 
 instance ToJSON Literal where
     toJSON = \case
-        Char c -> object
-            [ "type"   .= String "char"
-            , "value"  .= c
-            ]
-        Double d -> object
-            [ "type"   .= String "double"
-            , "value"  .= d
-            ]
-        Integer i -> object
-            [ "type"   .= String "integer"
-            , "value"  .= i
-            ]
-        Text t -> object
-            [ "type"   .= String "text"
-            , "value"  .= t
-            ]
+        Char c -> withTag "char" ["value" .= c]
+        Double d -> withTag "double" ["value" .= d]
+        Integer i -> withTag "integer" ["value" .= i]
+        Text t -> withTag "text" ["value" .= t]
 
 data Structure metadata
     = Algebraic metadata Name [Expression metadata]
@@ -392,7 +415,7 @@ instance Codegen (Structure metadata) where
             ]
 
 instance FromJSON (Structure ()) where
-    parseJSON = withObject "Language.LowCode.Logic.AST.Structure" \o -> o .: "type" >>= \case
+    parseJSON = withObject "Language.LowCode.Logic.AST.Structure" \o -> o .: "tag" >>= \case
         "adt"    -> Algebraic () <$> o .: "name"  <*> o .: "fields"
         "record" -> Record    () <$> o .: "name"  <*> o .: "fields"
         "array"  -> Array     () <$> o .: "value"
@@ -401,21 +424,39 @@ instance FromJSON (Structure ()) where
 
 instance ToJSON (Structure metadata) where
     toJSON = \case
-        Algebraic _ name constructors -> object
-            [ "type"   .= String "adt"
-            , "name"   .= name
+        Algebraic _ name constructors -> withTag "adt"
+            [ "name"   .= name
             , "fields" .= constructors
             ]
-        Array _ a -> object
-            [ "type"   .= String "array"
-            , "value"  .= a
+        Array _ a -> withTag "array"
+            [ "value"  .= a
             ]
-        Record _ recordName fields -> object
-            [ "type"   .= String "record"
-            , "name"   .= recordName
+        Record _ recordName fields -> withTag "record"
+            [ "name"   .= recordName
             , "fields" .= fields
             ]
 
+-- FIXME: Suppose an AlgebraicType Foo with a constructor Bar Foo. How do we
+-- encode it? Not the way it's actually implemented, because it will stack
+-- overflow trying to find it's own type infinitely! The best way to fix it
+-- would perhaps be to simply refer to its own (module-qualified) name.
+--   RecordType likely will have the same problem if it tries to refer to itself
+-- and so will probably require the same fix.
+--   Note that the module will still contain a Map Name [Constructor] that can
+--   be used to lookup for the constructors of the ADT.
+-- As for the qualified name, I suggest creating a new record called Import,
+-- parametrized over a type variable a, which will contain the module of type a,
+-- and an ADT Qualification, with constructors Qualified Text and Unqualified.
+--   Notice this will also solve another problem, which is checking for types
+-- with the same name but different fields, which shouldn't be allowed.
+-- TODO: Should RecordType keep track of its name? Or should we perhaps add a
+-- new type (such as struct or class) for this?
+-- TODO: Should AlgebraicType constructors be named (like F# or Rust does)? This
+-- will allow for better JS name generation. Alternatively, we could also allow
+-- just one Type per Constructor (again, like F# or Rust), and make use of
+-- Records in case that the user needs more than one field in the constructor.
+-- TODO: Should we make a tuple type? Or should it be defined as a simple ADT,
+-- like PureScript does?
 data Type
     = AlgebraicType Name [Constructor]
     | ArrayType Type
@@ -435,7 +476,7 @@ unitType :: Type
 unitType = AlgebraicType "Unit" [Constructor "Unit" []]
 
 instance FromJSON Type where
-    parseJSON = withObject "Language.LowCode.Logic.AST.VariableType" \o -> o .: "type" >>= \case
+    parseJSON = withObject "Language.LowCode.Logic.AST.VariableType" \o -> o .: "tag" >>= \case
         "adt"      -> AlgebraicType <$> o .: "name" <*> o .: "constructors"
         "array"    -> ArrayType <$> o .: "elements"
         "char"     -> pure CharType
@@ -445,34 +486,29 @@ instance FromJSON Type where
         "record"   -> RecordType <$> o .: "fields"
         "text"     -> pure TextType
         other      -> fail $
-                       "Expected 'array', 'char', 'double', 'function',\
-                       \ 'integer', 'record' or 'text',\
-                       \ but got '" <> other <> "'."
+            "Expected 'array', 'char', 'double', 'function','integer', 'record'\
+            \ or 'text', but got '" <> other <> "'."
 
 instance ToJSON Type where
     toJSON = \case
-        AlgebraicType name constructors -> object
-            [ "type"         .= String "adt"
-            , "name"         .= name
+        AlgebraicType name constructors -> withTag "adt"
+            [ "name"         .= name
             , "constructors" .= constructors
             ]
-        ArrayType elements -> object
-            [ "type"         .= String "array"
-            , "elements"     .= elements
+        ArrayType elements -> withTag "array"
+            [ "elements"     .= elements
             ]
-        CharType    -> object [ "type" .= String "char"    ]
-        DoubleType  -> object [ "type" .= String "double"  ]
-        FunctionType arguments return' -> object
-            [ "type"          .= String "function"
-            , "arguments"     .= arguments
+        CharType    -> withTag "char" []
+        DoubleType  -> withTag "double" []
+        FunctionType arguments return' -> withTag "function"
+            [ "arguments"     .= arguments
             , "return"        .= return'
             ]
-        IntegerType -> object [ "type" .= String "integer" ]
-        RecordType fieldsType -> object
-            [ "type"        .= String "record"
-            , "fields"      .= fieldsType
+        IntegerType -> withTag "integer" []
+        RecordType fieldsType -> withTag "record"
+            [ "fields"      .= fieldsType
             ]
-        TextType    -> object [ "type" .= String "text"    ]
+        TextType    -> withTag "text" []
 
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 type Precedence = Int

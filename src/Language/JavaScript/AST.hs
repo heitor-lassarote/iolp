@@ -1,5 +1,6 @@
 module Language.JavaScript.AST
     ( module Language.Common
+    , Module (..)
     , AST (..)
     , Expression (..)
     , Literal (..)
@@ -17,13 +18,16 @@ import qualified Data.Text as T
 
 import Language.Common
 
+data Module = Module
+    { functions :: [AST]
+    } deriving (Eq, Show)
+
 -- Simplified version good enough to create the conversion.
 data AST
     = Assign Expression Expression
     | Block [AST]
     | Expression Expression
     | If Expression AST (Maybe AST)
-    | NonScopedBlock [AST]
     | Return (Maybe Expression)
     | Var Text Expression
     | While Expression AST
@@ -44,6 +48,7 @@ data Expression
 data Literal
     = Array    [Expression]
     | Boolean !Bool
+    | Int     !Int
     | Number  !Double
     | Record   [(Name, Expression)]
     | Text     Text
