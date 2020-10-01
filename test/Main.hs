@@ -11,6 +11,8 @@ import qualified Language.CSS as CSS
 import qualified Language.HTML as HTML
 import qualified Language.LowCode.Logic as L
 
+import qualified LogicModuleTests
+
 {- Test 1: Counter
     This test should generate a small page contained a button on the left, a
 button on the right and a label between them, initialized with "0". The left
@@ -85,12 +87,12 @@ counterLogic =
 
 counter :: BundleCssHtmlLogic
 counter = BundleCssHtmlLogic
-    { cssOptions       = def
-    , extraJsFiles     = [("printInt.js", "printInt = x => x.toString();")]
-    , htmlOptions      = def
-    , jsOptions        = def
-    , mainFunction     = (L.mkModule "main") {L.importedModules = ["Counter"]}
-    , pages            =
+    { cssOptions   = def
+    , extraJsFiles = Map.singleton "printInt.js" "printInt = x => x.toString();"
+    , htmlOptions  = def
+    , jsOptions    = def
+    , mainModule   = (L.mkModule "main") {L.importedModules = ["Counter"]}
+    , pages        =
         [ PageCssHtmlLogic
             { css   = counterCss
             , html  = counterHtml
@@ -102,4 +104,5 @@ counter = BundleCssHtmlLogic
 
 main :: IO ()
 main = do
-    print (generate counter :: Status [(FilePath, Text)] [(FilePath, Text)])
+    print (generate counter :: Either [GeneratedFail] [GeneratedSuccess Text])
+    LogicModuleTests.test

@@ -10,8 +10,8 @@ type Attribute = (Text, Text)
 type Attributes = [Attribute]
 
 data AST
-    = Tag Name Attributes [AST]
-    | Text Text
+    = Tag !Name !Attributes ![AST]
+    | Text !Text
     deriving (Eq, Show)
 
 instance FromJSON AST where

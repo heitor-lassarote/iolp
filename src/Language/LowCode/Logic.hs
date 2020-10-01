@@ -11,6 +11,7 @@ module Language.LowCode.Logic
     , module Language.LowCode.Logic.Error
     , module Language.LowCode.Logic.JavaScriptConverter
     , module Language.LowCode.Logic.Module
+    , module Language.LowCode.Logic.Standard
     , Metadata (..)
     ) where
 
@@ -23,7 +24,9 @@ import Language.LowCode.Logic.AST
 import Language.LowCode.Logic.Error
 import Language.LowCode.Logic.JavaScriptConverter
 import Language.LowCode.Logic.Module
+import Language.LowCode.Logic.Standard
 
 newtype Metadata = Metadata
     { position :: Double2
-    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
+    } deriving stock    (Eq, Generic, Ord, Show)
+      deriving anyclass (FromJSON, ToJSON)

@@ -18,9 +18,9 @@ class HasIndentation a where
     getCurrentIndentation :: a -> Int
     setCurrentIndentation :: Int -> a -> a
     modifyCurrentIndentation :: (Int -> Int) -> a -> a
-    modifyCurrentIndentation f a =
-        let i = getCurrentIndentation a
-         in setCurrentIndentation (f i) a
+    modifyCurrentIndentation f a = setCurrentIndentation (f i) a
+      where
+        i = getCurrentIndentation a
 
 unsafeCodegen
     :: (Codegen ast, Emit gen, Monoid gen)
@@ -90,7 +90,7 @@ emitBetween
     -> f gen
     -> f gen
     -> f gen
-emitBetween left right middle = mconcat <$> sequenceA [ left, middle, right ]
+emitBetween left right middle = mconcat <$> sequenceA [left, middle, right]
 
 emitBetween'
     :: (Applicative f, Emit gen, Monoid gen)
@@ -99,3 +99,6 @@ emitBetween'
     -> f gen
     -> f gen
 emitBetween' left right = emitBetween (emitA left) (emitA right)
+
+mconcatA :: (Applicative f, Monoid a) => [f a] -> f a
+mconcatA = fmap mconcat . sequenceA

@@ -8,7 +8,7 @@ module Language.JavaScript.Codegen
     , javaScriptCodegen
     ) where
 
-import Universum
+import Universum hiding (Const)
 
 import Control.Monad.Trans.Except (throwE)
 import Data.Aeson (FromJSON, ToJSON)
@@ -41,18 +41,18 @@ instance Codegen Literal where
     codegen = genLiteral
 
 data Options = Options
-    { bracesOnNewLine :: Bool
-    , compactCode     :: Bool
-    , indentLevel     :: Int
-    , strict          :: Bool
+    { bracesOnNewLine :: !Bool
+    , compactCode     :: !Bool
+    , indentLevel     :: !Int
+    , strict          :: !Bool
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 instance Default Options where
     def = Options False False 4 True
 
 data JSGeneratorState = JSGeneratorState
-    { currentIndentLevel :: Int
-    , options            :: Options
+    { currentIndentLevel :: !Int
+    , options            :: !Options
     } deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 instance HasIndentation JSGeneratorState where
@@ -94,9 +94,8 @@ genLiteral = \case
         cs <- commaSpace
         emitBetween' "{" "}" $ separatedByF (uncurry codegenField) cs fs
     Text x -> emitBetween' "\"" "\"" $ emitM x
-    Void -> lift $ throwE "Cannot print variable of type 'Void'."
   where
-    codegenField fieldName expr = mconcat <$> sequence
+    codegenField fieldName expr = mconcatA
         [ emitM fieldName
         , emitM ":"
         , space
@@ -107,7 +106,7 @@ genBlock
     :: (Emit gen, Monoid gen)
     => [AST]
     -> JavaScriptCodegen gen
-genBlock asts = mconcat <$> sequence
+genBlock asts = mconcatA
     [ nlIndent
     , emitM "{"
     , nl
@@ -129,33 +128,31 @@ genFunction
     -> AST
     -> JavaScriptCodegen gen
 genFunction name args body = case name of
-    Just name' -> mconcat <$> sequence
+    Just name' -> mconcatA
         [ indentCompact
         , emitM "function"
         , space
         , emitIfValid name'
-        , emitM "("
-        , pure $ mconcat $ map emit args
-        , emitM ")"
+        , args'
         , genAst body
         ]
-    Nothing -> mconcat <$> sequence
+    Nothing -> mconcatA
         [ indentCompact
-        , emitM "("
-        , pure $ mconcat $ map emit args
-        , emitM ")"
+        , args'
         , space
         , emitM "=>"
         , space
         , genAst body
         ]
+  where
+    args' = emitBetween' "(" ")" $ mconcatA $ intersperse commaSpace $ map emitM args
 
 genAssignment
     :: (Emit gen, Monoid gen)
     => Expression
     -> Expression
     -> JavaScriptCodegen gen
-genAssignment left right = mconcat <$> sequence
+genAssignment left right = mconcatA
     [ indentCompact
     , genExpression left
     , space
@@ -168,12 +165,13 @@ genAssignment left right = mconcat <$> sequence
 
 genDeclaration
     :: (Emit gen, Monoid gen)
-    => Name
+    => Bool
+    -> Name
     -> Expression
     -> JavaScriptCodegen gen
-genDeclaration name expression = mconcat <$> sequence
+genDeclaration isConst name expression = mconcatA
     [ indentCompact
-    , emitM "let "
+    , emitM if isConst then "const " else "let "
     , emitIfValid name
     , space
     , emitM "="
@@ -188,28 +186,28 @@ genExpression
     => Expression
     -> JavaScriptCodegen gen
 genExpression = \case
-    Access expr name -> mconcat <$> sequence
+    Access expr name -> mconcatA
         [ genExpression expr
         , emitM "."
         , emitM name
         ]
-    BinaryOp left op right -> mconcat <$> sequence
+    BinaryOp left op right -> mconcatA
         [ genExpression left
         , emitM $ binarySymbolToText op
         , genExpression right
         ]
-    Call expr args -> mconcat <$> sequence
+    Call expr args -> mconcatA
         [ genExpression expr
         , emitBetween' "(" ")" $ args `separatedBy'` ", "
         ]
     Function nameMaybe args inner -> genFunction nameMaybe args inner
-    Index expr inner -> mconcat <$> sequence
+    Index expr inner -> mconcatA
         [ genExpression expr
         , emitBetween' "[" "]" $ genExpression inner
         ]
     Literal value -> genLiteral value
     Parenthesis expr -> emitBetween' "(" ")" $ genExpression expr
-    UnaryOp op expr -> mconcat <$> sequence
+    UnaryOp op expr -> mconcatA
         [ emitM $ unarySymbolToText op
         , genExpression expr
         ]
@@ -222,52 +220,68 @@ javaScriptCodegen m = do
     bodies <- traverse genAst (functions m)
     pure $ useStrict <> mconcat bodies
 
--- TODO: Generate else if instead of ifs inside else blocks.
+genIf :: (Emit gen, Monoid gen) => Expression -> AST -> Maybe AST -> JavaScriptCodegen gen
+genIf expr ifB = \case
+    Just (If expr' elseIfB elseB) -> mkIfElse (Just (expr', elseIfB)) elseB
+    elseB                         -> mkIfElse Nothing elseB
+  where
+    mkIf = genAst
+
+    mkElse Nothing  = pure mempty
+    mkElse (Just f) = mconcatA [indent, emitM "else", genAst f]
+
+    mkIfElse elseIf elseB = mconcatA
+        [ indent
+        , emitM "if"
+        , space
+        , emitBetween' "(" ")" $ genExpression expr
+        , mkIf ifB
+        , mkElseIf elseIf
+        , mkElse elseB
+        ]
+
+    mkElseIf Nothing                 = pure mempty
+    mkElseIf (Just (expr', elseIfB)) = mconcatA
+        [ indent
+        , emitM "else if"
+        , space
+        , emitBetween' "(" ")" $ genExpression expr'
+        , mkIf elseIfB
+        ]
+
 genAst :: (Emit gen, Monoid gen) => AST -> JavaScriptCodegen gen
 genAst = \case
     Assign left right -> genAssignment left right
     Block asts -> genBlock asts
-    Expression expression -> mconcat <$> sequence
+    Const name expression -> genDeclaration True name expression
+    Expression expression -> mconcatA
         [ indentCompact
         , genExpression expression
         , emitM ";"
         , nl
         ]
-    If expression t f -> do
-        indent' <- indentCompact
-        space' <- space
-        trueBranch <- genAst t
-        falseBranch <- case f of
-            Nothing -> emitM mempty
-            Just f' -> do
-                falseBranch <- genAst f'
-                pure $ mconcat [indent', emit "else", falseBranch]
-
-        expression' <- genExpression expression
-        pure $ mconcat
-            [ indent'
-            , emit "if"
-            , space'
-            , emit "("
-            , expression'
-            , emit ")"
-            , trueBranch
-            , falseBranch
-            ]
-    Return Nothing -> mconcat <$> sequence
+    If expression t f -> genIf expression t f
+    Return Nothing -> mconcatA
         [ indentCompact
         , emitM "return;"
         , nl
         ]
-    Return (Just expression) -> mconcat <$> sequence
+    Return (Just expression) -> mconcatA
         [ indentCompact
         , emitM "return "
         , genExpression expression
         , emitM ";"
         , nl
         ]
-    Var name expression -> genDeclaration name expression
-    While expression body -> mconcat <$> sequence
+    Throw expression -> mconcatA
+        [ indentCompact
+        , emitM "throw new "
+        , genExpression expression
+        , emitM ";"
+        , nl
+        ]
+    Var name expression -> genDeclaration False name expression
+    While expression body -> mconcatA
         [ indentCompact
         , emitM "while"
         , space

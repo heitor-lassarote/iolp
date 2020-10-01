@@ -1,7 +1,6 @@
 module Language.LowCode.Logic.Module
     ( Module (..)
     , mkModule
-    , ModuleImports (..)
     ) where
 
 import Universum hiding (Type)
@@ -13,12 +12,12 @@ import Language.Common (Name)
 import Language.LowCode.Logic.AST (Constructor, Field, Function, Type)
 
 data Module exprMetadata astMetadata = Module
-    { adtTemplates    :: Map Name [Constructor]
-    , externs         :: Map Name Type
-    , functions       :: [Function exprMetadata astMetadata]
-    , importedModules :: [Name]
-    , moduleName      :: Name
-    , recordTemplates :: Map Name [Field]
+    { adtTemplates    :: !(Map Name [Constructor Type])
+    , externs         :: !(Map Name Type)
+    , functions       :: ![Function exprMetadata astMetadata]
+    , importedModules :: ![Name]
+    , moduleName      :: !Name
+    , recordTemplates :: !(Map Name [Field Type])
     } deriving (Eq, Generic, Show, ToJSON)
 
 instance (FromJSON astMetadata) => FromJSON (Module () astMetadata) where
@@ -32,8 +31,3 @@ instance (FromJSON astMetadata) => FromJSON (Module () astMetadata) where
 
 mkModule :: Name -> Module exprMetadata astMetadata
 mkModule name = Module Map.empty Map.empty [] [] name Map.empty
-
-data ModuleImports exprMetadata astMetadata = ModuleImports
-    { moduleImports :: Map Name (ModuleImports exprMetadata astMetadata)
-    , rootModule    :: Module exprMetadata astMetadata
-    } deriving (Show)

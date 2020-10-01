@@ -122,10 +122,12 @@ getBuildR pid = do
         Error err -> sendResponseStatus status500 err
         Success bundle' -> pure $ generate bundle'
     case status of
-        Ok files -> do
-            zipPath <- mkBundleZip (show $ fromSqlKey pid) (toString $ projectName project) files
+        Right files -> do
+            zipPath <- mkBundleZip (show $ fromSqlKey pid) (toString $ projectName project) $ map toTuple files
             sendFile "application/zip" zipPath
-        Err errors -> sendResponseStatus status500 $ toJSON errors
+        Left errors -> sendResponseStatus status500 $ toJSON errors
+  where
+    toTuple GeneratedSuccess {..} = (path, file)
 
 getUserR :: Handler Value
 getUserR = do

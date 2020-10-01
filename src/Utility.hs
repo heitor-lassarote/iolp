@@ -3,6 +3,7 @@ module Utility
     , concatUnzip
     , findMap
     , withTag
+    , zipWithExact
     ) where
 
 import Universum hiding (foldr)
@@ -25,3 +26,10 @@ findMap f = foldr go Nothing
 
 withTag :: Text -> [(Text, Value)] -> Value
 withTag tag fields = object ("tag" .= String tag : fields)
+
+zipWithExact :: (a -> b -> c) -> [a] -> [b] -> Maybe [c]
+zipWithExact f = (fmap reverse .) . go []
+  where
+    go cs (a : as) (b : bs) = go (f a b : cs) as bs
+    go cs []       []       = Just cs
+    go _  _        _        = Nothing

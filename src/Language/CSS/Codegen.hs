@@ -24,7 +24,9 @@ instance Codegen AST where
 
 newtype Options = Options
     { indentLevel :: Int
-    } deriving (Eq, Generic, Show, FromJSON, ToJSON)
+    } deriving stock    (Generic, Show)
+      deriving newtype  (Eq)
+      deriving anyclass (FromJSON, ToJSON)
 
 instance Default Options where
     def = Options 4

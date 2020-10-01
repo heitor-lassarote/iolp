@@ -52,17 +52,16 @@ isLogical = \case
     Or -> True
     _ -> False
 
-unknownSymbol :: (IsString s, Monoid s) => s -> s
-unknownSymbol symbol = mconcat ["Unknown symbol '", symbol, "'."]
+unknownSymbol :: (IsString s, Semigroup s) => s -> s
+unknownSymbol symbol = "Unknown symbol '" <> symbol <> "'."
 
 instance FromJSON BinarySymbol where
-    parseJSON = withObject "Language.Common.BinarySymbol" \o -> toSymbol =<< o .: "symbol"
+    parseJSON = withText "Language.Common.BinarySymbol" (toSymbol . toString)
       where
         toSymbol sym = maybe (fail $ unknownSymbol sym) pure (readMaybe sym)
 
--- TODO: Perhaps change from object to text?
 instance ToJSON BinarySymbol where
-    toJSON symbol = object [ "symbol" .= String (show symbol) ]
+    toJSON = String . show
 
 data UnarySymbol
     -- Arithmetic
@@ -73,7 +72,7 @@ data UnarySymbol
     deriving (Enum, Eq, Ord, Read, Show)
 
 instance FromJSON UnarySymbol where
-    parseJSON = withObject "Language.Common.UnarySymbol" \o -> toSymbol =<< o .: "symbol"
+    parseJSON = withText "Language.Common.UnarySymbol" (toSymbol . toString)
       where
         toSymbol sym = maybe (fail $ unknownSymbol sym) pure (readMaybe sym)
 

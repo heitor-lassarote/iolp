@@ -29,8 +29,11 @@ common shared-properties
     , BangPatterns
     , BlockArguments
     , DeriveFunctor
+    , DerivingStrategies
+    , DuplicateRecordFields
     , FlexibleContexts
     , FlexibleInstances
+    , GeneralizedNewtypeDeriving
     , LambdaCase
     , NoImplicitPrelude
     , OverloadedStrings
@@ -67,9 +70,7 @@ executable low-code
   default-extensions:
       DeriveAnyClass
     , DeriveGeneric
-    , DerivingStrategies
     , GADTs
-    , GeneralizedNewtypeDeriving
     , MultiParamTypeClasses
     , QuasiQuotes
     , StandaloneDeriving
@@ -131,6 +132,7 @@ library
     , Language.LowCode.Logic.Error
     , Language.LowCode.Logic.JavaScriptConverter
     , Language.LowCode.Logic.Module
+    , Language.LowCode.Logic.Standard
     , Language.LowCode.UI
     , Language.LowCode.UI.AST
     , Language.LowCode.UI.HTMLConverter
@@ -145,10 +147,13 @@ test-suite test
   build-depends:
       containers            >=0 && <1
     , data-default-class    >=0 && <1
-    , HUnit                 >=1 && <2
+    , hspec                 >=2 && <3
     , low-code              >=0 && <1
     , QuickCheck            >=2 && <3
-  hs-source-dirs:       test
+    , these                 >=1 && <2
+  other-modules:
+      LogicModuleTests
   ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat
+  hs-source-dirs:       test
   main-is:              Main.hs
   type:                 exitcode-stdio-1.0

@@ -10,7 +10,7 @@ module Language.JavaScript.AST
     , isValidName
     ) where
 
-import Universum
+import Universum hiding (Const)
 
 import           Data.Char (isAlphaNum, isLetter)
 import           Data.Set  as Set
@@ -19,41 +19,42 @@ import qualified Data.Text as T
 import Language.Common
 
 data Module = Module
-    { functions :: [AST]
-    } deriving (Eq, Show)
+    { functions :: ![AST]
+    } deriving (Eq, Ord, Show)
 
 -- Simplified version good enough to create the conversion.
 data AST
-    = Assign Expression Expression
-    | Block [AST]
-    | Expression Expression
-    | If Expression AST (Maybe AST)
-    | Return (Maybe Expression)
-    | Var Text Expression
-    | While Expression AST
-    deriving (Eq, Show)
+    = Assign !Expression !Expression
+    | Block ![AST]
+    | Const !Text !Expression
+    | Expression !Expression
+    | If !Expression !AST !(Maybe AST)
+    | Return !(Maybe Expression)
+    | Throw !Expression
+    | Var !Text !Expression
+    | While !Expression !AST
+    deriving (Eq, Ord, Show)
 
 data Expression
-    = Access Expression Name
-    | BinaryOp Expression !BinarySymbol Expression
-    | Call Expression [Expression]
-    | Function (Maybe Text) [Text] AST
-    | Index Expression Expression
-    | Literal Literal
-    | Parenthesis Expression
-    | UnaryOp !UnarySymbol Expression
-    | Variable Name
-    deriving (Eq, Show)
+    = Access !Expression !Name
+    | BinaryOp !Expression !BinarySymbol !Expression
+    | Call !Expression ![Expression]
+    | Function !(Maybe Text) ![Text] !AST
+    | Index !Expression !Expression
+    | Literal !Literal
+    | Parenthesis !Expression
+    | UnaryOp !UnarySymbol !Expression
+    | Variable !Name
+    deriving (Eq, Ord, Show)
 
 data Literal
-    = Array    [Expression]
+    = Array   ![Expression]
     | Boolean !Bool
     | Int     !Int
     | Number  !Double
-    | Record   [(Name, Expression)]
-    | Text     Text
-    | Void
-    deriving (Eq, Show)
+    | Record  ![(Name, Expression)]
+    | Text    !Text
+    deriving (Eq, Ord, Show)
 
 -- Reference:
 -- https://www.w3schools.com/js/js_reserved.asp

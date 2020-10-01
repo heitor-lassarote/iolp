@@ -5,15 +5,13 @@ module Language.LowCode.Logic.AST
     , Constructor (..)
     , Function (..)
     , MatchPattern (..)
+    , patternToExpr
     , AST (..)
     , Expression (..)
     , Literal (..)
     , Structure (..)
-    , unit
     , Type (..)
     , parseExpression
-    , boolType
-    , unitType
     , unaryToText
     , mapUnaryToText
     , mapTextToUnary
@@ -41,15 +39,15 @@ import           Utility (biject, withTag)
 class HasMetadata f where
     getMetadata  :: f a -> a
 
-data Field = Field
-    { fieldName :: Name
-    , fieldType :: Type
-    } deriving (Eq, Generic, Ord, Show, FromJSON, ToJSON)
+data Field a = Field
+    { fieldName  :: !Name
+    , fieldValue :: !a
+    } deriving (Eq, Functor, Generic, Ord, Show, FromJSON, ToJSON)
 
-data Constructor = Constructor
-    { constructorName  :: Name
-    , constructorTypes :: [Type]
-    } deriving (Eq, Generic, Ord, Show, FromJSON, ToJSON)
+data Constructor a = Constructor
+    { constructorName  :: !Name
+    , constructorValue :: !(Maybe a)
+    } deriving (Eq, Functor, Generic, Ord, Show, FromJSON, ToJSON)
 
 data Function exprMetadata metadata
     = Function !metadata !Name !Type ![Name] !(AST exprMetadata metadata)
@@ -73,64 +71,60 @@ instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (Function expres
         ]
 
 data MatchPattern
-    = AlgebraicPattern Name [MatchPattern]
-    | ArrayPattern [MatchPattern]
-    | LiteralPattern Literal
-    | NamePattern Name
-    | RecordPattern Name [MatchPattern]
+    = AlgebraicPattern !(Constructor MatchPattern)
+    | ArrayPattern ![MatchPattern]
+    | LiteralPattern !Literal
+    | NamePattern !Name
+    | RecordPattern ![Field MatchPattern]
     deriving (Eq, Show)
 
 instance FromJSON MatchPattern where
-    parseJSON = withObject "Language.LowCode.Logic.AST.MatchExpr" \o -> o .: "tag" >>= \case
-        "adt"     -> AlgebraicPattern <$> o .: "constructorName" <*> o .: "fields"
-        "array"   -> ArrayPattern <$> o .: "positions"
-        "literal" -> LiteralPattern <$> o .: "value"
-        "name"    -> NamePattern <$> o .: "name"
-        "record"  -> RecordPattern <$> o .: "recordName" <*> o .: "fields"
+    parseJSON = withObject "Language.LowCode.Logic.AST.MatchPattern" \o -> o .: "tag" >>= \case
+        "adt"     -> AlgebraicPattern <$> o .: "constructor"
+        "array"   -> ArrayPattern     <$> o .: "positions"
+        "literal" -> LiteralPattern   <$> o .: "value"
+        "name"    -> NamePattern      <$> o .: "name"
+        "record"  -> RecordPattern    <$> o .: "fields"
         other     -> fail $
             "Expected 'adt', 'array', 'default', 'literal' or 'record', but got\
             \ '" <> other <> "'."
 
 instance ToJSON MatchPattern where
     toJSON = \case
-        AlgebraicPattern name fields -> withTag "adt"
-            [ "constructorName" .= name
-            , "fields"          .= fields
-            ]
-        ArrayPattern positions -> withTag "array"
-            [ "positions"       .= positions
-            ]
-        LiteralPattern value' -> withTag "literal"
-            [ "value"           .= value'
-            ]
-        NamePattern name -> withTag "name"
-            [ "name"            .= name
-            ]
-        RecordPattern name fields -> withTag "record"
-            [ "recordName"      .= name
-            , "fields"          .= fields
-            ]
+        AlgebraicPattern constructor -> withTag "adt" ["constructor" .= constructor]
+        ArrayPattern positions -> withTag "array" ["positions" .= positions]
+        LiteralPattern value' -> withTag "literal" ["value" .= value']
+        NamePattern name -> withTag "name" ["name" .= name]
+        RecordPattern fields -> withTag "record" ["fields" .= fields]
+
+patternToExpr :: MatchPattern -> Expression ()
+patternToExpr = \case
+    AlgebraicPattern constructor -> Structure () $ Algebraic () (patternToExpr <$> constructor)
+    ArrayPattern positions -> Structure () $ Array () (patternToExpr <$> positions)
+    LiteralPattern lit -> Literal () lit
+    NamePattern name -> Variable () name
+    RecordPattern fields -> Structure () $ Record () (patternToExpr <<$>> fields)
 
 data AST exprMetadata metadata
     -- | Assigns a new value to the first expression, and what follows after.
-    = Assign metadata (Expression exprMetadata) (Expression exprMetadata) (AST exprMetadata metadata)
+    = Assign !metadata !(Expression exprMetadata) !(Expression exprMetadata) !(AST exprMetadata metadata)
     -- | Represents the end of a cycle.
-    | End metadata
+    | End !metadata
     -- | Executes a raw expression. Useful for Call.
-    | Expression metadata (Expression exprMetadata) (AST exprMetadata metadata)
+    | Expression !metadata !(Expression exprMetadata) !(AST exprMetadata metadata)
     -- | Allows a condition to be tested, and contains the true branch, false
     -- branch and what follows after the branches.
-    | If metadata (Expression exprMetadata) (AST exprMetadata metadata) (AST exprMetadata metadata) (AST exprMetadata metadata)
+    | If !metadata !(Expression exprMetadata) !(AST exprMetadata metadata) !(AST exprMetadata metadata) !(AST exprMetadata metadata)
     -- | Represents a match pattern, similar to a "case of" or a "switch" structure.
-    | Match metadata (Expression exprMetadata) [(MatchPattern, AST exprMetadata metadata)] (AST exprMetadata metadata)
+    | Match !metadata !(Expression exprMetadata) ![(MatchPattern, AST exprMetadata metadata)] !(AST exprMetadata metadata)
     -- | Exits the function, optionally returning a value.
-    | Return metadata (Maybe (Expression exprMetadata))
+    | Return !metadata !(Maybe (Expression exprMetadata))
     -- | Declares a variable with the specified name and type, followed by the
     -- remainder of the cycle.
-    | Var metadata Name !Type (Expression exprMetadata) (AST exprMetadata metadata)
+    | Var !metadata !Name !Type !(Expression exprMetadata) !(AST exprMetadata metadata)
     -- | Represents a condition which should be run while a predicate is not
     -- met, followed by the remainder of the cycle.
-    | While metadata (Expression exprMetadata) (AST exprMetadata metadata) (AST exprMetadata metadata)
+    | While !metadata !(Expression exprMetadata) !(AST exprMetadata metadata) !(AST exprMetadata metadata)
     deriving (Eq, Functor, Show)
 
 instance HasMetadata (AST expressionMetadata) where
@@ -238,15 +232,15 @@ instance HasMetadata Expression where
         Variable m _ -> m
 
 data Expression metadata
-    = Access metadata (Expression metadata) Name
-    | BinaryOp metadata (Expression metadata) !BinarySymbol (Expression metadata)
-    | Call metadata (Expression metadata) [(Expression metadata)]
-    | Index metadata (Expression metadata) (Expression metadata)
-    | Literal metadata Literal
-    | Parenthesis metadata (Expression metadata)
-    | Structure metadata (Structure metadata)
-    | UnaryOp metadata !UnarySymbol (Expression metadata)
-    | Variable metadata Name
+    = Access !metadata !(Expression metadata) !Name
+    | BinaryOp !metadata !(Expression metadata) !BinarySymbol !(Expression metadata)
+    | Call !metadata !(Expression metadata) ![(Expression metadata)]
+    | Index !metadata !(Expression metadata) !(Expression metadata)
+    | Literal !metadata !Literal
+    | Parenthesis !metadata !(Expression metadata)
+    | Structure !metadata !(Structure metadata)
+    | UnaryOp !metadata !UnarySymbol !(Expression metadata)
+    | Variable !metadata !Name
     deriving (Eq, Functor, Show)
 
 instance FromJSON (Expression ()) where
@@ -342,12 +336,11 @@ instance Codegen (Expression metadata) where
             ]
         Variable _ name' -> emitM name'
 
--- TODO: Add let ... in ... so that we can declare variables and functions?
 data Literal
-    = Char Char
-    | Double Double
-    | Integer Integer
-    | Text Text
+    = Char !Char
+    | Double !Double
+    | Integer !Integer
+    | Text !Text
     deriving (Eq, Show)
 
 instance Codegen Literal where
@@ -361,10 +354,10 @@ instance Codegen Literal where
 
 instance FromJSON Literal where
     parseJSON = withObject "Language.LowCode.Logic.AST.Literal" \o -> o .: "tag" >>= \case
-        "char"   -> Char       <$> o .: "value"
-        "double" -> Double     <$> o .: "value"
-        "integer"-> Integer    <$> o .: "value"
-        "text"   -> Text       <$> o .: "value"
+        "char"   -> Char    <$> o .: "value"
+        "double" -> Double  <$> o .: "value"
+        "integer"-> Integer <$> o .: "value"
+        "text"   -> Text    <$> o .: "value"
         other    -> fail $
             "Expected 'char', 'double','integer' or 'text', but got '" <> other <> "'."
 
@@ -376,108 +369,67 @@ instance ToJSON Literal where
         Text t -> withTag "text" ["value" .= t]
 
 data Structure metadata
-    = Algebraic metadata Name [Expression metadata]
-    | Array metadata [Expression metadata]
-    | Record metadata Name [(Name, Expression metadata)]
+    = Algebraic !metadata !(Constructor (Expression metadata))
+    | Array !metadata ![Expression metadata]
+    | Record !metadata ![Field (Expression metadata)]
     deriving (Eq, Functor, Show)
-
-unit :: Structure Type
-unit = Algebraic unitType "Unit" []
 
 instance HasMetadata Structure where
     getMetadata = \case
-        Algebraic m _ _ -> m
+        Algebraic m _ -> m
         Array m _ -> m
-        Record m _ _ -> m
+        Record m _ -> m
 
 instance Codegen (Structure metadata) where
     type GeneratorState (Structure metadata) = ()
 
     codegen = \case
-        Algebraic _ name fields -> codegenAlgebraic name fields
+        Algebraic _ constructor -> codegenAlgebraic constructor
         Array _ a -> emitBetween' "[" "]" $ a `separatedBy'` ", "
-        Record _ r fs -> codegenRecord r fs
+        Record _ fs -> codegenRecord fs
       where
-        codegenAlgebraic name fields = mconcat <$> sequence
+        codegenAlgebraic (Constructor name value') = mconcat <$> sequence
             [ emitM name
-            , emitBetween' "(" ")" $ fields `separatedBy'` ", "
+            , maybe (emitM "") (emitBetween' "(" ")" . codegen) value'
             ]
 
-        codegenField fieldName expr = mconcat <$> sequence
+        codegenField (Field fieldName expr) = mconcat <$> sequence
             [ emitM fieldName
             , emitM " = "
             , codegen expr
             ]
 
-        codegenRecord recordName fields = mconcat <$> sequence
-            [ emitM recordName
-            , emitBetween' "{" "}" $ separatedByF (uncurry codegenField) (emit ", ") fields
-            ]
+        codegenRecord fields =
+            emitBetween' "{" "}" $ separatedByF codegenField (emit ", ") fields
 
 instance FromJSON (Structure ()) where
     parseJSON = withObject "Language.LowCode.Logic.AST.Structure" \o -> o .: "tag" >>= \case
-        "adt"    -> Algebraic () <$> o .: "name"  <*> o .: "fields"
-        "record" -> Record    () <$> o .: "name"  <*> o .: "fields"
-        "array"  -> Array     () <$> o .: "value"
+        "adt"    -> Algebraic () <$> o .: "constructor"
+        "array"  -> Array     () <$> o .: "positions"
+        "record" -> Record    () <$> o .: "fields"
         other    -> fail $
             "Expected 'adt', 'array' or 'record', but got '" <> other <> "'."
 
 instance ToJSON (Structure metadata) where
     toJSON = \case
-        Algebraic _ name constructors -> withTag "adt"
-            [ "name"   .= name
-            , "fields" .= constructors
-            ]
-        Array _ a -> withTag "array"
-            [ "value"  .= a
-            ]
-        Record _ recordName fields -> withTag "record"
-            [ "name"   .= recordName
-            , "fields" .= fields
-            ]
+        Algebraic _ constructor -> withTag "adt" ["constructor" .= constructor]
+        Array _ a -> withTag "array" ["positions" .= a]
+        Record _ fields -> withTag "record" ["fields" .= fields]
 
--- FIXME: Suppose an AlgebraicType Foo with a constructor Bar Foo. How do we
--- encode it? Not the way it's actually implemented, because it will stack
--- overflow trying to find it's own type infinitely! The best way to fix it
--- would perhaps be to simply refer to its own (module-qualified) name.
---   RecordType likely will have the same problem if it tries to refer to itself
--- and so will probably require the same fix.
---   Note that the module will still contain a Map Name [Constructor] that can
---   be used to lookup for the constructors of the ADT.
--- As for the qualified name, I suggest creating a new record called Import,
--- parametrized over a type variable a, which will contain the module of type a,
--- and an ADT Qualification, with constructors Qualified Text and Unqualified.
---   Notice this will also solve another problem, which is checking for types
--- with the same name but different fields, which shouldn't be allowed.
--- TODO: Should RecordType keep track of its name? Or should we perhaps add a
--- new type (such as struct or class) for this?
--- TODO: Should AlgebraicType constructors be named (like F# or Rust does)? This
--- will allow for better JS name generation. Alternatively, we could also allow
--- just one Type per Constructor (again, like F# or Rust), and make use of
--- Records in case that the user needs more than one field in the constructor.
--- TODO: Should we make a tuple type? Or should it be defined as a simple ADT,
--- like PureScript does?
 data Type
-    = AlgebraicType Name [Constructor]
-    | ArrayType Type
+    = AlgebraicType !Name
+    | ArrayType !Type
     | CharType
     | DoubleType
-    | FunctionType [Type] Type
+    | FunctionType ![Type] !Type
     | IntegerType
-    | RecordType [Field]
+    | RecordType ![Field Type]
     | TextType
     deriving (Eq, Ord, Show)
 
--- TODO: In the future, move these "concrete" types to a standard library.
-boolType :: Type
-boolType = AlgebraicType "Bool" [Constructor "False" [], Constructor "True" []]
-
-unitType :: Type
-unitType = AlgebraicType "Unit" [Constructor "Unit" []]
-
 instance FromJSON Type where
     parseJSON = withObject "Language.LowCode.Logic.AST.VariableType" \o -> o .: "tag" >>= \case
-        "adt"      -> AlgebraicType <$> o .: "name" <*> o .: "constructors"
+        "adt"      -> AlgebraicType <$> o .: "name"
         "array"    -> ArrayType <$> o .: "elements"
         "char"     -> pure CharType
         "double"   -> pure DoubleType
@@ -491,24 +443,23 @@ instance FromJSON Type where
 
 instance ToJSON Type where
     toJSON = \case
-        AlgebraicType name constructors -> withTag "adt"
-            [ "name"         .= name
-            , "constructors" .= constructors
+        AlgebraicType name -> withTag "adt"
+            [ "name"      .= name
             ]
         ArrayType elements -> withTag "array"
-            [ "elements"     .= elements
+            [ "elements"  .= elements
             ]
-        CharType    -> withTag "char" []
-        DoubleType  -> withTag "double" []
+        CharType -> withTag "char" []
+        DoubleType -> withTag "double" []
         FunctionType arguments return' -> withTag "function"
-            [ "arguments"     .= arguments
-            , "return"        .= return'
+            [ "arguments" .= arguments
+            , "return"    .= return'
             ]
         IntegerType -> withTag "integer" []
-        RecordType fieldsType -> withTag "record"
-            [ "fields"      .= fieldsType
+        RecordType fields -> withTag "record"
+            [ "fields"    .= fields
             ]
-        TextType    -> withTag "text" []
+        TextType -> withTag "text" []
 
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 type Precedence = Int
@@ -632,11 +583,9 @@ value = structure <|> constant <|> variable
 
 structure :: Parser (Expression ())
 structure = Structure () <$> choice
-    [ Array   () <$> array
-    , record'    <$> try record
+    [ Array  () <$> array
+    , Record () <$> try record
     ]
-  where
-    record' = uncurry (Record ())
 
 constant :: Parser (Expression ())
 constant = Literal () <$> choice
@@ -664,21 +613,16 @@ variableName = do
     tail' <- takeWhileP Nothing (\c -> Char.isAlphaNum c || c == '_')
     pure $ Text.cons head' tail'
 
-record :: Parser (Name, [(Name, Expression ())])
-record = do
-    recordName <- variableName
+record :: Parser [Field (Expression ())]
+record = between (char '{') (char '}') $ flip sepBy (char ',') do
     space
-    fields <- between (char '{') (char '}') $ flip sepBy (char ',') do
-        space
-        fieldName <- variableName
-        space
-        void $ char '='
-        space
-        expr <- expression0
-        space
-        pure (fieldName, expr)
+    fieldName <- variableName
     space
-    pure (recordName, fields)
+    void $ char '='
+    space
+    expr <- expression0
+    space
+    pure $ Field fieldName expr
 
 errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorUnaryNotFound symbol' = "Undefined unary operator '" <> symbol' <> "'."

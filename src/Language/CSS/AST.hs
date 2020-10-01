@@ -8,11 +8,11 @@ type Attribute = (Text, Text)
 type ClassName = Text
 
 data AST
-    = CSS [Class]
+    = CSS ![Class]
     deriving (Eq, Generic, Show, FromJSON, ToJSON)
 
 data Class
-    = Class ClassName [Attribute]
+    = Class !ClassName ![Attribute]
     deriving (Eq, Show)
 
 instance FromJSON Class where
