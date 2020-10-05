@@ -34,7 +34,8 @@ data Error
     deriving (Eq, Show)
 
 prettyCyclic :: NonEmpty Name -> Text
-prettyCyclic (f :| c) = sformat ("'" % stext % "' imports '" % stext) f (go c)
+prettyCyclic (f :| []) = sformat ("'" % stext % "' imports itself.") f
+prettyCyclic (f :| cs) = sformat ("'" % stext % "' imports '" % stext) f (go cs)
   where
     go (x : xs) = sformat ("'" % stext % "', which imports\n" % stext) x (go xs)
     go []       = sformat ("'" % stext % "'.") f

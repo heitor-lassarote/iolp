@@ -34,7 +34,7 @@ import           Language.Common
 import           Language.LowCode.Logic.AST
 import           Language.LowCode.Logic.Error
 import           Language.LowCode.Logic.Module
-import           Language.LowCode.Logic.Standard (boolType, unit, unitType)
+import           Language.LowCode.Logic.Standard (boolType, unit', unitType)
 import           Utility
 
 data VariableInfo = VariableInfo
@@ -311,7 +311,7 @@ analyzeReturn Nothing = do
     ret <- gets returnType
     when (ret /= unitType) $
         addError $ TypeMismatch "return" ret unitType
-    pure $ Structure unitType unit
+    pure $ Structure unitType unit'
 analyzeReturn (Just expr) = do
     ret <- gets returnType
     exprE <- analyzeExprWithHint ret expr

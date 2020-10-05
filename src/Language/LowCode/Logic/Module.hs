@@ -9,7 +9,7 @@ import           Data.Aeson
 import qualified Data.Map.Strict as Map
 
 import Language.Common (Name)
-import Language.LowCode.Logic.AST (Constructor, Field, Function, Type)
+import Language.LowCode.Logic.AST (Constructor, Function, Type)
 
 data Module exprMetadata astMetadata = Module
     { adtTemplates    :: !(Map Name [Constructor Type])
@@ -17,7 +17,6 @@ data Module exprMetadata astMetadata = Module
     , functions       :: ![Function exprMetadata astMetadata]
     , importedModules :: ![Name]
     , moduleName      :: !Name
-    , recordTemplates :: !(Map Name [Field Type])
     } deriving (Eq, Generic, Show, ToJSON)
 
 instance (FromJSON astMetadata) => FromJSON (Module () astMetadata) where
@@ -27,7 +26,6 @@ instance (FromJSON astMetadata) => FromJSON (Module () astMetadata) where
                <*> o .: "functions"
                <*> o .: "importedModules"
                <*> o .: "moduleName"
-               <*> o .: "recordTemplates"
 
 mkModule :: Name -> Module exprMetadata astMetadata
-mkModule name = Module Map.empty Map.empty [] [] name Map.empty
+mkModule name = Module Map.empty Map.empty [] [] name
