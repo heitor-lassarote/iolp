@@ -41,6 +41,11 @@
     cursor: not-allowed;
 }
 
+//SweetAlert
+.swal-text {
+    text-align: center;
+}
+
 // Smart Tab
 .st-theme-default > .nav .nav-link.active {
     color: #18a689 !important;
@@ -62,4 +67,9 @@
 }
 .st-theme-pills > .nav {
     background: #18a689 !important;
+}
+
+#canvas-container {
+    height: fit-content !important;
+    max-height: fit-content !important;
 }

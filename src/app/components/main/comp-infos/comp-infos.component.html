@@ -2,27 +2,27 @@
     <div id="smarttab">
         <ul class="nav">
             <li>
-                <a class="nav-link" href="#tab-1">
-                    Informações
-                </a>
+                <a class="nav-link" href="#tab-1"> Informações </a>
             </li>
             <li>
-                <a class="nav-link" href="#tab-2">
-                    Estilo
-                </a>
+                <a class="nav-link" href="#tab-2"> Estilo </a>
             </li>
         </ul>
 
         <div class="tab-content">
             <div id="tab-1" class="tab-pane col-md-12" role="tabpanel">
-                <h3>Tipo: {{infosForm.get("type").value}}</h3>
+                <h3>Tipo: {{ infosForm.get("type").value }}</h3>
                 <div class="col-12">
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
                             <h5>Nome:</h5>
                         </div>
                         <div class="col-9">
-                            <input type="text" class="form-control" formControlName="name" />
+                            <input
+                                type="text"
+                                class="form-control"
+                                formControlName="name"
+                            />
                         </div>
                     </div>
                     <div class="row m-b-sm">
@@ -30,7 +30,11 @@
                             <h5>Texto:</h5>
                         </div>
                         <div class="col-9">
-                            <input type="text" class="form-control" formControlName="text" />
+                            <input
+                                type="text"
+                                class="form-control"
+                                formControlName="text"
+                            />
                         </div>
                     </div>
                 </div>
@@ -42,11 +46,18 @@
                             <h5>Altura:</h5>
                         </div>
                         <div class="col-5 size-input">
-                            <input type="number" class="form-control" formControlName="height"
-                                min="1"/>
+                            <input
+                                type="number"
+                                class="form-control"
+                                formControlName="height"
+                                min="1"
+                            />
                         </div>
                         <div class="col-4">
-                            <select id="css-unity-h" class="form-control">
+                            <select
+                                formControlName="heightUnity"
+                                class="form-control"
+                            >
                                 <option value="px">px</option>
                                 <option value="pct">%</option>
                                 <option value="rem">rem</option>
@@ -58,11 +69,18 @@
                             <h5>Largura:</h5>
                         </div>
                         <div class="col-5 size-input">
-                            <input type="number" class="form-control" formControlName="width"
-                                min="1"/>
+                            <input
+                                type="number"
+                                class="form-control"
+                                formControlName="width"
+                                min="1"
+                            />
                         </div>
                         <div class="col-4">
-                            <select id="css-unity-w" class="form-control">
+                            <select
+                                formControlName="widthUnity"
+                                class="form-control"
+                            >
                                 <option value="px">px</option>
                                 <option value="pct">%</option>
                                 <option value="rem">rem</option>
@@ -72,26 +90,42 @@
                     <h4 class="m-b-sm">Centralização</h4>
                     <div class="row m-b-sm">
                         <div class="col-3">
-                            <button type="button" class="btn btn-default btn-align"
-                                (click)="alignText('left')" [disabled]="!haveComponent">
+                            <button
+                                type="button"
+                                class="btn btn-default btn-align"
+                                (click)="alignText('left')"
+                                [disabled]="!haveComponent"
+                            >
                                 <i class="fa fa-align-left"></i>
                             </button>
                         </div>
                         <div class="col-3">
-                            <button type="button" class="btn btn-default btn-align"
-                                (click)="alignText('center')" [disabled]="!haveComponent">
+                            <button
+                                type="button"
+                                class="btn btn-default btn-align"
+                                (click)="alignText('center')"
+                                [disabled]="!haveComponent"
+                            >
                                 <i class="fa fa-align-center"></i>
                             </button>
                         </div>
                         <div class="col-3">
-                            <button type="button" class="btn btn-default btn-align"
-                                (click)="alignText('right')" [disabled]="!haveComponent">
+                            <button
+                                type="button"
+                                class="btn btn-default btn-align"
+                                (click)="alignText('right')"
+                                [disabled]="!haveComponent"
+                            >
                                 <i class="fa fa-align-right"></i>
                             </button>
                         </div>
                         <div class="col-3">
-                            <button type="button" class="btn btn-default btn-align"
-                                (click)="alignText('justify')" [disabled]="!haveComponent">
+                            <button
+                                type="button"
+                                class="btn btn-default btn-align"
+                                (click)="alignText('justify')"
+                                [disabled]="!haveComponent"
+                            >
                                 <i class="fa fa-align-justify"></i>
                             </button>
                         </div>
@@ -101,7 +135,11 @@
         </div>
     </div>
     <div class="col-12 text-right m-t-sm">
-        <button type="submit" [disabled]="infosForm.invalid || !haveComponent" class="btn btn-primary">
+        <button
+            type="submit"
+            [disabled]="infosForm.invalid || !haveComponent"
+            class="btn btn-primary"
+        >
             Aplicar
         </button>
     </div>

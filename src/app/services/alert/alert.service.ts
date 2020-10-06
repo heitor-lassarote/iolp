@@ -11,13 +11,21 @@ export class AlertService {
     createConfirmDenyDialog(title: string, message: string, action: Function) {
         swal({
             title: title,
-            message: message,
+            text: message,
             icon: "warning",
             buttons: true,
         }).then((confirm: boolean) => {
             if (confirm) {
                 action();
             }
+        });
+    }
+
+    createConfirmDialog(title: string, message: string) {
+        swal({
+            title: title,
+            text: message,
+            icon: "warning",
         });
     }
 }

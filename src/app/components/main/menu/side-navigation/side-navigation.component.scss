@@ -11,3 +11,9 @@
     text-overflow: ellipsis;
     overflow-x: hidden;
 }
+.nav-label {
+    color: white;
+}
+a:hover .nav-label {
+    color: #18a689;
+}

@@ -48,6 +48,7 @@ export class SideNavigationComponent implements OnInit {
     createComponent(type: string) {
         let element: Element = {
             type: type,
+            name: "",
             height: "50px",
             width: "50px",
             position: {

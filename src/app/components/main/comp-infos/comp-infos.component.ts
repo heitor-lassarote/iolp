@@ -25,12 +25,23 @@ export class CompInfosComponent implements OnInit {
         this.infosForm = this.formBuilder.group({
             // html
             type: "",
-            name: ["", Validators.required],
-            text: "",
+            name: [
+                { value: "", disabled: !this.haveComponent },
+                Validators.required,
+            ],
+            text: { value: "", disabled: !this.haveComponent },
 
             // css
-            width: ["", [Validators.required, Validators.min(1)]],
-            height: ["", [Validators.required, Validators.min(1)]],
+            width: [
+                { value: "", disabled: !this.haveComponent },
+                [Validators.required, Validators.min(1)],
+            ],
+            widthUnity: { value: "", disabled: !this.haveComponent },
+            height: [
+                { value: "", disabled: !this.haveComponent },
+                [Validators.required, Validators.min(1)],
+            ],
+            heightUnity: { value: "", disabled: !this.haveComponent },
         });
         this.showInfosService.getComponentInfos().subscribe((info: Info) => {
             this.originInfo = info;
@@ -43,14 +54,44 @@ export class CompInfosComponent implements OnInit {
         let form = this.infosForm;
         let html = info.html;
         let css = info.css;
+
         // html
         form.get("type").setValue(html.type);
         form.get("name").setValue(html.name);
+        this.infosForm.get("name").enable();
         form.get("text").setValue(html.text);
+        this.infosForm.get("text").enable();
 
         //css
-        form.get("width").setValue(css.width);
-        form.get("height").setValue(css.height);
+        let size: { value: number; unity: string } = this.getSizePart(
+            css.width
+        );
+        console.log(size);
+        form.get("width").setValue(size.value);
+        form.get("widthUnity").setValue(size.unity);
+        this.infosForm.get("width").enable();
+        this.infosForm.get("widthUnity").enable();
+        size = this.getSizePart(css.height);
+        console.log(size);
+        form.get("height").setValue(size.value);
+        form.get("heightUnity").setValue(size.unity);
+        this.infosForm.get("height").enable();
+        this.infosForm.get("heightUnity").enable();
+    }
+
+    getSizePart(str: string): { value: number; unity: string } {
+        let strArray = str.split("");
+        let number = "";
+        let unity = "";
+        strArray.forEach((letter, i) => {
+            if (Number.isNaN(parseInt(letter))) unity += letter;
+            else number += letter;
+        });
+
+        return {
+            value: parseFloat(number),
+            unity: unity,
+        };
     }
 
     clearFields() {
@@ -86,6 +127,8 @@ export class CompInfosComponent implements OnInit {
         this.clearFields();
         this.originInfo = null;
         this.haveComponent = false;
+        this.infosForm.get("name").disable();
+        this.infosForm.get("text").disable();
     }
 
     setNewInfo(value: any) {

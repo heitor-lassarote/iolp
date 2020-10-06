@@ -115,11 +115,11 @@ $(document).ready(function () {
     //});
 
     // Minimalize menu
-    $(".navbar-minimalize").on("click", function (event) {
-        event.preventDefault();
-        $("body").toggleClass("mini-navbar");
-        SmoothlyMenu();
-    });
+    // $(".navbar-minimalize").on("click", function (event) {
+    //     event.preventDefault();
+    //     $("body").toggleClass("mini-navbar");
+    //     SmoothlyMenu();
+    // });
 
     // Tooltips demo
     $(".tooltip-demo").tooltip({

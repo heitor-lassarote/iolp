@@ -5,7 +5,7 @@ export class Info {
         text: string;
     };
     css: {
-        width: number;
-        height: number;
+        width: string;
+        height: string;
     };
 }

@@ -5,3 +5,10 @@
     align-items: center;
     text-align: center;
 }
+#infos-container {
+    position: absolute !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: 60px !important;
+    height: calc(100vh - 60px);
+}

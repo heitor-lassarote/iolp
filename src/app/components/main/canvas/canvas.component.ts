@@ -23,6 +23,10 @@ import {
     CdkDragMove,
     CdkDragDrop,
 } from "@angular/cdk/drag-drop";
+import { logicEvent, logicFunction } from "../../domain/logic-components";
+import { FormArray, FormBuilder, FormGroup } from "@angular/forms";
+import { AlertService } from "src/app/services/alert/alert.service";
+import { BehaviorSubject, Observable } from "rxjs";
 
 declare let $: any;
 declare let css: any;
@@ -33,23 +37,79 @@ declare let css: any;
     styleUrls: ["./canvas.component.scss"],
 })
 export class CanvasComponent implements OnInit {
+    logicForm: FormGroup;
+    isLogicContainer: boolean = false;
+    $logicContainer: BehaviorSubject<boolean>;
     public style: object = {};
     componentQtt: number = 1;
     elements: Element[] = [];
     cssObject: CssOut[] = [];
+    logicElements: logicFunction[] = [
+        {
+            funcName: "onReady",
+            readonly: false,
+            events: [],
+            commandLine: [],
+        },
+    ];
 
     constructor(
         private spawnService: SpawnComponentService,
         private showInfosService: ShowComponentInfoService,
         private sendService: SendService,
         private spinner: NgxSpinnerService,
-        private toastr: ToastrService
-    ) {}
+        private toastr: ToastrService,
+        private formBuilder: FormBuilder,
+        private alert: AlertService
+    ) {
+        this.$logicContainer = new BehaviorSubject<boolean>(false);
+    }
 
     ngOnInit() {
         this.spawnService.getElements().subscribe((element: Element) => {
+            element.name = `component${this.elements.length}`;
             this.elements.push(element);
         });
+
+        this.$logicContainer.subscribe((value: boolean) => {
+            if (value) {
+                $("#infos-container").prop("hidden", true);
+                $("#canvas-container")
+                    .addClass("col-lg-12")
+                    .removeClass("col-lg-9");
+                let children = document.getElementById("side-menu").childNodes;
+                children.forEach((child: HTMLElement) => {
+                    if (child.className === "") {
+                        child.setAttribute("hidden", "true");
+                    }
+                });
+            } else {
+                $("#infos-container").prop("hidden", false);
+                $("#canvas-container")
+                    .removeClass("col-lg-12")
+                    .addClass("col-lg-9");
+                let children = document.getElementById("side-menu").childNodes;
+                children.forEach((child: HTMLElement) => {
+                    if (child.className === "") {
+                        child.removeAttribute("hidden");
+                    }
+                });
+            }
+        });
+
+        this.logicForm = this.formBuilder.group({
+            commandLines: this.formBuilder.array([]),
+        });
+    }
+
+    // Change Container listeners
+    setLogicContainer(value: boolean) {
+        this.isLogicContainer = value;
+        this.$logicContainer.next(value);
+    }
+
+    getLogicContainer(): Observable<boolean> {
+        return this.$logicContainer.asObservable();
     }
 
     validate(event: ResizeEvent): boolean {
@@ -122,16 +182,8 @@ export class CanvasComponent implements OnInit {
                 text: $(comp).text() !== null ? $(comp).text() : "",
             },
             css: {
-                width: parseFloat(
-                    $(comp)
-                        .css("width")
-                        .substring(0, $(comp).css("width").indexOf("p"))
-                ),
-                height: parseFloat(
-                    $(comp)
-                        .css("height")
-                        .substring(0, $(comp).css("height").indexOf("p"))
-                ),
+                width: $(comp).css("width"),
+                height: $(comp).css("height"),
             },
         };
         this.showInfosService.setComponentInfos(infos);
@@ -341,5 +393,56 @@ export class CanvasComponent implements OnInit {
         } finally {
             this.spinner.hide("loadingSpinner");
         }
+    }
+
+    get formData() {
+        return <FormArray>this.logicForm.get("commandLines");
+    }
+
+    addAction(component: HTMLElement) {
+        this.logicElements.push({
+            funcName: "",
+            readonly: false,
+            commandLine: [],
+            events: [],
+        });
+    }
+
+    createItem(component: HTMLElement, type: string) {
+        const id = component.id;
+        let func = id.split("-")[0];
+        let curElement: logicFunction;
+        switch (type) {
+            case "cl":
+                curElement = this.logicElements.find(
+                    (element) => func === element.funcName
+                );
+                curElement.commandLine.push({ exec: "", type: "" });
+                break;
+            case "evt":
+                if (this.elements.length === 0) {
+                    this.alert.createConfirmDialog(
+                        "Atenção",
+                        "É necessário haver algum componente antes de criar um evento!"
+                    );
+                } else {
+                    curElement = this.logicElements.find(
+                        (element) => func === element.funcName
+                    );
+                    curElement.events.push({ eventName: "", commandLine: [] });
+                }
+
+                break;
+        }
+    }
+
+    createEvtCl(component: HTMLElement) {
+        const id = component.id;
+        let evt = id.split("-")[0];
+        let curEvt: logicEvent;
+        let curElement = this.logicElements.find((element) => {
+            curEvt = element.events.find((ev) => evt === ev.eventName);
+        });
+        curEvt.commandLine.push({ exec: "", type: "" });
     }
 }

@@ -1,52 +1,278 @@
-<div class="screen" id="canvas">
-    <div *ngFor="let e of elements; let i = index">
-        <div
-            *ngIf="e.type === 'container'"
-            [ngStyle]="{
-                width: e.width,
-                height: e.height,
-                position: 'absolut',
-                border: 'solid'
-            }"
-            mwlResizable
-            [enableGhostResize]="true"
-            [validateResize]="validate"
-            [resizeEdges]="{ bottom: true, right: true, top: true, left: true }"
-            (resizeEnd)="onResizeEnd($event)"
-            (click)="click($event, $event.target)"
-            cdkDrag
-            cdkDragBoundary=".screen"
-            draggable="true"
-            (cdkDragDropped)="onDrop($event)"
-            id="component{{ i }}"
-            class="draggable"
-        ></div>
-        <button
-            *ngIf="e.type === 'button'"
-            class="btn btn-default draggable"
-            id="component{{ i }}"
-            draggable="true"
-            (cdkDragEnded)="drop($event)"
-            (click)="click($event, $event.target)"
-            cdkDrag
-            cdkDragBoundary=".screen"
-        >
-            Botão
-        </button>
-        <p
-            *ngIf="e.type === 'label'"
-            class="draggable"
-            id="component{{ i }}"
-            draggable="true"
-            (cdkDragEnded)="drop($event)"
-            (click)="click($event, $event.target)"
-            cdkDrag
-            cdkDragBoundary=".screen"
-        >
-            Novo Label
-        </p>
+<div class="row col-md-12 text-left m-b-md">
+    <button
+        type="button"
+        class="btn m-r-md tab-btn"
+        [class.btn-default]="isLogicContainer"
+        [class.btn-primary]="!isLogicContainer"
+        (click)="setLogicContainer(false)"
+    >
+        Interface
+    </button>
+    <button
+        type="button"
+        class="btn btn-default tab-btn"
+        [class.btn-default]="!isLogicContainer"
+        [class.btn-primary]="isLogicContainer"
+        (click)="setLogicContainer(true)"
+    >
+        Lógica
+    </button>
+</div>
+
+<div id="gui" class="col-md-12" *ngIf="!isLogicContainer">
+    <div class="screen" id="canvas">
+        <div *ngFor="let e of elements; let i = index">
+            <div
+                *ngIf="e.type === 'container'"
+                [ngStyle]="{
+                    width: e.width,
+                    height: e.height,
+                    position: 'absolut',
+                    border: 'solid'
+                }"
+                mwlResizable
+                (click)="click($event, $event.target)"
+                cdkDrag
+                cdkDragBoundary=".screen"
+                (cdkDragDropped)="onDrop($event)"
+                [id]="e.name"
+            ></div>
+            <button
+                *ngIf="e.type === 'button'"
+                class="btn btn-default draggable"
+                [id]="e.name"
+                (cdkDragEnded)="drop($event)"
+                (click)="click($event, $event.target)"
+                cdkDrag
+                cdkDragBoundary=".screen"
+            >
+                Botão
+            </button>
+            <p
+                *ngIf="e.type === 'label'"
+                class="draggable"
+                [id]="e.name"
+                (cdkDragEnded)="drop($event)"
+                (click)="click($event, $event.target)"
+                cdkDrag
+                cdkDragBoundary=".screen"
+            >
+                Novo Label
+            </p>
+            <input
+                *ngIf="e.type === 'input'"
+                class="draggable input-field"
+                [id]="e.name"
+                (click)="click($event, $event.target)"
+                cdkDrag
+                cdkDragBoundary=".screen"
+            />
+        </div>
     </div>
 </div>
+
+<div id="logic" class="col-md-12" *ngIf="isLogicContainer">
+    <form [formGroup]="logicForm">
+        <div class="ibox">
+            <div class="ibox-title">
+                <div class="ibox-tools">
+                    <div class="row-flex">
+                        <h4 class="add-title">Nova função</h4>
+                        <button
+                            type="button"
+                            class="btn btn-primary add-btn m-l-sm"
+                            (click)="addAction($event.target)"
+                        >
+                            <i class="fa fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="ibox-content">
+                <div class="ibox" *ngFor="let func of logicElements">
+                    <div class="ibox-title inside-ibox">
+                        <h5 class="func-name">Nome da função:</h5>
+                        <input
+                            class="m-l-sm form-control"
+                            style="width: 200px"
+                            type="text"
+                            [value]="func.funcName"
+                        />
+                        <div class="ibox-tools">
+                            <div class="row-flex">
+                                <h4 class="add-title">Novo item</h4>
+                                <button
+                                    type="button"
+                                    class="btn btn-primary add-btn m-l-sm dropdown-toggle"
+                                    id="{{ func.funcName }}-btn"
+                                    data-toggle="dropdown"
+                                >
+                                    <i class="fa fa-plus"></i>
+                                </button>
+                                <ul class="dropdown-menu create-item">
+                                    <li
+                                        (click)="
+                                            createItem(
+                                                $event.target.parentNode
+                                                    .parentNode.parentNode
+                                                    .childNodes[1],
+                                                'cl'
+                                            )
+                                        "
+                                    >
+                                        <a> Linha de comando </a>
+                                    </li>
+                                    <li>
+                                        <a
+                                            (click)="
+                                                createItem(
+                                                    $event.target.parentNode
+                                                        .parentNode.parentNode
+                                                        .childNodes[1],
+                                                    'evt'
+                                                )
+                                            "
+                                        >
+                                            Evento
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ibox-content">
+                        <div
+                            class="col-md-12 m-b-md m-t-sm"
+                            *ngFor="let cl of func.commandLine"
+                        >
+                            <div class="row">
+                                <div class="col-md-5">
+                                    <select class="form-control">
+                                        <option value="decision">
+                                            Decisão
+                                        </option>
+                                        <option value="repetition">
+                                            Repetição
+                                        </option>
+                                    </select>
+                                </div>
+                                <div class="col-md-7">
+                                    <div class="col-md-12 m-b-sm column">
+                                        <div class="row">
+                                            <div class="col-md-5">
+                                                <select class="form-control">
+                                                    <option value="if">
+                                                        Se
+                                                    </option>
+                                                    <option value="switch">
+                                                        Switch
+                                                    </option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input
+                                                    type="text"
+                                                    class="form-control"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div
+                            class="col-md-12 m-b-md m-t-sm"
+                            *ngFor="let evt of func.events"
+                        >
+                            <div class="ibox">
+                                <div class="ibox-title inside-ibox">
+                                    <h5 class="func-name">Componente:</h5>
+                                    <select
+                                        class="m-l-sm form-control"
+                                        style="width: 150px"
+                                    >
+                                        <option
+                                            *ngFor="let element of elements"
+                                            [value]="element.name"
+                                        >
+                                            {{ element.name }}
+                                        </option>
+                                    </select>
+                                    <div class="ibox-tools">
+                                        <div class="row-flex">
+                                            <h4 class="add-title">
+                                                Nova linha de comando
+                                            </h4>
+                                            <button
+                                                type="button"
+                                                class="btn btn-primary add-btn m-l-sm"
+                                                id="{{ evt.eventName }}-btn"
+                                                data-toggle="dropdown"
+                                                (click)="
+                                                    createEvtCl($event.target)
+                                                "
+                                            >
+                                                <i class="fa fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ibox-content">
+                                <div
+                                    class="col-md-12 m-b-md m-t-sm"
+                                    *ngFor="let cl of evt.commandLine"
+                                >
+                                    <div class="row">
+                                        <div class="col-md-5">
+                                            <select class="form-control">
+                                                <option value="decision">
+                                                    Decisão
+                                                </option>
+                                                <option value="repetition">
+                                                    Repetição
+                                                </option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-7">
+                                            <div
+                                                class="col-md-12 m-b-sm column"
+                                            >
+                                                <div class="row">
+                                                    <div class="col-md-5">
+                                                        <select
+                                                            class="form-control"
+                                                        >
+                                                            <option value="if">
+                                                                Se
+                                                            </option>
+                                                            <option
+                                                                value="switch"
+                                                            >
+                                                                Switch
+                                                            </option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-7">
+                                                        <input
+                                                            type="text"
+                                                            class="form-control"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
 <div class="col-12 text-right">
     <button type="button" class="btn btn-primary m-t-sm" (click)="apply()">
         Aplicar
