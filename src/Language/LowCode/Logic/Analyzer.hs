@@ -256,8 +256,9 @@ algebraicToFunctions = fmap Map.unions . Traversable.traverse (addVars . Map.map
     fromConstructors adtName constructors =
         Map.fromList (map (fromConstructor adtName) constructors)
 
-    fromConstructor adtName (Constructor cName cType) =
-        (cName, FunctionType (maybeToList cType) (AlgebraicType adtName))
+    fromConstructor adtName (Constructor cName cType) = case cType of
+        Nothing     -> (cName, AlgebraicType adtName)
+        Just cType' -> (cName, FunctionType [cType'] (AlgebraicType adtName))
 
 analyzeImpl :: Map Name (ModuleImports e a) -> Analyzer e a (Map Name (ModuleImports Type a))
 analyzeImpl mods = forM mods \(ModuleImports _ imports root) -> do
