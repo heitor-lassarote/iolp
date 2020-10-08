@@ -34,7 +34,8 @@ import           Language.Common
 import           Language.LowCode.Logic.AST
 import           Language.LowCode.Logic.Error
 import           Language.LowCode.Logic.Module
-import           Language.LowCode.Logic.Standard (boolType, unit', unitType)
+import           Language.LowCode.Logic.Standard.Prelude (boolType, unit', unitType)
+import           Language.LowCode.Logic.Type
 import           Utility
 
 data VariableInfo = VariableInfo
@@ -67,20 +68,28 @@ instance Default AnalyzerWriter where
     def = mempty
 
 data ModuleImports exprMetadata astMetadata = ModuleImports
-    { cachedSymbols :: !(Map Text VariableInfo)
+    { cachedSymbols :: !(Map Name VariableInfo)
     , moduleImports :: !(Map Name (ModuleImports exprMetadata astMetadata))
     , rootModule    :: !(Module exprMetadata astMetadata)
     } deriving (Show)
 
+--instance Semigroup (ModuleImports e a) where
+--    ModuleImports ca cs ci rm <> ModuleImports ca' cs' ci' rm' =
+--        ModuleImports (cs <> ca') (cs <> cs') (ci <> ci') (rm <> rm') (joinMods rm rm')
+--      where
+--        joinMods (Module at e f im mn) (Module at' e' f' im' mn') =
+--            Module (at <> at') (e <> e') (f <> f') (im <> im') (mn <> mn')
+
 data AnalyzerState exprMetadata astMetadata = AnalyzerState
-    { analyzerSymbols      :: !(Map Text VariableInfo)
+    { analyzerSymbols      :: !(Map Name VariableInfo)
     , currentModule        :: !(Module exprMetadata astMetadata)
+    , adtsInScope          :: !(Map Name [Constructor Type])
     , modulesAnalyzedSoFar :: !(Map Name (ModuleImports Type astMetadata))
     , returnType           :: !Type
     } deriving (Show)
 
 instance Default (AnalyzerState exprMetadata astMetadata) where
-    def = AnalyzerState Map.empty (mkModule "") Map.empty unitType
+    def = AnalyzerState Map.empty (mkModule "") Map.empty Map.empty unitType
 
 type AnalyzerT exprMetadata astMetadata m
     = ChronicleT AnalyzerWriter (ReaderT AnalyzerReader (StateT (AnalyzerState exprMetadata astMetadata) m))
@@ -243,8 +252,9 @@ collect :: Module e a -> Analyzer e' a' (Map Name VariableInfo)
 collect mod' = do
     exts' <- addVars exts
     funcs' <- addVars funcs
-    adts <- algebraicToFunctions (adtTemplates mod')
-    pure $ Map.unions [exts', funcs', adts]
+    --adts <- algebraicToFunctions (adtTemplates mod')
+    --pure $ Map.unions [exts', funcs', adts]
+    pure $ Map.union exts' funcs'
   where
     exts = Map.mapWithKey (,) (externs mod')
     funcs = Map.fromList $ getFuncNameType <$> functions mod'
@@ -256,7 +266,7 @@ algebraicToFunctions = fmap Map.unions . Traversable.traverse (addVars . Map.map
     fromConstructors adtName constructors =
         Map.fromList (map (fromConstructor adtName) constructors)
 
-    fromConstructor adtName (Constructor cName cType) = case cType of
+    fromConstructor adtName (Constructor _adtName cName cType) = case cType of
         Nothing     -> (cName, AlgebraicType adtName)
         Just cType' -> (cName, FunctionType [cType'] (AlgebraicType adtName))
 
@@ -267,9 +277,11 @@ analyzeImpl mods = forM mods \(ModuleImports _ imports root) -> do
         Just root' -> pure root'
         Nothing -> do
             mods' <- analyzeImpl imports
-            let cache = Map.unions $ map cachedSymbols $ Map.elems mods'
+            let adts = Map.unions (adtTemplates root : Map.elems (map (adtTemplates . rootModule) imports))
+                cache = Map.unions $ map cachedSymbols $ Map.elems mods'
             modify \s -> s
-                { analyzerSymbols = cache
+                { adtsInScope     = adts
+                , analyzerSymbols = cache
                 , currentModule   = root
                 }
             moduleSymbols <- collect root
@@ -282,7 +294,7 @@ analyzeImpl mods = forM mods \(ModuleImports _ imports root) -> do
                     }
             modify \s -> s
                 { modulesAnalyzedSoFar = Map.insert (moduleName root) mi (modulesAnalyzedSoFar s)
-                } 
+                }
             pure mi
 
 
@@ -321,22 +333,35 @@ analyzeReturn (Just expr) = do
         addError $ TypeMismatch (unsafeCodegen' expr) ret typeE
     pure exprE
 
-findAdt :: Name -> Analyzer e' a' (Maybe (Name, [Constructor Type], Constructor Type))
-findAdt cName = do
-    adts <- gets (adtTemplates . currentModule)
-    pure $ findMap go $ Map.toList adts
-  where
-    go (adtName, adtConstructors) =
-        (adtName, adtConstructors,) <$> find ((== cName) . constructorName) adtConstructors
+findAdt :: Name -> Name -> Analyzer e' a' (Maybe (Constructor Type))
+findAdt adtName cName =
+    join . fmap (find ((== cName) . constructorName)) . Map.lookup adtName <$> gets adtsInScope
+
+findCtor :: Name -> Analyzer e' a' (Maybe (Constructor Type))
+findCtor cName = do
+    adts <- gets adtsInScope
+    pure $ findMap (find ((== cName) . constructorName)) $ Map.elems adts
+
+--analyzeConstructor :: Constructor e -> Analyzer e' a' (Constructor Type)
+--analyzeConstructor (Constructor adtName cName _) = do
+--    ctorLookup <- findCtor cName
+--    case ctorLookup of
+--        Nothing -> addError (NoSuchConstructor adtName cName)
+--        Just (Constructor adtName' cName' _)
+--            | cName /= cName' -> addError (ConstructorMismatch adtName cName' cName)
+--            | otherwise       -> pure ()
 
 analyzePattern' :: MatchPattern -> Analyzer e' a' ()
 analyzePattern' = \case
-    AlgebraicPattern (Constructor cName field) -> findAdt cName >>= \case
-        Just (_adtName, _constructors, Constructor _cName cType) -> case (field, cType) of
-            (Just field', Just cType') -> void (analyzePattern cType' field')
-            (Just field', Nothing    ) -> analyzePattern' field'
-            _                          -> pure ()
-        Nothing -> addError (NoSuchConstructor cName)
+    AlgebraicPattern (Constructor adtName cName field) -> findCtor cName >>= \case
+        Just (Constructor _adtName cName' cType) -> do
+            when (cName /= cName') $
+                addError (ConstructorMismatch adtName cName' cName)
+            case (field, cType) of
+                (Just field', Just cType') -> void (analyzePattern cType' field')
+                (Just field', Nothing    ) -> analyzePattern' field'
+                _                          -> pure ()
+        Nothing -> addError (NoSuchConstructor adtName cName)
     ArrayPattern positions -> traverse_ analyzePattern' positions
     LiteralPattern (Double d) -> addWarning (FloatingPointEquality d)
     LiteralPattern _ -> pure ()
@@ -347,13 +372,16 @@ analyzePattern' = \case
 
 analyzePattern :: Type -> MatchPattern -> Analyzer e' a' (Map Name VariableInfo)
 analyzePattern expectedType = \case
-    AlgebraicPattern (Constructor cName field) -> findAdt cName >>= \case
-        Just (adtName, _constructors, Constructor _cName cType)
-            | AlgebraicType adtName == expectedType -> case (field, cType) of
-                (Just field', Just cType') -> analyzePattern cType' field'
-                _                          -> pure Map.empty
+    AlgebraicPattern (Constructor adtName cName field) -> findCtor cName >>= \case
+        Just (Constructor _adtName cName' cType)
+            | AlgebraicType adtName == expectedType -> do
+                when (cName /= cName') $
+                    addError (ConstructorMismatch adtName cName' cName)
+                case (field, cType) of
+                    (Just field', Just cType') -> analyzePattern cType' field'
+                    _                          -> pure Map.empty
             | otherwise -> mismatch cName (AlgebraicType adtName)
-        Nothing -> addError (NoSuchConstructor cName) *> pure Map.empty
+        Nothing -> addError (NoSuchConstructor adtName cName) *> pure Map.empty
     ArrayPattern positions -> case expectedType of
         ArrayType t -> Map.unions <$> traverse (analyzePattern t) positions
         _           -> addError UnknownArray *> pure Map.empty
@@ -582,7 +610,7 @@ analyzeApply :: Name -> [Type] -> Type -> Analyzer e' a' Type
 analyzeApply name arguments (FunctionType argTypes ret) = do
     let nArgs = length arguments
         nTypes = length argTypes
-    when (nArgs /= nTypes) $ addError $ IncompatibleSignatures name nArgs nTypes
+    when (nArgs /= nTypes) $ addError $ IncompatibleSignatures name nTypes nArgs
     traverse_ (uncurry (checkTypes name)) $ zip argTypes arguments
     pure ret
 analyzeApply name _ type' = addError (NotAFunction name) *> pure type'
@@ -659,13 +687,16 @@ analyzeRecordWithHint expectedFields fields = do
 
 -- TODO: analyzeAlgebraicWithHint
 analyzeAlgebraic :: Constructor (Expression e) -> Analyzer e' a' (Structure Type)
-analyzeAlgebraic (Constructor name expr) = findAdt name >>= \case
+analyzeAlgebraic (Constructor adtName name expr) = findCtor name >>= \case
     Nothing -> do
         whenJust expr (void . analyzeExpr)
-        fatalError $ NoSuchConstructor name
-    Just (adtName, _adtConstructors, adtConstructor) -> do
-        field <- sequence $ liftA2 analyzeExprWithHint (constructorValue adtConstructor) expr
-        pure $ Algebraic (AlgebraicType adtName) (Constructor name field)
+        fatalError $ NoSuchConstructor adtName name
+    Just (Constructor _adtName name' adtType) -> do
+        when (name /= name') $
+            addError (ConstructorMismatch adtName name' name)
+        field <- sequence $ liftA2 analyzeExprWithHint adtType expr
+        pure $ Algebraic (AlgebraicType adtName) (Constructor adtName name field)
+
 
 literalType :: Literal -> Type
 literalType = \case

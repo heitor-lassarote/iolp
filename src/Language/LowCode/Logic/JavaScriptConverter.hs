@@ -13,6 +13,7 @@ import qualified Language.JavaScript.AST as JS
 import           Language.LanguageConverter
 import qualified Language.LowCode.Logic.AST    as L
 import qualified Language.LowCode.Logic.Module as L
+import qualified Language.LowCode.Logic.Type   as L
 import           Utility (concatUnzip)
 
 instance LanguageConverter (L.Module L.Type astMetadata) JS.Module where
@@ -25,7 +26,7 @@ instance LanguageConverter (L.Module L.Type astMetadata) JS.Module where
         go constructors asts = map algebraicToFunction constructors <> asts
 
         algebraicToFunction :: L.Constructor L.Type -> JS.AST
-        algebraicToFunction (L.Constructor name fieldMaybe) = JS.Const name case fieldMaybe of
+        algebraicToFunction (L.Constructor _ name fieldMaybe) = JS.Const name case fieldMaybe of
             Nothing -> JS.Literal (JS.Record [mkField "$" name])
             Just _  -> JS.Function Nothing ["value"] (JS.Expression $ mkRecord name)
           where
@@ -103,12 +104,12 @@ convertMatch expr (b : bs) = [JS.Const varName (convert expr), mkMatches (b :| b
         -> L.MatchPattern
         -> ([(JS.Name, JS.Expression)], [JS.Expression])
     mkCondition names exprs tree = \case
-        L.AlgebraicPattern (L.Constructor name Nothing)
-            | name == "True" -> (names, JS.Literal (JS.Boolean True) : exprs)
-            | name == "False" -> (names, JS.UnaryOp JS.Not (JS.Literal (JS.Boolean False)) : exprs)
-            | name == "Unit" -> (names, tree === JS.Literal (JS.Record []) : exprs)
+        L.AlgebraicPattern (L.Constructor adtName name Nothing)
+            | adtName == "Bool" && name == "True" -> (names, JS.Literal (JS.Boolean True) : exprs)
+            | adtName == "Bool" && name == "False" -> (names, JS.UnaryOp JS.Not (JS.Literal (JS.Boolean False)) : exprs)
+            | adtName == "Unit" && name == "Unit" -> (names, tree === JS.Literal (JS.Record []) : exprs)
             | otherwise -> (names, mkDiscriminate name : exprs)
-        L.AlgebraicPattern (L.Constructor name (Just field)) ->
+        L.AlgebraicPattern (L.Constructor _ name (Just field)) ->
             mkCondition names (mkDiscriminate name : exprs) (mkAccess "value") field
         L.ArrayPattern positions ->
             concatUnzip $ zipWith (mkCondition names (mkLength positions : mkIndexes <> exprs)) mkIndexes positions
@@ -152,9 +153,9 @@ instance LanguageConverter (L.Structure L.Type) JS.Expression where
 
 convertAlgebraic :: L.Constructor (L.Expression L.Type) -> JS.Expression
 convertAlgebraic = \case
-    L.Constructor name Nothing
-        | name == "False" -> JS.Literal $ JS.Boolean False
-        | name == "True"  -> JS.Literal $ JS.Boolean True
-        | name == "Unit"  -> JS.Literal $ JS.Record []
+    L.Constructor adtName name Nothing
+        | adtName == "Bool" && name == "False" -> JS.Literal $ JS.Boolean False
+        | adtName == "Bool" && name == "True"  -> JS.Literal $ JS.Boolean True
+        | adtName == "Unit" && name == "Unit"  -> JS.Literal $ JS.Record []
         | otherwise       -> JS.Variable name
-    L.Constructor name (Just field) -> JS.Call (JS.Variable name) [convert field]
+    L.Constructor _ name (Just field) -> JS.Call (JS.Variable name) [convert field]

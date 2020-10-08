@@ -11,7 +11,8 @@ module Language.LowCode.Logic
     , module Language.LowCode.Logic.Error
     , module Language.LowCode.Logic.JavaScriptConverter
     , module Language.LowCode.Logic.Module
-    , module Language.LowCode.Logic.Standard
+    , module Language.LowCode.Logic.Standard.Prelude
+    , module Language.LowCode.Logic.Type
     , Metadata (..)
     ) where
 
@@ -24,7 +25,8 @@ import Language.LowCode.Logic.AST
 import Language.LowCode.Logic.Error
 import Language.LowCode.Logic.JavaScriptConverter
 import Language.LowCode.Logic.Module
-import Language.LowCode.Logic.Standard
+import Language.LowCode.Logic.Standard.Prelude
+import Language.LowCode.Logic.Type
 
 newtype Metadata = Metadata
     { position :: Double2

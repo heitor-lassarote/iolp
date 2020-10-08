@@ -11,18 +11,20 @@ import Formatting (float, int, sformat, shown, stext, (%))
 
 import Language.Codegen (unsafeCodegen')
 import Language.LowCode.Logic.AST
+import Language.LowCode.Logic.Type (Type)
 
 -- TODO: Add information about where the error is coming from.
 -- TODO: Should IncompatibleTypes and TypeMismatch really have these signatures?
 data Error
-    = CyclicImports !(NonEmpty Name)
+    = ConstructorMismatch !Name !Name !Name
+    | CyclicImports !(NonEmpty Name)
     | DuplicateModule !Name
     | DuplicateRecord !Name
     | IncompatibleSignatures !Name !Int !Int
     | IncompatibleTypes1 !UnarySymbol !(Expression ())
     | IncompatibleTypes2 !(Expression ()) !BinarySymbol !(Expression ())
-    | MissingFields (NonEmpty Name)
-    | NoSuchConstructor !Name
+    | MissingFields !(NonEmpty Name)
+    | NoSuchConstructor !Name !Name
     | NoSuchModule !Name
     | NotAFunction !Name
     | NotAMember !Type !Name
@@ -40,13 +42,23 @@ prettyCyclic (f :| cs) = sformat ("'" % stext % "' imports '" % stext) f (go cs)
     go (x : xs) = sformat ("'" % stext % "', which imports\n" % stext) x (go xs)
     go []       = sformat ("'" % stext % "'.") f
 
+prettyAdt :: Name -> Name -> Text
+prettyAdt adtName adtConstructor = sformat ("'" % stext % "::" % stext % "'")
+    adtName
+    adtConstructor
+
 prettyError :: Error -> Text
 prettyError = \case
+    ConstructorMismatch adtName expected actual -> sformat
+        ("Invalid constructor '" % stext % "'. The only constructor for the given ADT is '" % stext % "'.")
+        (prettyAdt adtName actual)
+        (prettyAdt adtName expected)
     CyclicImports cycles -> prettyCyclic cycles
     DuplicateModule name -> sformat ("Duplicate module '" % stext % "'.") name
     DuplicateRecord fieldName -> sformat
         ("Duplicate field '" % stext % "' on record.")
         fieldName
+    -- FIXME: singular/plural (should apply to some other errors here too)
     IncompatibleSignatures name args1 args2 -> sformat
         ("'" % stext % "' expects " % int % " arguments, but " % int % " were given.")
         name
@@ -64,9 +76,9 @@ prettyError = \case
     MissingFields (name :| names) -> sformat
         ("Record does not have the required fields: " % shown % ".")
         (name : names)
-    NoSuchConstructor name -> sformat
+    NoSuchConstructor adtName cName -> sformat
         ("Could not find ADT containing a constuctor called '" % stext % "'.")
-        name
+        (prettyAdt adtName cName)
     NoSuchModule name -> sformat ("Could not find module '" % stext % "'.") name
     -- TODO: Add types/expressions being applied? And maybe the inferred type?
     NotAFunction name -> sformat ("Can't use '" % stext % "' as function.") name

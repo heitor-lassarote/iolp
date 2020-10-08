@@ -10,8 +10,8 @@ module Language.LowCode.Logic.AST
     , Expression (..)
     , Literal (..)
     , Structure (..)
-    , Type (..)
     , parseFunction
+    , function
     , parseAst
     , parseExpression
     , unaryToText
@@ -28,6 +28,7 @@ import           Data.Aeson hiding (Array, Bool)
 import           Data.Aeson.Types (prependFailure, unexpected)
 import qualified Data.Char as Char
 import qualified Data.Map.Strict as Map
+import qualified Data.Set as Set
 import qualified Data.Text as Text
 import           Text.Megaparsec hiding (match, unexpected)
 import           Text.Megaparsec.Char
@@ -36,20 +37,12 @@ import qualified Text.Megaparsec.Char.Lexer as Lexer
 import           Language.Codegen
 import           Language.Common
 import           Language.Emit
+import           Language.LowCode.Logic.Parser
+import           Language.LowCode.Logic.Type
 import           Utility (biject, withTag)
 
 class HasMetadata f where
     getMetadata  :: f a -> a
-
-data Field a = Field
-    { fieldName  :: !Name
-    , fieldValue :: !a
-    } deriving (Eq, Functor, Generic, Ord, Show, FromJSON, ToJSON)
-
-data Constructor a = Constructor
-    { constructorName  :: !Name
-    , constructorValue :: !(Maybe a)
-    } deriving (Eq, Functor, Generic, Ord, Show, FromJSON, ToJSON)
 
 data Function exprMetadata metadata
     = Function !metadata !Name !Type ![Name] !(AST exprMetadata metadata)
@@ -59,17 +52,17 @@ instance (FromJSON metadata) => FromJSON (Function () metadata) where
     parseJSON = withObject "Language.LowCode.Logic.AST.Function" \o ->
         Function <$> o .: "metadata"
                  <*> o .: "name"
-                 <*> o .: "returnType"
+                 <*> o .: "type"
                  <*> o .: "arguments"
                  <*> o .: "body"
 
 instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (Function expressionMetadata metadata) where
     toJSON (Function metadata name returnType arguments body) = object
-        [ "metadata"   .= metadata
-        , "name"       .= String name
-        , "returnType" .= returnType
-        , "arguments"  .= arguments
-        , "body"       .= body
+        [ "metadata"  .= metadata
+        , "name"      .= String name
+        , "type"      .= returnType
+        , "arguments" .= arguments
+        , "body"      .= body
         ]
 
 data MatchPattern
@@ -390,8 +383,10 @@ instance Codegen (Structure metadata) where
         Array _ a -> emitBetween' "[" "]" $ a `separatedBy'` ", "
         Record _ fs -> codegenRecord fs
       where
-        codegenAlgebraic (Constructor name value') = mconcat <$> sequence
-            [ emitM name
+        codegenAlgebraic (Constructor adtName name value') = mconcat <$> sequence
+            [ emitM adtName
+            , emitM "::"
+            , emitM name
             , maybe (emitM "") (emitBetween' "(" ")" . codegen) value'
             ]
 
@@ -418,53 +413,6 @@ instance ToJSON (Structure metadata) where
         Array _ a -> withTag "array" ["positions" .= a]
         Record _ fields -> withTag "record" ["fields" .= fields]
 
-data Type
-    = AlgebraicType !Name
-    | ArrayType !Type
-    | CharType
-    | DoubleType
-    | FunctionType ![Type] !Type
-    | IntegerType
-    | RecordType ![Field Type]
-    | TextType
-    deriving (Eq, Ord, Show)
-
-instance FromJSON Type where
-    parseJSON = withObject "Language.LowCode.Logic.AST.VariableType" \o -> o .: "tag" >>= \case
-        "adt"      -> AlgebraicType <$> o .: "name"
-        "array"    -> ArrayType <$> o .: "elements"
-        "char"     -> pure CharType
-        "double"   -> pure DoubleType
-        "function" -> FunctionType <$> o .: "arguments" <*> o .: "return"
-        "integer"  -> pure IntegerType
-        "record"   -> RecordType <$> o .: "fields"
-        "text"     -> pure TextType
-        other      -> fail $
-            "Expected 'array', 'char', 'double', 'function','integer', 'record'\
-            \ or 'text', but got '" <> other <> "'."
-
-instance ToJSON Type where
-    toJSON = \case
-        AlgebraicType name -> withTag "adt"
-            [ "name"      .= name
-            ]
-        ArrayType elements -> withTag "array"
-            [ "elements"  .= elements
-            ]
-        CharType -> withTag "char" []
-        DoubleType -> withTag "double" []
-        FunctionType arguments ret -> withTag "function"
-            [ "arguments" .= arguments
-            , "return"    .= ret
-            ]
-        IntegerType -> withTag "integer" []
-        RecordType fields -> withTag "record"
-            [ "fields"    .= fields
-            ]
-        TextType -> withTag "text" []
-
-type Parser = Parsec Void Text
-
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 
 type Precedence = Int
@@ -474,31 +422,11 @@ data Operator = Operator
     , precedence    :: !Precedence
     } deriving (Eq, Show)
 
-parse' :: Parser a -> Text -> Either Text a
-parse' p = first (toText . errorBundlePretty) . parse (space *> p <* eof) ""
-
-spaceConsumer :: (MonadParsec e s m, Token s ~ Char, Tokens s ~ Text) => m ()
-spaceConsumer = Lexer.space space1 (Lexer.skipLineComment "//") (Lexer.skipBlockCommentNested "/*" "*/")
-
-lexeme :: (MonadParsec e s m, Token s ~ Char, Tokens s ~ Text) => m a -> m a
-lexeme = Lexer.lexeme spaceConsumer
-
-symbol :: (MonadParsec e s m, Token s ~ Char, Tokens s ~ Text) => Tokens s -> m (Tokens s)
-symbol = Lexer.symbol spaceConsumer
-
-bracket :: Char -> Char -> Parser a -> Parser a
-bracket left right = between (lexeme (char left)) (lexeme (char right))
-
-parenthesis, braces, brackets :: Parser a -> Parser a
-parenthesis = bracket '(' ')'
-braces      = bracket '[' ']'
-brackets    = bracket '{' '}'
-
 parseFunction :: Text -> Either Text (Function () ())
 parseFunction = parse' function
 
 function :: Parser (Function () ())
-function = try function' <|> functionSugar
+function = label "function declaration" (try function' <|> functionSugar)
 
 function' :: Parser (Function () ())
 function' = do
@@ -523,9 +451,6 @@ parseAst = parse' ast
 ast :: Parser (AST () ())
 ast = option (End ()) $ choice [assign, try expression, if', match, return', while, var]
 
-endl :: Parser ()
-endl = void (lexeme (char ';'))
-
 assign :: Parser (AST () ())
 assign = do
     left <- try $ leftOfAssignment <* void (lexeme (char '='))
@@ -544,7 +469,7 @@ if' = do
     symbol "if"
     cond <- expression0
     trueBranch <- brackets ast
-    falseBranch <- option (End ()) (symbol "else" *> brackets ast)
+    falseBranch <- option (End ()) (symbol "else" *> (brackets ast <|> if'))
     next <- ast
     pure $ If () cond trueBranch falseBranch next
 
@@ -552,7 +477,7 @@ match :: Parser (AST () ())
 match = do
     symbol "match"
     cond <- expression0
-    pats <- brackets $ flip sepBy (lexeme (char ',')) do
+    pats <- brackets $ flip sepEndBy (lexeme (char ',')) do
         pat <- pattern
         branch <- brackets ast
         pure (pat, branch)
@@ -580,19 +505,14 @@ while = do
     next <- ast
     pure $ While () cond loop next
 
--- FIXME: How to discriminate between Algebraic and Name? For now, it always
--- uses Algebraic.
 pattern :: Parser MatchPattern
 pattern = choice [algebraicP, arrayP, literalP, nameP, recordP]
   where
-    algebraicP = AlgebraicPattern <$> (liftA2 Constructor variableName (optional (parenthesis pattern)))
+    algebraicP = AlgebraicPattern <$> algebraic pattern
     arrayP = ArrayPattern <$> array pattern
     literalP = LiteralPattern <$> literal
     nameP = NamePattern <$> variableName
     recordP = RecordPattern <$> record pattern
-
-array :: Parser a -> Parser [a]
-array p = braces (p `sepEndBy` lexeme (char ','))
 
 literal :: Parser Literal
 literal = choice
@@ -601,37 +521,6 @@ literal = choice
     , Integer <$> try integer
     , Text    <$> text
     ]
-
-tuple :: Parser a -> Parser [a]
-tuple p = parenthesis (p `sepBy` lexeme (char ','))
-
-record :: Parser a -> Parser [Field a]
-record p = try $ brackets $ flip sepBy (lexeme (char ',')) do
-    fieldName <- variableName
-    void (lexeme (char '='))
-    value' <- p
-    pure $ Field fieldName value'
-
-typeName :: Parser Type
-typeName = try tupleFunc <|> funcOrType
-  where
-    types = choice
-        [ TextType      <$  symbol "Text"
-        , RecordType    <$> record typeName
-        , IntegerType   <$  symbol "Integer"
-        , DoubleType    <$  symbol "Double"
-        , CharType      <$  symbol "Char"
-        , ArrayType     <$> braces typeName
-        , AlgebraicType <$> variableName
-        ]
-
-    right = symbol "->" *> typeName
-
-    funcOrType = do
-        left <- parenthesis typeName <|> types
-        pure . maybe left (FunctionType [left]) =<< optional right
-
-    tupleFunc = liftA2 FunctionType (tuple typeName) right
 
 -- Reference:
 -- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_Precedence
@@ -733,24 +622,19 @@ value = structure <|> Literal () <$> literal <|> variable
 
 structure :: Parser (Expression ())
 structure = Structure () <$> choice
-    [ Array  () <$> array expression0
-    , Record () <$> record expression0
+    [ Algebraic () <$> algebraic expression0
+    , Array     () <$> array expression0
+    , Record    () <$> record expression0
     ]
 
 variable :: Parser (Expression ())
 variable = Variable () <$> variableName
 
 char'' :: Parser Char
-char'' = bracket '\'' '\'' Lexer.charLiteral
+char'' = between (char '\'') (lexeme (char '\'')) Lexer.charLiteral
 
 text :: Parser Text
 text = toText <$> (char '"' *> manyTill Lexer.charLiteral (char '"'))
-
-variableName :: Parser Text
-variableName = lexeme do
-    head' <- letterChar <|> char '_'
-    tail' <- takeWhileP Nothing (\c -> Char.isAlphaNum c || c == '_')
-    pure $ Text.cons head' tail'
 
 errorUnaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorUnaryNotFound symbol' = "Undefined unary operator '" <> symbol' <> "'."
@@ -759,10 +643,10 @@ errorBinaryNotFound :: (IsString s, Semigroup s) => s -> s
 errorBinaryNotFound symbol' = "Undefined binary operator '" <> symbol' <> "'."
 
 isOperatorSymbol :: Char -> Bool
-isOperatorSymbol c = (c `notElem` forbidden) && (Char.isPunctuation c || Char.isSymbol c)
+isOperatorSymbol c = Set.member c allowed
   where
-    forbidden :: Text
-    forbidden = ";,.()[]{}"
+    allowed :: Set Char
+    allowed = Set.fromList $ toString $ Text.concat (Map.keys mapTextToUnary <> Map.keys mapTextToBinary)
 
 unaryOperator :: Parser UnarySymbol
 unaryOperator = do
