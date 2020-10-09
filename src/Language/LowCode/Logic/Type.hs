@@ -9,7 +9,6 @@ import Universum hiding (Type, try)
 
 import Data.Aeson
 import Text.Megaparsec
-import Text.Megaparsec.Char
 
 import Language.Common (Name)
 import Language.LowCode.Logic.Parser

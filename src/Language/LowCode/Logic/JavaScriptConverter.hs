@@ -39,32 +39,27 @@ instance LanguageConverter (L.Function L.Type) JS.AST where
         L.Function name _ arguments next ->
             JS.Expression $ JS.Function (Just name) arguments (convert next)
 
-instance LanguageConverter (L.AST L.Type) JS.AST where
-    convert = JS.Block . convert'
+instance LanguageConverter [L.AST L.Type] JS.AST where
+    convert = JS.Block . concatMap convert'
       where
         convert' = \case
-            L.Assign left right next ->
-                JS.Assign (convert left) (convert right) : convert' next
-            L.End ->
-                []
-            L.Expression expression next ->
-                (JS.Expression $ convert expression) : convert' next
-            L.If expression true false next ->
-                JS.If (convert expression)
-                      (JS.Block $ convert' true)
-                      (tryElse false) : convert' next
-            L.Match expression branches next ->
-                convertMatch expression branches <> convert' next
+            L.Assign left right ->
+                [JS.Assign (convert left) (convert right)]
+            L.Expression expression ->
+                [JS.Expression $ convert expression]
+            L.If expression true false ->
+                [JS.If (convert expression) (convert true) (tryElse false)]
+            L.Match expression branches ->
+                convertMatch expression branches
             L.Return expression ->
                 [JS.Return (convert <$> expression)]
-            L.Var name _ expression next ->
-                JS.Var name (convert expression) : convert' next
-            L.While expression body next ->
-                JS.While (convert expression)
-                         (JS.Block $ convert' body) : convert' next
+            L.Var name _ expression ->
+                [JS.Var name (convert expression)]
+            L.While expression body ->
+                [JS.While (convert expression) (convert body)]
 
-        tryElse L.End = Nothing
-        tryElse ast   = Just $ JS.Block $ convert' ast
+        tryElse []  = Nothing
+        tryElse ast = Just $ convert ast
 
 -- FIXME: Create a name generator!
 convertMatch :: L.Expression L.Type -> [L.Branch L.Type] -> [JS.AST]

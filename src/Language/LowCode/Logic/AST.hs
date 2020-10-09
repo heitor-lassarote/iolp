@@ -46,7 +46,7 @@ class HasMetadata f where
     getMetadata  :: f a -> a
 
 data Function exprMetadata
-    = Function !Name !Type ![Name] !(AST exprMetadata)
+    = Function !Name !Type ![Name] ![AST exprMetadata]
     deriving (Eq, Functor, Show)
 
 instance FromJSON (Function ()) where
@@ -91,7 +91,7 @@ patternToExpr = \case
     StructurePattern struct -> Structure () (patternToExpr <$> struct)
 
 data Branch exprMetadata
-    = Branch MatchPattern (AST exprMetadata)
+    = Branch MatchPattern [AST exprMetadata]
     deriving (Eq, Functor, Show)
 
 instance FromJSON (Branch ()) where
@@ -106,103 +106,72 @@ instance ToJSON (Branch exprMetadata) where
         ]
 
 data AST exprMetadata
-    -- | Assigns a new value to the first expression, and what follows after.
-    = Assign !(Expression exprMetadata) !(Expression exprMetadata) !(AST exprMetadata)
-    -- | Represents the end of a cycle.
-    | End
+    -- | Assigns a new value to the first expression.
+    = Assign !(Expression exprMetadata) !(Expression exprMetadata)
     -- | Executes a raw expression. Useful for Call.
-    | Expression !(Expression exprMetadata) !(AST exprMetadata)
-    -- | Allows a condition to be tested, and contains the true branch, false
-    -- branch and what follows after the branches.
-    | If !(Expression exprMetadata) !(AST exprMetadata) !(AST exprMetadata) !(AST exprMetadata)
+    | Expression !(Expression exprMetadata)
+    -- | Allows a condition to be tested, and contains the true branch and false branch.
+    | If !(Expression exprMetadata) ![AST exprMetadata] ![AST exprMetadata]
     -- | Represents a match pattern, similar to a "case of" or a "switch" structure.
-    | Match !(Expression exprMetadata) ![Branch exprMetadata] !(AST exprMetadata)
+    | Match !(Expression exprMetadata) ![Branch exprMetadata]
     -- | Exits the function, optionally returning a value.
     | Return !(Maybe (Expression exprMetadata))
-    -- | Declares a variable with the specified name and type, followed by the
-    -- remainder of the cycle.
-    | Var !Name !Type !(Expression exprMetadata) !(AST exprMetadata)
-    -- | Represents a condition which should be run while a predicate is not
-    -- met, followed by the remainder of the cycle.
-    | While !(Expression exprMetadata) !(AST exprMetadata) !(AST exprMetadata)
+    -- | Declares a variable with the specified name and type.
+    | Var !Name !Type !(Expression exprMetadata)
+    -- | Represents a condition which should be run while a predicate is not met.
+    | While !(Expression exprMetadata) ![AST exprMetadata]
     deriving (Eq, Functor, Show)
 
 instance FromJSON (AST ()) where
     parseJSON = withObject "Language.LowCode.Logic.AST.AST" \o -> o .: "tag" >>= \case
         "assign"      -> Assign     <$> o .: "leftExpression"
                                     <*> o .: "rightExpression"
-                                    <*> o .: "nextAst"
-        "end"         -> pure End
         "expression"  -> Expression <$> o .: "expression"
-                                    <*> o .: "nextAst"
         "if"          -> If         <$> o .: "expression"
                                     <*> o .: "trueBranchAst"
                                     <*> o .: "falseBranchAst"
-                                    <*> o .: "nextAst"
         "match"       -> Match      <$> o .: "expression"
                                     <*> o .: "branches"
-                                    <*> o .: "nextAst"
         "return"      -> Return     <$> o .: "expression"
         "var"         -> Var        <$> o .: "name"
                                     <*> o .: "type"
                                     <*> o .: "expression"
-                                    <*> o .: "nextAst"
         "while"       -> While      <$> o .: "expression"
                                     <*> o .: "whileAst"
-                                    <*> o .: "nextAst"
         other         -> fail $
-            "Unknown tag '" <> other <> "'. Available tags are: 'assign', 'end',\
+            "Unknown tag '" <> other <> "'. Available tags are: 'assign',\
             \ 'expression', 'if', 'match', 'return', 'start', 'var' and 'while'."
 
 instance ToJSON (AST expressionMetadata) where
     toJSON = \case
-        Assign left right next -> withTag "assign"
+        Assign left right -> withTag "assign"
             [ "leftExpression"  .= left
             , "rightExpression" .= right
-            , "nextAst"         .= next
             ]
-        End -> withTag "end" []
-        Expression expr next -> withTag "expression"
+        Expression expr -> withTag "expression"
             [ "expression"      .= expr
-            , "nextAst"         .= next
             ]
-        If expr true false next -> withTag "if"
+        If expr true false -> withTag "if"
             [ "expression"      .= expr
             , "trueBranchAst"   .= true
             , "falseBranchAst"  .= false
-            , "nextAst"         .= next
             ]
-        Match expr branches next -> withTag "match"
+        Match expr branches -> withTag "match"
             [ "expression"      .= expr
             , "branches"        .= branches
-            , "nextAst"         .= next
             ]
         Return expr -> withTag "return"
             [ "expression"      .= expr
             ]
-        Var name type' expr next -> withTag "var"
+        Var name type' expr -> withTag "var"
             [ "name"            .= name
             , "type"            .= type'
             , "expression"      .= expr
-            , "nextAst"         .= next
             ]
-        While expr body next -> withTag "while"
+        While expr body -> withTag "while"
             [ "expression"      .= expr
             , "whileAst"        .= body
-            , "nextAst"         .= next
             ]
-
-instance HasMetadata Expression where
-    getMetadata = \case
-        Access m _ _ -> m
-        BinaryOp m _ _ _ -> m
-        Call m _ _ -> m
-        Index m _ _ -> m
-        Literal m _ -> m
-        Parenthesis m _ -> m
-        Structure m _ -> m
-        UnaryOp m _ _ -> m
-        Variable m _ -> m
 
 data Expression metadata
     = Access !metadata !(Expression metadata) !Name
@@ -215,6 +184,18 @@ data Expression metadata
     | UnaryOp !metadata !UnarySymbol !(Expression metadata)
     | Variable !metadata !Name
     deriving (Eq, Functor, Show)
+
+instance HasMetadata Expression where
+    getMetadata = \case
+        Access m _ _ -> m
+        BinaryOp m _ _ _ -> m
+        Call m _ _ -> m
+        Index m _ _ -> m
+        Literal m _ -> m
+        Parenthesis m _ -> m
+        Structure m _ -> m
+        UnaryOp m _ _ -> m
+        Variable m _ -> m
 
 instance FromJSON (Expression ()) where
     parseJSON (String s) = either (fail . toString) pure $ parseExpression s
@@ -373,41 +354,38 @@ functionSugar = do
     body <- brackets ast
     pure $ Function name (FunctionType types ret) args body
 
-parseAst :: Text -> Either Text (AST ())
+parseAst :: Text -> Either Text [AST ()]
 parseAst = parse' ast
 
-ast :: Parser (AST ())
-ast = option End $ choice [assign, try expression, if', match, return', while, var]
+ast :: Parser [AST ()]
+ast = many $ choice [assign, try expression, if', match, return', while, var]
 
 assign :: Parser (AST ())
 assign = do
     left <- try $ leftOfAssignment <* void (lexeme (char '='))
     right <- expression0
     endl
-    next <- ast
-    pure $ Assign left right next
+    pure $ Assign left right
   where
     leftOfAssignment = secondary =<< variable
 
 expression :: Parser (AST ())
-expression = liftA2 Expression (expression0 <* endl) ast
+expression = Expression <$> (expression0 <* endl)
 
 if' :: Parser (AST ())
 if' = do
     symbol "if"
     cond <- expression0
     trueBranch <- brackets ast
-    falseBranch <- option End (symbol "else" *> (brackets ast <|> if'))
-    next <- ast
-    pure $ If cond trueBranch falseBranch next
+    falseBranch <- option [] (symbol "else" *> (brackets ast <|> pure <$> if'))
+    pure $ If cond trueBranch falseBranch
 
 match :: Parser (AST ())
 match = do
     symbol "match"
     cond <- expression0
     pats <- brackets $ flip sepEndBy (lexeme (char ',')) $ liftA2 Branch pattern (brackets ast)
-    next <- ast
-    pure $ Match cond pats next
+    pure $ Match cond pats
 
 return' :: Parser (AST ())
 return' = Return <$> (symbol "return" *> optional expression0 <* endl)
@@ -419,16 +397,14 @@ var = do
     void (lexeme (char '='))
     value' <- expression0
     endl
-    next <- ast
-    pure $ Var name type' value' next
+    pure $ Var name type' value'
 
 while :: Parser (AST ())
 while = do
     symbol "while"
     cond <- expression0
     loop <- brackets ast
-    next <- ast
-    pure $ While cond loop next
+    pure $ While cond loop
 
 pattern :: Parser MatchPattern
 pattern = choice [structureP, literalP, nameP]

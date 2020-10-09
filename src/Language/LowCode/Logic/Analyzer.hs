@@ -261,16 +261,6 @@ collect mod' = do
     funcs = Map.fromList $ getFuncNameType <$> functions mod'
     getFuncNameType (Function n t _ _) = (n, (n, t))
 
-algebraicToFunctions :: Map Name [Constructor Type] -> Analyzer e' (Map Name VariableInfo)
-algebraicToFunctions = fmap Map.unions . Traversable.traverse (addVars . Map.mapWithKey (,)) . Map.elems . Map.mapWithKey fromConstructors
-  where
-    fromConstructors adtName constructors =
-        Map.fromList (map (fromConstructor adtName) constructors)
-
-    fromConstructor adtName (Constructor _adtName cName cType) = case cType of
-        Nothing     -> (cName, AlgebraicType adtName)
-        Just cType' -> (cName, FunctionType [cType'] (AlgebraicType adtName))
-
 analyzeImpl :: Map Name (ModuleImports e) -> Analyzer e (Map Name (ModuleImports Type))
 analyzeImpl mods = forM mods \(ModuleImports _ imports root) -> do
     analyzed <- gets modulesAnalyzedSoFar
@@ -309,15 +299,15 @@ analyze' mods = fmap getMods . analyzeImpl =<< linkModules mods
     go (ModuleImports _ ms m) acc = Map.insert (moduleName m) m (Map.union acc (getMods ms))
 
 analyzeFunction :: Function e -> Analyzer e' (Function Type)
-analyzeFunction (Function name (FunctionType argTypes ret) arguments next) = do
+analyzeFunction (Function name (FunctionType argTypes ret) arguments body) = do
     let nArgs = length arguments
         nTypes = length argTypes
     when (nArgs /= nTypes) $
         addError $ IncompatibleSignatures name nArgs nTypes
-    ast <- withScope do
+    asts <- withScope do
         void (addVars (zip arguments argTypes))
-        withAnalyzerT id (\s -> s { returnType = ret }) (analyzeAst next)
-    pure $ Function name (FunctionType argTypes ret) arguments ast
+        withAnalyzerT id (\s -> s { returnType = ret }) (analyzeAsts body)
+    pure $ Function name (FunctionType argTypes ret) arguments asts
 analyzeFunction (Function name _ _ _) = fatalError (NotAFunction name)
 
 analyzeReturn :: Maybe (Expression e) -> Analyzer e' (Expression Type)
@@ -402,35 +392,37 @@ analyzeMatch expr branches = do
     branches' <- traverse (go exprWithMetadata) branches
     pure (exprWithMetadata, branches')
   where
-    go e (Branch p a) = withScope do
+    go e (Branch p as) = withScope do
         infos <- analyzePattern (getMetadata e) p
         modify \s -> s { analyzerSymbols = Map.union infos (analyzerSymbols s) }
-        Branch p <$> analyzeAst a
+        Branch p <$> analyzeAsts as
+
+analyzeAsts :: [AST e] -> Analyzer e' [AST Type]
+analyzeAsts = traverse analyzeAst
 
 analyzeAst :: AST e -> Analyzer e' (AST Type)
 analyzeAst = \case
-    Assign left right next -> do
+    Assign left right -> do
         (left', right') <- analyzeAssign left right
-        Assign left' right' <$> analyzeAst next
-    End -> pure End
-    Expression expr next -> Expression <$> analyzeExpr expr <*> analyzeAst next
-    If cond true false next -> do
+        pure $ Assign left' right'
+    Expression expr -> Expression <$> analyzeExpr expr
+    If cond true false -> do
         cond' <- analyzeExprWithHint boolType cond
         checkTypes "if" boolType (getMetadata cond')
-        true'  <- withScope $ analyzeAst true
-        false' <- withScope $ analyzeAst false
-        If cond' true' false' <$> analyzeAst next
-    Match expr branches next -> do
+        true'  <- withScope $ analyzeAsts true
+        false' <- withScope $ analyzeAsts false
+        pure $ If cond' true' false'
+    Match expr branches -> do
         (expr', branches') <- analyzeMatch expr branches
-        Match expr' branches' <$> analyzeAst next
+        pure $ Match expr' branches'
     Return exprMaybe -> Return <$> (Just <$> analyzeReturn exprMaybe)
-    Var var type' expr next -> do
-        Var var type' <$> analyzeVar var type' expr <*> analyzeAst next
-    While cond body next -> do
+    Var var type' expr -> do
+        Var var type' <$> analyzeVar var type' expr
+    While cond body -> do
         cond' <- analyzeExprWithHint boolType cond
         checkTypes "while" boolType (getMetadata cond')
-        body' <- withScope $ analyzeAst body
-        While cond' body' <$> analyzeAst next
+        body' <- withScope $ analyzeAsts body
+        pure $ While cond' body'
 
 analyzeExpr :: Expression e -> Analyzer e' (Expression Type)
 analyzeExpr = \case
