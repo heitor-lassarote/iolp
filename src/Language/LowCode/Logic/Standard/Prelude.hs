@@ -15,9 +15,10 @@ import qualified Data.Map.Strict as Map
 
 import Language.LowCode.Logic.AST
 import Language.LowCode.Logic.Module
+import Language.LowCode.Logic.Structure
 import Language.LowCode.Logic.Type
 
-prelude :: Module () ()
+prelude :: Module e
 prelude = Module
     { adtTemplates = Map.unions
         [ bool
@@ -36,16 +37,16 @@ boolType = AlgebraicType "Bool"
 falseConstructor :: Constructor e
 falseConstructor = Constructor "Bool" "False" Nothing
 
-false :: Structure Type
-false = Algebraic boolType falseConstructor
+false :: Structure e
+false = Algebraic falseConstructor
 
 trueConstructor :: Constructor e
 trueConstructor = Constructor "Bool" "True" Nothing
 
-true :: Structure Type
-true = Algebraic boolType trueConstructor
+true :: Structure e
+true = Algebraic trueConstructor
 
-bool :: Map Name [Constructor Type]
+bool :: Map Name [Constructor e]
 bool = Map.singleton "Bool" [falseConstructor, trueConstructor]
 
 unitType :: Type
@@ -54,8 +55,8 @@ unitType = AlgebraicType "Unit"
 unitConstructor :: Constructor e
 unitConstructor = Constructor "Unit" "Unit" Nothing
 
-unit' :: Structure Type
-unit' = Algebraic unitType unitConstructor
+unit' :: Structure e
+unit' = Algebraic unitConstructor
 
-unit :: Map Name [Constructor Type]
+unit :: Map Name [Constructor e]
 unit = Map.singleton "Unit" [unitConstructor]

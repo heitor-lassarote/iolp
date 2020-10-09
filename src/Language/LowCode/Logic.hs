@@ -12,13 +12,9 @@ module Language.LowCode.Logic
     , module Language.LowCode.Logic.JavaScriptConverter
     , module Language.LowCode.Logic.Module
     , module Language.LowCode.Logic.Standard.Prelude
+    , module Language.LowCode.Logic.Structure
     , module Language.LowCode.Logic.Type
-    , Metadata (..)
     ) where
-
-import Universum
-
-import Data.Aeson
 
 import Language.LowCode.Logic.Analyzer
 import Language.LowCode.Logic.AST
@@ -26,9 +22,5 @@ import Language.LowCode.Logic.Error
 import Language.LowCode.Logic.JavaScriptConverter
 import Language.LowCode.Logic.Module
 import Language.LowCode.Logic.Standard.Prelude
+import Language.LowCode.Logic.Structure
 import Language.LowCode.Logic.Type
-
-newtype Metadata = Metadata
-    { position :: Double2
-    } deriving stock    (Eq, Generic, Ord, Show)
-      deriving anyclass (FromJSON, ToJSON)

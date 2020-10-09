@@ -2,13 +2,18 @@ module Language.LowCode.Logic.Type
     ( Type (..)
     , Field (..)
     , Constructor (..)
+    , typeName
     ) where
 
-import Universum hiding (Type)
+import Universum hiding (Type, try)
 
 import Data.Aeson
+import Text.Megaparsec
+import Text.Megaparsec.Char
 
 import Language.Common (Name)
+import Language.LowCode.Logic.Parser
+import Language.LowCode.Logic.Structure
 import Utility (withTag)
 
 data Type
@@ -56,13 +61,23 @@ instance ToJSON Type where
             ]
         TextType -> withTag "text" []
 
-data Field a = Field
-    { fieldName  :: !Name
-    , fieldValue :: !a
-    } deriving (Eq, Functor, Generic, Ord, Show, FromJSON, ToJSON)
+typeName :: Parser Type
+typeName = try tupleFunc <|> funcOrType
+  where
+    types = choice
+        [ TextType      <$  symbol "Text"
+        , RecordType    <$> record typeName
+        , IntegerType   <$  symbol "Integer"
+        , DoubleType    <$  symbol "Double"
+        , CharType      <$  symbol "Char"
+        , ArrayType     <$> braces typeName
+        , AlgebraicType <$> variableName
+        ]
 
-data Constructor a = Constructor
-    { constructorAdt   :: !Name
-    , constructorName  :: !Name
-    , constructorValue :: !(Maybe a)
-    } deriving (Eq, Functor, Generic, Ord, Show, FromJSON, ToJSON)
+    right = symbol "->" *> typeName
+
+    funcOrType = do
+        left <- parenthesis typeName <|> types
+        pure . maybe left (FunctionType [left]) =<< optional right
+
+    tupleFunc = liftA2 FunctionType (tuple typeName) right

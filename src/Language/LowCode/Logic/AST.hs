@@ -5,11 +5,11 @@ module Language.LowCode.Logic.AST
     , Constructor (..)
     , Function (..)
     , MatchPattern (..)
+    , Branch (..)
     , patternToExpr
     , AST (..)
     , Expression (..)
     , Literal (..)
-    , Structure (..)
     , parseFunction
     , function
     , parseAst
@@ -38,178 +38,156 @@ import           Language.Codegen
 import           Language.Common
 import           Language.Emit
 import           Language.LowCode.Logic.Parser
+import           Language.LowCode.Logic.Structure
 import           Language.LowCode.Logic.Type
 import           Utility (biject, withTag)
 
 class HasMetadata f where
     getMetadata  :: f a -> a
 
-data Function exprMetadata metadata
-    = Function !metadata !Name !Type ![Name] !(AST exprMetadata metadata)
+data Function exprMetadata
+    = Function !Name !Type ![Name] !(AST exprMetadata)
     deriving (Eq, Functor, Show)
 
-instance (FromJSON metadata) => FromJSON (Function () metadata) where
+instance FromJSON (Function ()) where
     parseJSON = withObject "Language.LowCode.Logic.AST.Function" \o ->
-        Function <$> o .: "metadata"
-                 <*> o .: "name"
+        Function <$> o .: "name"
                  <*> o .: "type"
                  <*> o .: "arguments"
                  <*> o .: "body"
 
-instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (Function expressionMetadata metadata) where
-    toJSON (Function metadata name returnType arguments body) = object
-        [ "metadata"  .= metadata
-        , "name"      .= String name
+instance ToJSON (Function expressionMetadata) where
+    toJSON (Function name returnType arguments body) = object
+        [ "name"      .= String name
         , "type"      .= returnType
         , "arguments" .= arguments
         , "body"      .= body
         ]
 
 data MatchPattern
-    = AlgebraicPattern !(Constructor MatchPattern)
-    | ArrayPattern ![MatchPattern]
-    | LiteralPattern !Literal
+    = LiteralPattern !Literal
     | NamePattern !Name
-    | RecordPattern ![Field MatchPattern]
+    | StructurePattern !(Structure MatchPattern)
     deriving (Eq, Show)
 
 instance FromJSON MatchPattern where
     parseJSON = withObject "Language.LowCode.Logic.AST.MatchPattern" \o -> o .: "tag" >>= \case
-        "adt"     -> AlgebraicPattern <$> o .: "constructor"
-        "array"   -> ArrayPattern     <$> o .: "positions"
-        "literal" -> LiteralPattern   <$> o .: "value"
-        "name"    -> NamePattern      <$> o .: "name"
-        "record"  -> RecordPattern    <$> o .: "fields"
+        "literal"   -> LiteralPattern   <$> o .: "value"
+        "name"      -> NamePattern      <$> o .: "name"
+        "structure" -> StructurePattern <$> o .: "struct"
         other     -> fail $
-            "Expected 'adt', 'array', 'default', 'literal' or 'record', but got\
-            \ '" <> other <> "'."
+            "Expected 'literal', 'name' or 'structure', but got '" <> other <> "'."
 
 instance ToJSON MatchPattern where
     toJSON = \case
-        AlgebraicPattern constructor -> withTag "adt" ["constructor" .= constructor]
-        ArrayPattern positions -> withTag "array" ["positions" .= positions]
         LiteralPattern value' -> withTag "literal" ["value" .= value']
         NamePattern name -> withTag "name" ["name" .= name]
-        RecordPattern fields -> withTag "record" ["fields" .= fields]
+        StructurePattern struct -> withTag "structure" ["struct" .= struct]
 
 patternToExpr :: MatchPattern -> Expression ()
 patternToExpr = \case
-    AlgebraicPattern constructor -> Structure () $ Algebraic () (patternToExpr <$> constructor)
-    ArrayPattern positions -> Structure () $ Array () (patternToExpr <$> positions)
     LiteralPattern lit -> Literal () lit
     NamePattern name -> Variable () name
-    RecordPattern fields -> Structure () $ Record () (patternToExpr <<$>> fields)
+    StructurePattern struct -> Structure () (patternToExpr <$> struct)
 
-data AST exprMetadata metadata
-    -- | Assigns a new value to the first expression, and what follows after.
-    = Assign !metadata !(Expression exprMetadata) !(Expression exprMetadata) !(AST exprMetadata metadata)
-    -- | Represents the end of a cycle.
-    | End !metadata
-    -- | Executes a raw expression. Useful for Call.
-    | Expression !metadata !(Expression exprMetadata) !(AST exprMetadata metadata)
-    -- | Allows a condition to be tested, and contains the true branch, false
-    -- branch and what follows after the branches.
-    | If !metadata !(Expression exprMetadata) !(AST exprMetadata metadata) !(AST exprMetadata metadata) !(AST exprMetadata metadata)
-    -- | Represents a match pattern, similar to a "case of" or a "switch" structure.
-    | Match !metadata !(Expression exprMetadata) ![(MatchPattern, AST exprMetadata metadata)] !(AST exprMetadata metadata)
-    -- | Exits the function, optionally returning a value.
-    | Return !metadata !(Maybe (Expression exprMetadata))
-    -- | Declares a variable with the specified name and type, followed by the
-    -- remainder of the cycle.
-    | Var !metadata !Name !Type !(Expression exprMetadata) !(AST exprMetadata metadata)
-    -- | Represents a condition which should be run while a predicate is not
-    -- met, followed by the remainder of the cycle.
-    | While !metadata !(Expression exprMetadata) !(AST exprMetadata metadata) !(AST exprMetadata metadata)
+data Branch exprMetadata
+    = Branch MatchPattern (AST exprMetadata)
     deriving (Eq, Functor, Show)
 
-instance HasMetadata (AST expressionMetadata) where
-    getMetadata = \case
-        Assign m _ _ _ -> m
-        End m -> m
-        Expression m _ _ -> m
-        If m _ _ _ _ -> m
-        Match m _ _ _ -> m
-        Return m _ -> m
-        Var m _ _ _ _ -> m
-        While m _ _ _ -> m
+instance FromJSON (Branch ()) where
+    parseJSON = withObject "Language.LowCode.Logic.AST.Branch" \o ->
+        Branch <$> o .: "pattern"
+               <*> o .: "ast"
 
-instance (FromJSON metadata) => FromJSON (AST () metadata) where
+instance ToJSON (Branch exprMetadata) where
+    toJSON (Branch p a) = object
+        [ "pattern" .= p
+        , "ast"     .= a
+        ]
+
+data AST exprMetadata
+    -- | Assigns a new value to the first expression, and what follows after.
+    = Assign !(Expression exprMetadata) !(Expression exprMetadata) !(AST exprMetadata)
+    -- | Represents the end of a cycle.
+    | End
+    -- | Executes a raw expression. Useful for Call.
+    | Expression !(Expression exprMetadata) !(AST exprMetadata)
+    -- | Allows a condition to be tested, and contains the true branch, false
+    -- branch and what follows after the branches.
+    | If !(Expression exprMetadata) !(AST exprMetadata) !(AST exprMetadata) !(AST exprMetadata)
+    -- | Represents a match pattern, similar to a "case of" or a "switch" structure.
+    | Match !(Expression exprMetadata) ![Branch exprMetadata] !(AST exprMetadata)
+    -- | Exits the function, optionally returning a value.
+    | Return !(Maybe (Expression exprMetadata))
+    -- | Declares a variable with the specified name and type, followed by the
+    -- remainder of the cycle.
+    | Var !Name !Type !(Expression exprMetadata) !(AST exprMetadata)
+    -- | Represents a condition which should be run while a predicate is not
+    -- met, followed by the remainder of the cycle.
+    | While !(Expression exprMetadata) !(AST exprMetadata) !(AST exprMetadata)
+    deriving (Eq, Functor, Show)
+
+instance FromJSON (AST ()) where
     parseJSON = withObject "Language.LowCode.Logic.AST.AST" \o -> o .: "tag" >>= \case
-        "assign"      -> Assign     <$> o .: "metadata"
-                                    <*> o .: "leftExpression"
+        "assign"      -> Assign     <$> o .: "leftExpression"
                                     <*> o .: "rightExpression"
                                     <*> o .: "nextAst"
-        "end"         -> End        <$> o .: "metadata"
-        "expression"  -> Expression <$> o .: "metadata"
-                                    <*> o .: "expression"
+        "end"         -> pure End
+        "expression"  -> Expression <$> o .: "expression"
                                     <*> o .: "nextAst"
-        "if"          -> If         <$> o .: "metadata"
-                                    <*> o .: "expression"
+        "if"          -> If         <$> o .: "expression"
                                     <*> o .: "trueBranchAst"
                                     <*> o .: "falseBranchAst"
                                     <*> o .: "nextAst"
-        "match"       -> Match      <$> o .: "metadata"
-                                    <*> o .: "expression"
+        "match"       -> Match      <$> o .: "expression"
                                     <*> o .: "branches"
                                     <*> o .: "nextAst"
-        "return"      -> Return     <$> o .: "metadata"
-                                    <*> o .: "expression"
-        "var"         -> Var        <$> o .: "metadata"
-                                    <*> o .: "name"
+        "return"      -> Return     <$> o .: "expression"
+        "var"         -> Var        <$> o .: "name"
                                     <*> o .: "type"
                                     <*> o .: "expression"
                                     <*> o .: "nextAst"
-        "while"       -> While      <$> o .: "metadata"
-                                    <*> o .: "expression"
+        "while"       -> While      <$> o .: "expression"
                                     <*> o .: "whileAst"
                                     <*> o .: "nextAst"
         other         -> fail $
             "Unknown tag '" <> other <> "'. Available tags are: 'assign', 'end',\
             \ 'expression', 'if', 'match', 'return', 'start', 'var' and 'while'."
 
-instance (ToJSON expressionMetadata, ToJSON metadata) => ToJSON (AST expressionMetadata metadata) where
+instance ToJSON (AST expressionMetadata) where
     toJSON = \case
-        Assign metadata left right next -> withTag "assign"
-            [ "metadata"        .= metadata
-            , "leftExpression"  .= left
+        Assign left right next -> withTag "assign"
+            [ "leftExpression"  .= left
             , "rightExpression" .= right
             , "nextAst"         .= next
             ]
-        End metadata -> withTag "end"
-            [ "metadata"        .= metadata
-            ]
-        Expression metadata expr next -> withTag "expression"
-            [ "metadata"        .= metadata
-            , "expression"      .= expr
+        End -> withTag "end" []
+        Expression expr next -> withTag "expression"
+            [ "expression"      .= expr
             , "nextAst"         .= next
             ]
-        If metadata expr true false next -> withTag "if"
-            [ "metadata"        .= metadata
-            , "expression"      .= expr
+        If expr true false next -> withTag "if"
+            [ "expression"      .= expr
             , "trueBranchAst"   .= true
             , "falseBranchAst"  .= false
             , "nextAst"         .= next
             ]
-        Match metadata expr branches next -> withTag "match"
-            [ "metadata"        .= metadata
-            , "expression"      .= expr
+        Match expr branches next -> withTag "match"
+            [ "expression"      .= expr
             , "branches"        .= branches
             , "nextAst"         .= next
             ]
-        Return metadata expr -> withTag "return"
-            [ "metadata"        .= metadata
-            , "expression"      .= expr
+        Return expr -> withTag "return"
+            [ "expression"      .= expr
             ]
-        Var metadata name type' expr next -> withTag "var"
-            [ "metadata"        .= metadata
-            , "name"            .= name
+        Var name type' expr next -> withTag "var"
+            [ "name"            .= name
             , "type"            .= type'
             , "expression"      .= expr
             , "nextAst"         .= next
             ]
-        While metadata expr body next -> withTag "while"
-            [ "metadata"        .= metadata
-            , "expression"      .= expr
+        While expr body next -> withTag "while"
+            [ "expression"      .= expr
             , "whileAst"        .= body
             , "nextAst"         .= next
             ]
@@ -233,7 +211,7 @@ data Expression metadata
     | Index !metadata !(Expression metadata) !(Expression metadata)
     | Literal !metadata !Literal
     | Parenthesis !metadata !(Expression metadata)
-    | Structure !metadata !(Structure metadata)
+    | Structure !metadata !(Structure (Expression metadata))
     | UnaryOp !metadata !UnarySymbol !(Expression metadata)
     | Variable !metadata !Name
     deriving (Eq, Functor, Show)
@@ -363,56 +341,6 @@ instance ToJSON Literal where
         Integer i -> withTag "integer" ["value" .= i]
         Text t -> withTag "text" ["value" .= t]
 
-data Structure metadata
-    = Algebraic !metadata !(Constructor (Expression metadata))
-    | Array !metadata ![Expression metadata]
-    | Record !metadata ![Field (Expression metadata)]
-    deriving (Eq, Functor, Show)
-
-instance HasMetadata Structure where
-    getMetadata = \case
-        Algebraic m _ -> m
-        Array m _ -> m
-        Record m _ -> m
-
-instance Codegen (Structure metadata) where
-    type GeneratorState (Structure metadata) = ()
-
-    codegen = \case
-        Algebraic _ constructor -> codegenAlgebraic constructor
-        Array _ a -> emitBetween' "[" "]" $ a `separatedBy'` ", "
-        Record _ fs -> codegenRecord fs
-      where
-        codegenAlgebraic (Constructor adtName name value') = mconcat <$> sequence
-            [ emitM adtName
-            , emitM "::"
-            , emitM name
-            , maybe (emitM "") (emitBetween' "(" ")" . codegen) value'
-            ]
-
-        codegenField (Field fieldName expr) = mconcat <$> sequence
-            [ emitM fieldName
-            , emitM " = "
-            , codegen expr
-            ]
-
-        codegenRecord fields =
-            emitBetween' "{" "}" $ separatedByF codegenField (emit ", ") fields
-
-instance FromJSON (Structure ()) where
-    parseJSON = withObject "Language.LowCode.Logic.AST.Structure" \o -> o .: "tag" >>= \case
-        "adt"    -> Algebraic () <$> o .: "constructor"
-        "array"  -> Array     () <$> o .: "positions"
-        "record" -> Record    () <$> o .: "fields"
-        other    -> fail $
-            "Expected 'adt', 'array' or 'record', but got '" <> other <> "'."
-
-instance ToJSON (Structure metadata) where
-    toJSON = \case
-        Algebraic _ constructor -> withTag "adt" ["constructor" .= constructor]
-        Array _ a -> withTag "array" ["positions" .= a]
-        Record _ fields -> withTag "record" ["fields" .= fields]
-
 data Associativity = LeftAssoc | RightAssoc deriving (Eq, Show)
 
 type Precedence = Int
@@ -422,72 +350,69 @@ data Operator = Operator
     , precedence    :: !Precedence
     } deriving (Eq, Show)
 
-parseFunction :: Text -> Either Text (Function () ())
+parseFunction :: Text -> Either Text (Function ())
 parseFunction = parse' function
 
-function :: Parser (Function () ())
+function :: Parser (Function ())
 function = label "function declaration" (try function' <|> functionSugar)
 
-function' :: Parser (Function () ())
+function' :: Parser (Function ())
 function' = do
     type' <- typeName
     name <- variableName
     args <- tuple variableName
     body <- brackets ast
-    pure $ Function () name type' args body
+    pure $ Function name type' args body
 
-functionSugar :: Parser (Function () ())
+functionSugar :: Parser (Function ())
 functionSugar = do
     name <- variableName
     (types, args) <- unzip <$> tuple (liftA2 (,) typeName variableName)
     symbol "->"
     ret <- typeName
     body <- brackets ast
-    pure $ Function () name (FunctionType types ret) args body
+    pure $ Function name (FunctionType types ret) args body
 
-parseAst :: Text -> Either Text (AST () ())
+parseAst :: Text -> Either Text (AST ())
 parseAst = parse' ast
 
-ast :: Parser (AST () ())
-ast = option (End ()) $ choice [assign, try expression, if', match, return', while, var]
+ast :: Parser (AST ())
+ast = option End $ choice [assign, try expression, if', match, return', while, var]
 
-assign :: Parser (AST () ())
+assign :: Parser (AST ())
 assign = do
     left <- try $ leftOfAssignment <* void (lexeme (char '='))
     right <- expression0
     endl
     next <- ast
-    pure $ Assign () left right next
+    pure $ Assign left right next
   where
     leftOfAssignment = secondary =<< variable
 
-expression :: Parser (AST () ())
-expression = liftA2 (Expression ()) (expression0 <* endl) ast
+expression :: Parser (AST ())
+expression = liftA2 Expression (expression0 <* endl) ast
 
-if' :: Parser (AST () ())
+if' :: Parser (AST ())
 if' = do
     symbol "if"
     cond <- expression0
     trueBranch <- brackets ast
-    falseBranch <- option (End ()) (symbol "else" *> (brackets ast <|> if'))
+    falseBranch <- option End (symbol "else" *> (brackets ast <|> if'))
     next <- ast
-    pure $ If () cond trueBranch falseBranch next
+    pure $ If cond trueBranch falseBranch next
 
-match :: Parser (AST () ())
+match :: Parser (AST ())
 match = do
     symbol "match"
     cond <- expression0
-    pats <- brackets $ flip sepEndBy (lexeme (char ',')) do
-        pat <- pattern
-        branch <- brackets ast
-        pure (pat, branch)
+    pats <- brackets $ flip sepEndBy (lexeme (char ',')) $ liftA2 Branch pattern (brackets ast)
     next <- ast
-    pure $ Match () cond pats next
+    pure $ Match cond pats next
 
-return' :: Parser (AST () ())
-return' = Return () <$> (symbol "return" *> optional expression0 <* endl)
+return' :: Parser (AST ())
+return' = Return <$> (symbol "return" *> optional expression0 <* endl)
 
-var :: Parser (AST () ())
+var :: Parser (AST ())
 var = do
     type' <- typeName
     name <- variableName
@@ -495,24 +420,22 @@ var = do
     value' <- expression0
     endl
     next <- ast
-    pure $ Var () name type' value' next
+    pure $ Var name type' value' next
 
-while :: Parser (AST () ())
+while :: Parser (AST ())
 while = do
     symbol "while"
     cond <- expression0
     loop <- brackets ast
     next <- ast
-    pure $ While () cond loop next
+    pure $ While cond loop next
 
 pattern :: Parser MatchPattern
-pattern = choice [algebraicP, arrayP, literalP, nameP, recordP]
+pattern = choice [structureP, literalP, nameP]
   where
-    algebraicP = AlgebraicPattern <$> algebraic pattern
-    arrayP = ArrayPattern <$> array pattern
     literalP = LiteralPattern <$> literal
     nameP = NamePattern <$> variableName
-    recordP = RecordPattern <$> record pattern
+    structureP = StructurePattern <$> structure pattern
 
 literal :: Parser Literal
 literal = choice
@@ -618,14 +541,7 @@ integer = lexeme do
         | otherwise           = error $ "Panic in integer: Unknown digit: " <> Text.singleton c
 
 value :: Parser (Expression ())
-value = structure <|> Literal () <$> literal <|> variable
-
-structure :: Parser (Expression ())
-structure = Structure () <$> choice
-    [ Algebraic () <$> algebraic expression0
-    , Array     () <$> array expression0
-    , Record    () <$> record expression0
-    ]
+value = Structure () <$> structure expression0 <|> Literal () <$> literal <|> variable
 
 variable :: Parser (Expression ())
 variable = Variable () <$> variableName

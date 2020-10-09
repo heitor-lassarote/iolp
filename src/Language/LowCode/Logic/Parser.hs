@@ -9,11 +9,7 @@ module Language.LowCode.Logic.Parser
     , parenthesis
     , braces
     , brackets
-    , algebraic
-    , array
-    , record
     , tuple
-    , typeName
     , variableName
     ) where
 
@@ -26,7 +22,6 @@ import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 
 import Language.Common (Name)
-import Language.LowCode.Logic.Type (Constructor (..), Field (..), Type (..))
 
 type Parser = Parsec Void Text
 
@@ -53,42 +48,8 @@ parenthesis = bracket '(' ')'
 braces      = bracket '[' ']'
 brackets    = bracket '{' '}'
 
-algebraic :: Parser a -> Parser (Constructor a)
-algebraic p = liftA3 Constructor (try (variableName <* symbol "::")) variableName (optional $ parenthesis p)
-
-array :: Parser a -> Parser [a]
-array p = braces (p `sepEndBy` lexeme (char ','))
-
-record :: Parser a -> Parser [Field a]
-record p = try $ brackets $ flip sepBy (lexeme (char ',')) do
-    fieldName <- variableName
-    void (lexeme (char ':'))
-    value' <- p
-    pure $ Field fieldName value'
-
 tuple :: Parser a -> Parser [a]
 tuple p = parenthesis (p `sepBy` lexeme (char ','))
-
-typeName :: Parser Type
-typeName = try tupleFunc <|> funcOrType
-  where
-    types = choice
-        [ TextType      <$  symbol "Text"
-        , RecordType    <$> record typeName
-        , IntegerType   <$  symbol "Integer"
-        , DoubleType    <$  symbol "Double"
-        , CharType      <$  symbol "Char"
-        , ArrayType     <$> braces typeName
-        , AlgebraicType <$> variableName
-        ]
-
-    right = symbol "->" *> typeName
-
-    funcOrType = do
-        left <- parenthesis typeName <|> types
-        pure . maybe left (FunctionType [left]) =<< optional right
-
-    tupleFunc = liftA2 FunctionType (tuple typeName) right
 
 variableName :: Parser Name
 variableName = lexeme do

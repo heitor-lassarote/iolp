@@ -12,7 +12,7 @@ unsafeRight :: Either a b -> b
 unsafeRight (Left  _) = error "fromRight called with Left."
 unsafeRight (Right b) = b
 
-moduleJson :: Module () ()
+moduleJson :: Module ()
 moduleJson = unsafeRight $ parseModule [r|
 module JSON
 

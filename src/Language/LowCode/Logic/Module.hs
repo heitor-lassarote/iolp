@@ -14,17 +14,17 @@ import           Text.Megaparsec.Char
 import Language.Common (Name)
 import Language.LowCode.Logic.AST (Constructor, Function, function)
 import Language.LowCode.Logic.Parser
-import Language.LowCode.Logic.Type (Constructor (..), Type)
+import Language.LowCode.Logic.Type (Constructor (..), Type, typeName)
 
-data Module exprMetadata astMetadata = Module
+data Module exprMetadata = Module
     { adtTemplates    :: !(Map Name [Constructor Type])
     , externs         :: !(Map Name Type)
-    , functions       :: ![Function exprMetadata astMetadata]
+    , functions       :: ![Function exprMetadata]
     , importedModules :: ![Name]
     , moduleName      :: !Name
     } deriving (Eq, Generic, Show, ToJSON)
 
-instance (FromJSON astMetadata) => FromJSON (Module () astMetadata) where
+instance FromJSON (Module ()) where
     parseJSON = withObject "Language.LowCode.Logic.Module.Module" \o ->
         Module <$> o .: "adtTemplates"
                <*> o .: "externs"
@@ -32,13 +32,13 @@ instance (FromJSON astMetadata) => FromJSON (Module () astMetadata) where
                <*> o .: "importedModules"
                <*> o .: "moduleName"
 
-mkModule :: Name -> Module exprMetadata astMetadata
+mkModule :: Name -> Module exprMetadata
 mkModule name = Module Map.empty Map.empty [] [] name
 
-parseModule :: Text -> Either Text (Module () ())
+parseModule :: Text -> Either Text (Module ())
 parseModule = parse' module'
 
-module' :: Parser (Module () ())
+module' :: Parser (Module ())
 module' = do
     name <- label "module name" (symbol "module" *> variableName)
     imports' <- imports
@@ -54,9 +54,9 @@ import' = label "module import" (symbol "import" *> variableName <* endl)
 data Decl
     = AlgebraicDecl (Name, [Constructor Type])
     | ExternDecl (Type, Name)
-    | FunctionDecl (Function () ())
+    | FunctionDecl (Function ())
 
-topLevelDeclarations :: Parser (Map Name [Constructor Type], Map Name Type, [Function () ()])
+topLevelDeclarations :: Parser (Map Name [Constructor Type], Map Name Type, [Function ()])
 topLevelDeclarations = label "top level declaration" do
     decls <- many $ choice [AlgebraicDecl <$> adt, ExternDecl <$> try extern, FunctionDecl <$> function]
     pure $ partitionDecls decls

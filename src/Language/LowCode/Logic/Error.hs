@@ -77,7 +77,7 @@ prettyError = \case
         ("Record does not have the required fields: " % shown % ".")
         (name : names)
     NoSuchConstructor adtName cName -> sformat
-        ("Could not find ADT containing a constuctor called '" % stext % "'.")
+        ("Could not find ADT containing a constuctor called " % stext % ".")
         (prettyAdt adtName cName)
     NoSuchModule name -> sformat ("Could not find module '" % stext % "'.") name
     -- TODO: Add types/expressions being applied? And maybe the inferred type?

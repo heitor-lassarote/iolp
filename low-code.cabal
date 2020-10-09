@@ -136,6 +136,7 @@ library
     , Language.LowCode.Logic.Parser
     , Language.LowCode.Logic.Standard.JSON
     , Language.LowCode.Logic.Standard.Prelude
+    , Language.LowCode.Logic.Structure
     , Language.LowCode.Logic.Type
     , Language.LowCode.UI
     , Language.LowCode.UI.AST

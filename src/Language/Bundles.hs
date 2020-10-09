@@ -55,7 +55,7 @@ mkBundleZip tempFolderName name files = do
 data PageCssHtmlLogic = PageCssHtmlLogic
     { css   :: !CSS.AST
     , html  :: ![HTML.AST]
-    , logic :: ![L.Module () L.Metadata]
+    , logic :: ![L.Module ()]
     , name  :: !Name
     } deriving (Generic, FromJSON, ToJSON)
 
@@ -64,7 +64,7 @@ data BundleCssHtmlLogic = BundleCssHtmlLogic
     , extraJsFiles :: !(Map Name Text)
     , htmlOptions  :: !HTML.Options
     , jsOptions    :: !JS.Options
-    , mainModule   :: !(L.Module () L.Metadata)
+    , mainModule   :: !(L.Module ())
     , pages        :: ![PageCssHtmlLogic]
     } deriving (Generic, ToJSON)
 
@@ -113,7 +113,7 @@ instance Bundle BundleCssHtmlLogic where
 
         linkHtml
             :: (Emit gen, Monoid gen)
-            => Map Name (L.Module L.Type a)
+            => Map Name (L.Module L.Type)
             -> Map Name [L.Warning]
             -> PageCssHtmlLogic
             -> Either GeneratedFail [GeneratedSuccess gen]
@@ -137,7 +137,7 @@ instance Bundle BundleCssHtmlLogic where
                       (\f -> GeneratedSuccess f (toString $ jsName n) w)
                       gen
             fst3 (a, _, _) = a
-            genLogic = evalCodegenT (JS.withOptions jsOptions) . codegen . (convert :: L.Module L.Type a -> JS.Module)
+            genLogic = evalCodegenT (JS.withOptions jsOptions) . codegen . (convert :: L.Module L.Type -> JS.Module)
             modulesAndErrors =
                 Map.Merge.merge
                     (Map.Merge.mapMissing \n m -> (n, first pure $ genLogic m, []))
