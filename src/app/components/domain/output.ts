@@ -95,11 +95,10 @@ export class Function {
     name: string;
     type: Type;
     arguments: string[];
-    body: AST;
+    body: AST[];
 }
 
 export abstract class AST {
-    metadata: any = [];
     tag: string;
 }
 
@@ -107,7 +106,6 @@ export class Assign extends AST {
     tag = "assign";
     leftExpression: Expression;
     rightExpression: Expression;
-    nextAst: AST;
 }
 
 export class End extends AST {
@@ -117,22 +115,19 @@ export class End extends AST {
 export class Expression_ extends AST {
     tag = "expression";
     expression: Expression;
-    nextAst: AST;
 }
 
 export class If extends AST {
     tag = "if";
     expression: Expression;
-    trueBranchAst: AST;
-    falseBranchAst: AST;
-    nextAst: AST;
+    trueBranchAst: AST[];
+    falseBranchAst: AST[];
 }
 
 export class Match extends AST {
     tag = "match";
     expression: Expression;
-    branches: [MatchPattern, AST][];
-    nextAst: AST;
+    branches: Branch[];
 }
 
 export class Return extends AST {
@@ -145,14 +140,17 @@ export class Var extends AST {
     name: string;
     type: Type;
     expression: Expression;
-    nextAst: AST;
 }
 
 export class While extends AST {
     tag = "while";
     expression: Expression;
-    whileAst: AST;
-    nextAST: AST;
+    whileAst: AST[];
+}
+
+export class Branch {
+    pattern: MatchPattern;
+    ast: AST[];
 }
 
 export abstract class MatchPattern {
@@ -160,16 +158,6 @@ export abstract class MatchPattern {
 }
 
 // FIXME: Change constructor_ to constructor.
-export class AlgebraicPattern extends MatchPattern {
-    tag = "adt";
-    constructor_: Constructor<MatchPattern>;
-}
-
-export class ArrayPattern extends MatchPattern {
-    tag = "array";
-    positions: MatchPattern[];
-}
-
 export class LiteralPattern extends MatchPattern {
     tag = "literal";
     value: Literal;
@@ -180,9 +168,9 @@ export class NamePattern extends MatchPattern {
     name: string;
 }
 
-export class RecordPattern extends MatchPattern {
-    tag = "record";
-    fields: Field<MatchPattern>[];
+export class StructurePattern extends MatchPattern {
+    tag = "structure";
+    struct: Structure<MatchPattern>;
 }
 
 export abstract class Expression {
@@ -239,7 +227,7 @@ export class Parenthesis extends Expression {
 
 export class Structure_ extends Expression {
     tag = "structure";
-    structure: Structure;
+    structure: Structure<Expression>;
 }
 
 // data UnarySymbol
@@ -280,22 +268,22 @@ export class Text extends Literal {
     value: string;
 }
 
-export abstract class Structure {
+export abstract class Structure<T> {
     tag: string;
 }
 
 // FIXME: Change constructor_ to constructor.
-export class Algebraic extends Structure {
+export class Algebraic<T> extends Structure<T> {
     tag = "adt";
-    constructor_: Constructor<Expression>;
+    constructor_: Constructor<T>;
 }
 
-export class Array extends Structure {
+export class Array<T> extends Structure<T> {
     tag = "array";
-    positions: Expression[];
+    positions: T[];
 }
 
-export class Record extends Structure {
+export class Record<T> extends Structure<T> {
     tag = "record";
-    fields: Field<Expression>[];
+    fields: Field<T>[];
 }
