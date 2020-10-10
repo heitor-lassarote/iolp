@@ -1,22 +1,29 @@
-<div class="row col-md-12 text-left m-b-md">
-    <button
-        type="button"
-        class="btn m-r-md tab-btn"
-        [class.btn-default]="isLogicContainer"
-        [class.btn-primary]="!isLogicContainer"
-        (click)="setLogicContainer(false)"
-    >
-        Interface
-    </button>
-    <button
-        type="button"
-        class="btn btn-default tab-btn"
-        [class.btn-default]="!isLogicContainer"
-        [class.btn-primary]="isLogicContainer"
-        (click)="setLogicContainer(true)"
-    >
-        Lógica
-    </button>
+<div class="row col-md-12 text-left m-b-md" style="padding-right: 0 !important">
+    <div class="col-md-6 text-left">
+        <button
+            type="button"
+            class="btn m-r-md tab-btn"
+            [class.btn-default]="isLogicContainer"
+            [class.btn-primary]="!isLogicContainer"
+            (click)="setLogicContainer(false)"
+        >
+            Interface
+        </button>
+        <button
+            type="button"
+            class="btn btn-default tab-btn"
+            [class.btn-default]="!isLogicContainer"
+            [class.btn-primary]="isLogicContainer"
+            (click)="setLogicContainer(true)"
+        >
+            Lógica
+        </button>
+    </div>
+    <div class="col-md-6 text-right" style="padding-right: 0 !important">
+        <button type="button" class="btn btn-primary tab-btn" (click)="apply()">
+            Aplicar
+        </button>
+    </div>
 </div>
 
 <div id="gui" class="col-md-12" *ngIf="!isLogicContainer">
@@ -34,14 +41,12 @@
                 (click)="click($event, $event.target)"
                 cdkDrag
                 cdkDragBoundary=".screen"
-                (cdkDragDropped)="onDrop($event)"
                 [id]="e.name"
             ></div>
             <button
                 *ngIf="e.type === 'button'"
                 class="btn btn-default draggable"
                 [id]="e.name"
-                (cdkDragEnded)="drop($event)"
                 (click)="click($event, $event.target)"
                 cdkDrag
                 cdkDragBoundary=".screen"
@@ -52,7 +57,6 @@
                 *ngIf="e.type === 'label'"
                 class="draggable"
                 [id]="e.name"
-                (cdkDragEnded)="drop($event)"
                 (click)="click($event, $event.target)"
                 cdkDrag
                 cdkDragBoundary=".screen"
@@ -81,7 +85,7 @@
                         <button
                             type="button"
                             class="btn btn-primary add-btn m-l-sm"
-                            (click)="addAction($event.target)"
+                            (click)="addAction()"
                         >
                             <i class="fa fa-plus"></i>
                         </button>
@@ -89,7 +93,10 @@
                 </div>
             </div>
             <div class="ibox-content">
-                <div class="ibox" *ngFor="let func of logicElements">
+                <div
+                    class="ibox"
+                    *ngFor="let func of logicElements; let funcIndex = index"
+                >
                     <div class="ibox-title inside-ibox">
                         <h5 class="func-name">Nome da função:</h5>
                         <input
@@ -97,6 +104,7 @@
                             style="width: 200px"
                             type="text"
                             [value]="func.funcName"
+                            [attr.readOnly]="func.readonly ? '' : null"
                         />
                         <div class="ibox-tools">
                             <div class="row-flex">
@@ -104,7 +112,6 @@
                                 <button
                                     type="button"
                                     class="btn btn-primary add-btn m-l-sm dropdown-toggle"
-                                    id="{{ func.funcName }}-btn"
                                     data-toggle="dropdown"
                                 >
                                     <i class="fa fa-plus"></i>
@@ -112,41 +119,42 @@
                                 <ul class="dropdown-menu create-item">
                                     <li
                                         (click)="
-                                            createItem(
-                                                $event.target.parentNode
-                                                    .parentNode.parentNode
-                                                    .childNodes[1],
-                                                'cl'
-                                            )
+                                            createItem(func.funcName, 'cl')
                                         "
                                     >
                                         <a> Linha de comando </a>
                                     </li>
-                                    <li>
+                                    <li *ngIf="funcIndex === 0">
                                         <a
                                             (click)="
-                                                createItem(
-                                                    $event.target.parentNode
-                                                        .parentNode.parentNode
-                                                        .childNodes[1],
-                                                    'evt'
-                                                )
+                                                createItem(func.funcName, 'evt')
                                             "
                                         >
                                             Evento
                                         </a>
                                     </li>
                                 </ul>
+
+                                <button
+                                    *ngIf="funcIndex !== 0"
+                                    class="m-l-md btn btn-remove"
+                                    (click)="removeFunc(funcIndex)"
+                                >
+                                    <i class="fa fa-trash"></i>
+                                </button>
                             </div>
                         </div>
                     </div>
                     <div class="ibox-content">
                         <div
                             class="col-md-12 m-b-md m-t-sm"
-                            *ngFor="let cl of func.commandLine"
+                            *ngFor="
+                                let cl of func.commandLine;
+                                let funcClIndex = index
+                            "
                         >
                             <div class="row">
-                                <div class="col-md-5">
+                                <div class="col-md-3">
                                     <select class="form-control">
                                         <option value="decision">
                                             Decisão
@@ -156,7 +164,7 @@
                                         </option>
                                     </select>
                                 </div>
-                                <div class="col-md-7">
+                                <div class="col-md-6">
                                     <div class="col-md-12 m-b-sm column">
                                         <div class="row">
                                             <div class="col-md-5">
@@ -178,11 +186,28 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="col-md-1">
+                                    <button
+                                        class="m-l-md btn btn-remove"
+                                        (click)="
+                                            removeItem(
+                                                func.funcName,
+                                                'cl',
+                                                funcClIndex
+                                            )
+                                        "
+                                    >
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div
                             class="col-md-12 m-b-md m-t-sm"
-                            *ngFor="let evt of func.events"
+                            *ngFor="
+                                let evt of func.events;
+                                let evtIndex = index
+                            "
                         >
                             <div class="ibox">
                                 <div class="ibox-title inside-ibox">
@@ -206,13 +231,24 @@
                                             <button
                                                 type="button"
                                                 class="btn btn-primary add-btn m-l-sm"
-                                                id="{{ evt.eventName }}-btn"
                                                 data-toggle="dropdown"
                                                 (click)="
-                                                    createEvtCl($event.target)
+                                                    createEvtCl(evt.eventName)
                                                 "
                                             >
                                                 <i class="fa fa-plus"></i>
+                                            </button>
+                                            <button
+                                                class="m-l-md btn btn-remove"
+                                                (click)="
+                                                    removeItem(
+                                                        func.funcName,
+                                                        'evt',
+                                                        evtIndex
+                                                    )
+                                                "
+                                            >
+                                                <i class="fa fa-trash"></i>
                                             </button>
                                         </div>
                                     </div>
@@ -221,10 +257,13 @@
                             <div class="ibox-content">
                                 <div
                                     class="col-md-12 m-b-md m-t-sm"
-                                    *ngFor="let cl of evt.commandLine"
+                                    *ngFor="
+                                        let cl of evt.commandLine;
+                                        let evtClIndex = index
+                                    "
                                 >
                                     <div class="row">
-                                        <div class="col-md-5">
+                                        <div class="col-md-3">
                                             <select class="form-control">
                                                 <option value="decision">
                                                     Decisão
@@ -234,7 +273,7 @@
                                                 </option>
                                             </select>
                                         </div>
-                                        <div class="col-md-7">
+                                        <div class="col-md-6">
                                             <div
                                                 class="col-md-12 m-b-sm column"
                                             >
@@ -262,6 +301,19 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="col-md-1">
+                                            <button
+                                                class="m-l-md btn btn-remove"
+                                                (click)="
+                                                    removeEvtCl(
+                                                        evt.eventName,
+                                                        evtClIndex
+                                                    )
+                                                "
+                                            >
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -274,7 +326,11 @@
 </div>
 
 <div class="col-12 text-right">
-    <button type="button" class="btn btn-primary m-t-sm" (click)="apply()">
+    <button
+        type="button"
+        class="btn btn-primary m-t-sm tab-btn"
+        (click)="apply()"
+    >
         Aplicar
     </button>
 </div>

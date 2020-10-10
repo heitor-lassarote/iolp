@@ -106,7 +106,17 @@ mwlResizable {
     height: max-content;
 }
 .tab-btn {
-    width: 15%;
+    width: 100px;
     justify-content: center !important;
     text-align: center;
+}
+.btn-remove {
+    color: red;
+    vertical-align: middle;
+    font-size: 20px;
+    background-color: white;
+    cursor: pointer !important;
+    padding: 0;
+    margin-bottom: auto;
+    margin-top: auto;
 }

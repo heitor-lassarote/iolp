@@ -47,7 +47,7 @@ export class CanvasComponent implements OnInit {
     logicElements: logicFunction[] = [
         {
             funcName: "onReady",
-            readonly: false,
+            readonly: true,
             events: [],
             commandLine: [],
         },
@@ -134,40 +134,6 @@ export class CanvasComponent implements OnInit {
             width: `${event.rectangle.width}px`,
             height: `${event.rectangle.height}px`,
         };
-    }
-
-    drop(event: CdkDragEnd) {
-        // console.log(event.source);
-        // if (event.previousContainer === event.container) {
-        //     moveItemInArray(
-        //         event.container.data,
-        //         event.previousIndex,
-        //         event.currentIndex
-        //     );
-        // } else {
-        //     transferArrayItem(
-        //         event.previousContainer.data,
-        //         event.container.data,
-        //         event.previousIndex,
-        //         event.currentIndex
-        //     );
-        // }
-    }
-
-    onDragMoved(event: CdkDragMove) {
-        console.log(event);
-    }
-
-    onDrop(event: CdkDragDrop<HTMLElement>) {
-        console.log(event);
-    }
-
-    onDragStart(event: CdkDragStart) {
-        // console.log(event);
-    }
-
-    onDragRelease(event: CdkDragRelease) {
-        // console.log(event);
     }
 
     click(ev: any, targ: any) {
@@ -307,6 +273,7 @@ export class CanvasComponent implements OnInit {
             name: sessionStorage.getItem("projectName"),
             ast: {
                 pages: [],
+                mainModule: null,
             },
         };
         let pages: Page[] = [];
@@ -335,34 +302,6 @@ export class CanvasComponent implements OnInit {
                 pageTest.html.push(htmlObject);
             });
         pageTest.css = this.cssObject;
-        let logic = {
-            tag: "start",
-            arguments: ["x"],
-            nextAst: {
-                tag: "if",
-                nextAst: null,
-                trueBranchAst: {
-                    tag: "return",
-                    expression: "1",
-                    metadata: { position: [0, 0] },
-                },
-                falseBranchAst: {
-                    tag: "return",
-                    expression: "x * factorial(x - 1)",
-                    metadata: { position: [0, 0] },
-                },
-                expression: "x = 0",
-                metadata: { position: [0, 0] },
-            },
-            name: "factorial",
-            returnType: {
-                return: { type: "integer" },
-                arguments: [{ type: "integer" }],
-                type: "function",
-            },
-            metadata: { position: [0, 0] },
-        };
-        pageTest.logic.push(logic);
         value.ast.pages.push(pageTest);
         try {
             let projectID = await this.sendService.postCode(value);
@@ -399,7 +338,7 @@ export class CanvasComponent implements OnInit {
         return <FormArray>this.logicForm.get("commandLines");
     }
 
-    addAction(component: HTMLElement) {
+    addAction() {
         this.logicElements.push({
             funcName: "",
             readonly: false,
@@ -408,9 +347,11 @@ export class CanvasComponent implements OnInit {
         });
     }
 
-    createItem(component: HTMLElement, type: string) {
-        const id = component.id;
-        let func = id.split("-")[0];
+    removeFunc(index: number) {
+        this.logicElements.splice(index, 1);
+    }
+
+    createItem(func: string, type: string) {
         let curElement: logicFunction;
         switch (type) {
             case "cl":
@@ -422,8 +363,15 @@ export class CanvasComponent implements OnInit {
             case "evt":
                 if (this.elements.length === 0) {
                     this.alert.createConfirmDialog(
-                        "Atenção",
+                        "Atenção!",
                         "É necessário haver algum componente antes de criar um evento!"
+                    );
+                } else if (
+                    this.elements.length === this.logicElements[0].events.length
+                ) {
+                    this.alert.createConfirmDialog(
+                        "Atenção!",
+                        "Não há mais componentes para terem eventos adicionados!"
                     );
                 } else {
                     curElement = this.logicElements.find(
@@ -436,13 +384,37 @@ export class CanvasComponent implements OnInit {
         }
     }
 
-    createEvtCl(component: HTMLElement) {
-        const id = component.id;
-        let evt = id.split("-")[0];
+    removeItem(func: string, type: string, index: number) {
+        let curElement: logicFunction;
+        switch (type) {
+            case "cl":
+                curElement = this.logicElements.find(
+                    (element) => func === element.funcName
+                );
+                curElement.commandLine.splice(index, 1);
+                break;
+            case "evt":
+                curElement = this.logicElements.find(
+                    (element) => func === element.funcName
+                );
+                curElement.events.splice(index, 1);
+                break;
+        }
+    }
+
+    createEvtCl(evt: string) {
         let curEvt: logicEvent;
         let curElement = this.logicElements.find((element) => {
             curEvt = element.events.find((ev) => evt === ev.eventName);
         });
         curEvt.commandLine.push({ exec: "", type: "" });
+    }
+
+    removeEvtCl(eventName: string, index: number) {
+        let curEvt: logicEvent;
+        let curElement = this.logicElements.find((element) => {
+            curEvt = element.events.find((ev) => eventName === ev.eventName);
+        });
+        curEvt.commandLine.splice(index, 1);
     }
 }
