@@ -69,8 +69,8 @@ withOptions options' = def { options = options' }
 indentCompact :: (Emit gen) => JavaScriptCodegen gen
 indentCompact = ifM (gets (compactCode . options)) (emitM "") indent
 
-commaSpace :: (Emit gen, Semigroup gen) => JavaScriptCodegen gen
-commaSpace = fmap (emit "," <>) space
+sepSpace :: (Emit gen, Semigroup gen) => Text -> JavaScriptCodegen gen
+sepSpace sep = fmap (emit sep <>) space
 
 nl :: (Emit gen) => JavaScriptCodegen gen
 nl = ifM (gets (compactCode . options)) (emitM "") (emitM "\n")
@@ -86,12 +86,12 @@ genLiteral
     => Literal
     -> JavaScriptCodegen gen
 genLiteral = \case
-    Array xs -> emitBetween' "[" "]" (separatedBy xs =<< commaSpace)
+    Array xs -> emitBetween' "[" "]" (separatedBy xs =<< sepSpace ",")
     Boolean x -> emitM if x then "true" else "false"
     Int x -> emitM $ show x
     Number x -> emitM $ show x
     Record fs -> do
-        cs <- commaSpace
+        cs <- sepSpace ";"
         emitBetween' "{" "}" $ separatedByF (uncurry codegenField) cs fs
     Text x -> emitBetween' "\"" "\"" $ emitM x
   where
@@ -145,7 +145,7 @@ genFunction name args body = case name of
         , genAst body
         ]
   where
-    args' = emitBetween' "(" ")" $ mconcatA $ intersperse commaSpace $ map emitM args
+    args' = emitBetween' "(" ")" $ mconcatA $ intersperse (sepSpace ",") $ map emitM args
 
 genAssignment
     :: (Emit gen, Monoid gen)

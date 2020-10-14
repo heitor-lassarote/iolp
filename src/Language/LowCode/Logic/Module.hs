@@ -40,7 +40,7 @@ parseModule = parse' module'
 
 module' :: Parser (Module ())
 module' = do
-    name <- label "module name" (symbol "module" *> variableName)
+    name <- label "module name" (symbol "module" *> variableName <* endl)
     imports' <- imports
     (adts, exts, funcs) <- topLevelDeclarations
     pure $ Module adts exts funcs imports' name

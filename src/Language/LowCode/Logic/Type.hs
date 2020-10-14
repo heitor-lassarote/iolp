@@ -27,7 +27,7 @@ data Type
     deriving (Eq, Ord, Show)
 
 instance FromJSON Type where
-    parseJSON = withObject "Language.LowCode.Logic.AST.VariableType" \o -> o .: "tag" >>= \case
+    parseJSON = withObject "Language.LowCode.Logic.Type.Type" \o -> o .: "tag" >>= \case
         "adt"      -> AlgebraicType <$> o .: "name"
         "array"    -> ArrayType <$> o .: "elements"
         "char"     -> pure CharType

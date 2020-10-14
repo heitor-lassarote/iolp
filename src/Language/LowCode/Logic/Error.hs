@@ -107,6 +107,7 @@ prettyError = \case
 
 data Warning
     = FloatingPointEquality !Double
+    | UnreachableStatement !(AST ())
     | UnusedVariable !Name
     deriving (Eq, Show)
 
@@ -116,6 +117,10 @@ prettyWarning = \case
         ("Floating point is imprecise and equality may fail. Test for delta " % float % " - ε < x < " % float % " + ε instead.")
         value
         value
+    UnreachableStatement ast -> sformat
+        ("Unreachable statement: " % stext)
+        "TODO: Add codegen for Logic.AST"
+        --(unsafeCodegen' ast)
     UnusedVariable name -> sformat
         ("Declared but not used: '" % stext % "'.")
         name

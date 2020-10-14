@@ -51,7 +51,7 @@ instance (Codegen a) => Codegen (Structure a) where
             emitBetween' "{" "}" $ separatedByF codegenField (emit ", ") fields
 
 instance (FromJSON a) => FromJSON (Structure a) where
-    parseJSON = withObject "Language.LowCode.Logic.AST.Structure" \o -> o .: "tag" >>= \case
+    parseJSON = withObject "Language.LowCode.Logic.Structure.Structure" \o -> o .: "tag" >>= \case
         "adt"    -> Algebraic <$> o .: "constructor"
         "array"  -> Array     <$> o .: "positions"
         "record" -> Record    <$> o .: "fields"

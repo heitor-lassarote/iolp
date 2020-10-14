@@ -44,6 +44,7 @@ import           Utility (biject, withTag)
 
 class HasMetadata f where
     getMetadata  :: f a -> a
+    setMetadata  :: a -> f a -> f a
 
 data Function exprMetadata
     = Function !Name !Type ![Name] ![AST exprMetadata]
@@ -75,7 +76,7 @@ instance FromJSON MatchPattern where
         "literal"   -> LiteralPattern   <$> o .: "value"
         "name"      -> NamePattern      <$> o .: "name"
         "structure" -> StructurePattern <$> o .: "struct"
-        other     -> fail $
+        other       -> fail $
             "Expected 'literal', 'name' or 'structure', but got '" <> other <> "'."
 
 instance ToJSON MatchPattern where
@@ -196,6 +197,16 @@ instance HasMetadata Expression where
         Structure m _ -> m
         UnaryOp m _ _ -> m
         Variable m _ -> m
+    setMetadata m = \case
+        Access _ a b -> Access m a b
+        BinaryOp _ a b c -> BinaryOp m a b c
+        Call _ a b -> Call m a b
+        Index _ a b -> Index m a b
+        Literal _ a -> Literal m a
+        Parenthesis _ a -> Parenthesis m a
+        Structure _ a -> Structure m a
+        UnaryOp _ a b -> UnaryOp m a b
+        Variable _ a -> Variable m a
 
 instance FromJSON (Expression ()) where
     parseJSON (String s) = either (fail . toString) pure $ parseExpression s
@@ -308,12 +319,12 @@ instance Codegen Literal where
 
 instance FromJSON Literal where
     parseJSON = withObject "Language.LowCode.Logic.AST.Literal" \o -> o .: "tag" >>= \case
-        "char"   -> Char    <$> o .: "value"
-        "double" -> Double  <$> o .: "value"
-        "integer"-> Integer <$> o .: "value"
-        "text"   -> Text    <$> o .: "value"
-        other    -> fail $
-            "Expected 'char', 'double','integer' or 'text', but got '" <> other <> "'."
+        "char"    -> Char    <$> o .: "value"
+        "double"  -> Double  <$> o .: "value"
+        "integer" -> Integer <$> o .: "value"
+        "text"    -> Text    <$> o .: "value"
+        other     -> fail $
+            "Expected 'char', 'double', 'integer' or 'text', but got '" <> other <> "'."
 
 instance ToJSON Literal where
     toJSON = \case
