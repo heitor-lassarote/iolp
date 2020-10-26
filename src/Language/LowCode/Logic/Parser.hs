@@ -35,7 +35,7 @@ symbol :: (MonadParsec e s m, Token s ~ Char, Tokens s ~ Text) => Tokens s -> m 
 symbol = Lexer.symbol spaceConsumer
 
 parse' :: Parser a -> Text -> Either Text a
-parse' p = first (toText . errorBundlePretty) . parse (space *> p <* eof) ""
+parse' p = first (toText . errorBundlePretty) . parse (spaceConsumer *> p <* eof) ""
 
 endl :: Parser ()
 endl = void (lexeme (char ';'))

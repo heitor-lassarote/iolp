@@ -64,7 +64,6 @@ data BundleCssHtmlLogic = BundleCssHtmlLogic
     , extraJsFiles :: !(Map Name Text)
     , htmlOptions  :: !HTML.Options
     , jsOptions    :: !JS.Options
-    , mainModule   :: !(L.Module ())
     , pages        :: ![PageCssHtmlLogic]
     } deriving (Generic, ToJSON)
 
@@ -74,7 +73,6 @@ instance FromJSON BundleCssHtmlLogic where
                            <*> o .:? "extraJsFiles" .!= Map.empty
                            <*> o .:? "htmlOptions"  .!= def
                            <*> o .:? "jsOptions"    .!= def
-                           <*> o .:  "mainModule"
                            <*> o .:  "pages"
 
 instance Bundle BundleCssHtmlLogic where
@@ -82,13 +80,9 @@ instance Bundle BundleCssHtmlLogic where
         | null errors = Right files
         | otherwise   = Left  errors
       where
-        logics = concatMap logic pages
-        analysis = L.analyze (mainModule :| logics)
-
         errors = lefts result
         files = concat $ rights result
-        -- FIXME: It's completely ignoring the generation of the main function!
-        result = case analysis of
+        result = case L.analyze $ concatMap logic pages of
             This writer  -> mkLeft writer
             That imports -> linkHtml imports Map.empty <$> pages
             These writer imports
@@ -113,7 +107,7 @@ instance Bundle BundleCssHtmlLogic where
 
         linkHtml
             :: (Emit gen, Monoid gen)
-            => Map Name (L.Module L.Type)
+            => Map Name (L.AnalyzedModule)
             -> Map Name [L.Warning]
             -> PageCssHtmlLogic
             -> Either GeneratedFail [GeneratedSuccess gen]
@@ -127,21 +121,26 @@ instance Bundle BundleCssHtmlLogic where
             cssName = pName <> ".css"
             cssNames = if css page == CSS.CSS [] then [] else [cssName]
             jsName = (<> ".js")
-            jsNames = map fst3 $ Map.elems modulesAndErrors
+            jsNames = map (view _2) $ sortOn (view _4) $ Map.elems modulesAndErrors
             htmlName = pName <> ".html"
+
             uiResult name =
                 bimap (\e -> GeneratedFail [e] (toString name) [])
                       (\f -> GeneratedSuccess f (toString name) [])
-            logicResult (n, gen, w) =
+            logicResult (_includeNumber, n, gen, w) =
                 bimap (\e -> GeneratedFail e (toString $ jsName n) w)
                       (\f -> GeneratedSuccess f (toString $ jsName n) w)
                       gen
-            fst3 (a, _, _) = a
-            genLogic = evalCodegenT (JS.withOptions jsOptions) . codegen . (convert :: L.Module L.Type -> JS.Module)
+            genLogic =
+                evalCodegenT (JS.withOptions jsOptions)
+                . codegen
+                . (convertDef :: L.Module L.Type -> JS.Module)
+                . L.amRootModule
+
             modulesAndErrors =
                 Map.Merge.merge
-                    (Map.Merge.mapMissing \n m -> (n, first pure $ genLogic m, []))
+                    (Map.Merge.mapMissing \n m -> (L.amIncludeNumber m, n, first pure $ genLogic m, []))
                     (Map.Merge.dropMissing)
-                    (Map.Merge.zipWithMatched \n m w -> (n, first pure $ genLogic m, w))
+                    (Map.Merge.zipWithMatched \n m w -> (L.amIncludeNumber m, n, first pure $ genLogic m, w))
                     (Map.filterWithKey (\k _ -> k `elem` map L.moduleName (logic page)) allMods)
                     (Map.map (map L.prettyWarning) warnings)

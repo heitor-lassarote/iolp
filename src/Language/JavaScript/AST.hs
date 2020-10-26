@@ -26,12 +26,12 @@ data Module = Module
 data AST
     = Assign !Expression !Expression
     | Block ![AST]
-    | Const !Text !Expression
+    | Const !Name !Expression
     | Expression !Expression
     | If !Expression !AST !(Maybe AST)
     | Return !(Maybe Expression)
     | Throw !Expression
-    | Var !Text !Expression
+    | Var !Name !Expression
     | While !Expression !AST
     deriving (Eq, Ord, Show)
 

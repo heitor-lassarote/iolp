@@ -7,11 +7,11 @@ import qualified Data.Text as T
 
 import Language.Emit
 
+type CodegenT state = StateT state (ExceptT Text Identity)
+
 class Codegen ast where
     type GeneratorState ast
     codegen :: (Emit gen, Monoid gen) => ast -> CodegenT (GeneratorState ast) gen
-
-type CodegenT state = StateT state (ExceptT Text Identity)
 
 class HasIndentation a where
     getIndentation        :: a -> Int

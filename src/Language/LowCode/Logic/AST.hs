@@ -6,7 +6,6 @@ module Language.LowCode.Logic.AST
     , Function (..)
     , MatchPattern (..)
     , Branch (..)
-    , patternToExpr
     , AST (..)
     , Expression (..)
     , Literal (..)
@@ -66,13 +65,15 @@ instance ToJSON (Function expressionMetadata) where
         ]
 
 data MatchPattern
-    = LiteralPattern !Literal
+    = DiscardPattern !Name
+    | LiteralPattern !Literal
     | NamePattern !Name
     | StructurePattern !(Structure MatchPattern)
     deriving (Eq, Show)
 
 instance FromJSON MatchPattern where
     parseJSON = withObject "Language.LowCode.Logic.AST.MatchPattern" \o -> o .: "tag" >>= \case
+        "discard"   -> DiscardPattern   <$> o .: "name"
         "literal"   -> LiteralPattern   <$> o .: "value"
         "name"      -> NamePattern      <$> o .: "name"
         "structure" -> StructurePattern <$> o .: "struct"
@@ -81,15 +82,19 @@ instance FromJSON MatchPattern where
 
 instance ToJSON MatchPattern where
     toJSON = \case
+        DiscardPattern name -> withTag "discard" ["name" .= name]
         LiteralPattern value' -> withTag "literal" ["value" .= value']
         NamePattern name -> withTag "name" ["name" .= name]
         StructurePattern struct -> withTag "structure" ["struct" .= struct]
 
-patternToExpr :: MatchPattern -> Expression ()
-patternToExpr = \case
-    LiteralPattern lit -> Literal () lit
-    NamePattern name -> Variable () name
-    StructurePattern struct -> Structure () (patternToExpr <$> struct)
+instance Codegen MatchPattern where
+    type GeneratorState MatchPattern = ()
+
+    codegen = \case
+        DiscardPattern name -> emitM $ Text.cons '?' name
+        LiteralPattern lit -> codegen lit
+        NamePattern name -> emitM name
+        StructurePattern struct -> codegen struct
 
 data Branch exprMetadata
     = Branch MatchPattern [AST exprMetadata]
@@ -372,7 +377,7 @@ ast :: Parser [AST ()]
 ast = many $ choice [assign, try expression, if', match, return', while, var]
 
 assign :: Parser (AST ())
-assign = do
+assign = label "variable assignment" do
     left <- try $ leftOfAssignment <* void (lexeme (char '='))
     right <- expression0
     endl
@@ -384,7 +389,7 @@ expression :: Parser (AST ())
 expression = Expression <$> (expression0 <* endl)
 
 if' :: Parser (AST ())
-if' = do
+if' = label "if statement" do
     symbol "if"
     cond <- expression0
     trueBranch <- brackets ast
@@ -392,17 +397,23 @@ if' = do
     pure $ If cond trueBranch falseBranch
 
 match :: Parser (AST ())
-match = do
+match = label "match statement" do
     symbol "match"
     cond <- expression0
-    pats <- brackets $ flip sepEndBy (lexeme (char ',')) $ liftA2 Branch pattern (brackets ast)
+    pats <- brackets $ flip sepEndBy (lexeme (char ',')) do
+        pat <- pattern
+        branch' <- branch <|> branchSugar
+        pure $ Branch pat branch'
     pure $ Match cond pats
+  where
+    branch = brackets ast
+    branchSugar = one <$> (symbol "=>" *> (Return . Just <$> expression0))
 
 return' :: Parser (AST ())
-return' = Return <$> (symbol "return" *> optional expression0 <* endl)
+return' = Return <$> (label "return statement " $ symbol "return" *> optional expression0 <* endl)
 
 var :: Parser (AST ())
-var = do
+var = label "variable declaration statement" do
     type' <- typeName
     name <- variableName
     void (lexeme (char '='))
@@ -411,15 +422,16 @@ var = do
     pure $ Var name type' value'
 
 while :: Parser (AST ())
-while = do
+while = label "while statement" do
     symbol "while"
     cond <- expression0
     loop <- brackets ast
     pure $ While cond loop
 
 pattern :: Parser MatchPattern
-pattern = choice [structureP, literalP, nameP]
+pattern = choice [discardP, structureP, literalP, nameP]
   where
+    discardP = DiscardPattern <$> (lexeme (char '?') *> option "" variableName)
     literalP = LiteralPattern <$> literal
     nameP = NamePattern <$> variableName
     structureP = StructurePattern <$> structure pattern
@@ -528,7 +540,11 @@ integer = lexeme do
         | otherwise           = error $ "Panic in integer: Unknown digit: " <> Text.singleton c
 
 value :: Parser (Expression ())
-value = Structure () <$> structure expression0 <|> Literal () <$> literal <|> variable
+value = choice
+    [ Structure () <$> structure expression0
+    , Literal   () <$> literal
+    , variable
+    ]
 
 variable :: Parser (Expression ())
 variable = Variable () <$> variableName

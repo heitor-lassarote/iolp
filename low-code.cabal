@@ -39,6 +39,7 @@ common shared-properties
     , OverloadedStrings
     , QuasiQuotes
     , RecordWildCards
+    , ScopedTypeVariables
     , TypeFamilies
   default-language:     Haskell2010
 
@@ -138,9 +139,6 @@ library
     , Language.LowCode.Logic.Standard.Prelude
     , Language.LowCode.Logic.Structure
     , Language.LowCode.Logic.Type
-    , Language.LowCode.UI
-    , Language.LowCode.UI.AST
-    , Language.LowCode.UI.HTMLConverter
     , Utility
   if flag(lib-Werror)
     ghc-options:        -Werror

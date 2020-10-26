@@ -81,6 +81,9 @@ space = ifM (gets (compactCode . options)) (emitM "") (emitM " ")
 nlIndent :: (Emit gen, Semigroup gen) => JavaScriptCodegen gen
 nlIndent = ifM (gets (bracesOnNewLine . options)) (liftA2 (<>) nl indentCompact) space
 
+endl :: (Emit gen, Semigroup gen) => JavaScriptCodegen gen
+endl = liftA2 (<>) (emitM ";") nl
+
 genLiteral
     :: (Emit gen, Monoid gen)
     => Literal
@@ -91,7 +94,7 @@ genLiteral = \case
     Int x -> emitM $ show x
     Number x -> emitM $ show x
     Record fs -> do
-        cs <- sepSpace ";"
+        cs <- sepSpace ","
         emitBetween' "{" "}" $ separatedByF (uncurry codegenField) cs fs
     Text x -> emitBetween' "\"" "\"" $ emitM x
   where
@@ -134,7 +137,8 @@ genFunction name args body = case name of
         , space
         , emitIfValid name'
         , args'
-        , genAst body
+        , body'
+        , nl
         ]
     Nothing -> mconcatA
         [ indentCompact
@@ -142,10 +146,16 @@ genFunction name args body = case name of
         , space
         , emitM "=>"
         , space
-        , genAst body
+        , body'
+        , nl
         ]
   where
     args' = emitBetween' "(" ")" $ mconcatA $ intersperse (sepSpace ",") $ map emitM args
+    body' = case body of
+        -- This case is handled separately, because an arrow function to a record
+        -- is mistaken by JS as an arrow function to a block with label syntax.
+        Expression (Literal (Record fields)) -> emitBetween' "(" ");" $ genLiteral $ Record fields
+        _                                    -> genAst body
 
 genAssignment
     :: (Emit gen, Monoid gen)
@@ -159,8 +169,6 @@ genAssignment left right = mconcatA
     , emitM "="
     , space
     , genExpression right
-    , emitM ";"
-    , nl
     ]
 
 genDeclaration
@@ -177,8 +185,6 @@ genDeclaration isConst name expression = mconcatA
     , emitM "="
     , space
     , genExpression expression
-    , emitM ";"
-    , nl
     ]
 
 genExpression
@@ -193,12 +199,16 @@ genExpression = \case
         ]
     BinaryOp left op right -> mconcatA
         [ genExpression left
+        , space
         , emitM $ binarySymbolToText op
+        , space
         , genExpression right
         ]
     Call expr args -> mconcatA
         [ genExpression expr
-        , emitBetween' "(" ")" $ args `separatedBy'` ", "
+        , do
+            sep <- sepSpace ","
+            emitBetween' "(" ")" $ args `separatedBy` sep
         ]
     Function nameMaybe args inner -> genFunction nameMaybe args inner
     Index expr inner -> mconcatA
@@ -216,71 +226,65 @@ genExpression = \case
 javaScriptCodegen :: (Emit gen, Monoid gen) => Module -> JavaScriptCodegen gen
 javaScriptCodegen m = do
     strict' <- gets (strict . options)
-    let useStrict = emit if strict' then "\"use strict\";\n" else ""
-    bodies <- traverse genAst (functions m)
-    pure $ useStrict <> mconcat bodies
+    let useStrict = emitM if strict' then "\"use strict\";\n" else ""
+    liftA2 (<>) useStrict (genModule m)
+
+genModule :: (Emit gen, Monoid gen) => Module -> JavaScriptCodegen gen
+genModule (Module functions) = mconcat <$> traverse genAst functions
 
 genIf :: (Emit gen, Monoid gen) => Expression -> AST -> Maybe AST -> JavaScriptCodegen gen
-genIf expr ifB = \case
-    Just (If expr' elseIfB elseB) -> mkIfElse (Just (expr', elseIfB)) elseB
-    elseB                         -> mkIfElse Nothing elseB
+genIf expr'' ifB' elseB' = mconcatA [indent, mkIfElse expr'' ifB' elseB']
   where
-    mkIf = genAst
+    mkIf (Block [If expr ifB elseB]) = mkIfElse expr ifB elseB
+    mkIf b                           = genAst b
 
     mkElse Nothing  = pure mempty
-    mkElse (Just f) = mconcatA [indent, emitM "else", genAst f]
+    mkElse (Just f) = case f of
+        Block [If expr ifB elseB] -> mconcatA [indent, emitM "else ", mkIfElse expr ifB elseB]
+        If expr ifB elseB         -> mconcatA [indent, emitM "else ", mkIfElse expr ifB elseB]
+        _                         -> mconcatA [indent, emitM "else", genAst f]
 
-    mkIfElse elseIf elseB = mconcatA
-        [ indent
-        , emitM "if"
+    mkIfElse expr ifB elseB = mconcatA
+        [ emitM "if"
         , space
         , emitBetween' "(" ")" $ genExpression expr
         , mkIf ifB
-        , mkElseIf elseIf
         , mkElse elseB
-        ]
-
-    mkElseIf Nothing                 = pure mempty
-    mkElseIf (Just (expr', elseIfB)) = mconcatA
-        [ indent
-        , emitM "else if"
-        , space
-        , emitBetween' "(" ")" $ genExpression expr'
-        , mkIf elseIfB
         ]
 
 genAst :: (Emit gen, Monoid gen) => AST -> JavaScriptCodegen gen
 genAst = \case
-    Assign left right -> genAssignment left right
+    Assign left right@(Function _ _ _) -> genAssignment left right
+    Assign left right -> liftA2 (<>) (genAssignment left right) endl
     Block asts -> genBlock asts
-    Const name expression -> genDeclaration True name expression
+    Const left right@(Function _ _ _) -> genDeclaration True left right
+    Const left right -> liftA2 (<>) (genDeclaration True left right) endl
+    Expression expression@(Function _ _ _) -> liftA2 (<>) indentCompact (genExpression expression)
     Expression expression -> mconcatA
         [ indentCompact
         , genExpression expression
-        , emitM ";"
-        , nl
+        , endl
         ]
     If expression t f -> genIf expression t f
     Return Nothing -> mconcatA
         [ indentCompact
-        , emitM "return;"
-        , nl
+        , emitM "return"
+        , endl
         ]
     Return (Just expression) -> mconcatA
         [ indentCompact
         , emitM "return "
         , genExpression expression
-        , emitM ";"
-        , nl
+        , endl
         ]
     Throw expression -> mconcatA
         [ indentCompact
         , emitM "throw new "
         , genExpression expression
-        , emitM ";"
-        , nl
+        , endl
         ]
-    Var name expression -> genDeclaration False name expression
+    Var left right@(Function _ _ _) -> genDeclaration False left right
+    Var left right -> liftA2 (<>) (genDeclaration False left right) endl
     While expression body -> mconcatA
         [ indentCompact
         , emitM "while"

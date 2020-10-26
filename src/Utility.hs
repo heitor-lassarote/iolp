@@ -2,8 +2,8 @@ module Utility
     ( biject
     , concatUnzip
     , findMap
+    , unsafeRight
     , withTag
-    , zipWithExact
     ) where
 
 import Universum hiding (foldr)
@@ -24,12 +24,9 @@ findMap f = foldr go Nothing
     go x Nothing = f x
     go _ found   = found
 
+unsafeRight :: Either a b -> b
+unsafeRight (Left  _) = error "fromRight called with Left."
+unsafeRight (Right b) = b
+
 withTag :: Text -> [(Text, Value)] -> Value
 withTag tag fields = object ("tag" .= String tag : fields)
-
-zipWithExact :: (a -> b -> c) -> [a] -> [b] -> Maybe [c]
-zipWithExact f = (fmap reverse .) . go []
-  where
-    go cs (a : as) (b : bs) = go (f a b : cs) as bs
-    go cs []       []       = Just cs
-    go _  _        _        = Nothing

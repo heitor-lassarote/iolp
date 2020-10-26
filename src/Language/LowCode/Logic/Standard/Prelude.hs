@@ -24,7 +24,15 @@ prelude = Module
         [ bool
         , unit
         ]
-    , externs = Map.empty
+    , externs = Map.fromList
+        [ ("doubleToInteger", FunctionType [DoubleType] IntegerType)
+        , ("doubleToText", FunctionType [DoubleType] TextType)
+        , ("integerToDouble", FunctionType [IntegerType] DoubleType)
+        , ("integerToText", FunctionType [IntegerType] TextType)
+        , ("textToDouble", FunctionType [TextType] DoubleType)
+        , ("textToInteger", FunctionType [TextType] IntegerType)
+        , ("trunc", FunctionType [DoubleType] IntegerType)
+        ]
     , functions = []
     , importedModules = []
     , moduleName = "Prelude"

@@ -2,10 +2,12 @@
 
 module Language.LowCode.Logic.JavaScriptConverter
     ( module Language.LanguageConverter
+    , LogicConverterState (..)
     ) where
 
 import Universum
 
+import           Data.Default.Class
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as Text
 
@@ -17,8 +19,21 @@ import qualified Language.LowCode.Logic.Structure as L
 import qualified Language.LowCode.Logic.Type      as L
 import           Utility (concatUnzip)
 
+type LogicConverter = State LogicConverterState
+
+newtype LogicConverterState = LogicConverterState
+    { lcsAdtCurrentIndex :: Int
+    } deriving (Show)
+
+instance Default LogicConverterState where
+    def = LogicConverterState (-1)
+
 instance LanguageConverter (L.Module L.Type) JS.Module where
-    convert m = JS.Module $ (algebraics <>) $ fmap convert $ L.functions m
+    type ConverterState (L.Module L.Type) JS.Module = LogicConverterState
+
+    convert m = do
+        functions <- traverse convert $ L.functions m
+        pure $ JS.Module (algebraics <> functions)
       where
         algebraics = Map.foldr go [] $ Map.filterWithKey filterBuiltin $ L.adtTemplates m
 
@@ -26,68 +41,93 @@ instance LanguageConverter (L.Module L.Type) JS.Module where
 
         go constructors asts = map algebraicToFunction constructors <> asts
 
+        fieldName = "value"
+
         algebraicToFunction :: L.Constructor L.Type -> JS.AST
-        algebraicToFunction (L.Constructor _ name fieldMaybe) = JS.Const name case fieldMaybe of
-            Nothing -> JS.Literal (JS.Record [mkField "$" name])
-            Just _  -> JS.Function Nothing ["value"] (JS.Expression $ mkRecord name)
+        algebraicToFunction (L.Constructor adtName name fieldMaybe) = JS.Const fName case fieldMaybe of
+            Nothing -> JS.Literal $ JS.Record [discriminate]
+            Just _  -> JS.Function Nothing [fieldName] (JS.Expression record)
           where
-            mkField left right = (left, JS.Literal (JS.Text right))
-            mkRecord n = JS.Literal (JS.Record [mkField "$" n, mkField "value" "value"])
+            fName = mkAdtName adtName name
+            discriminate = ("$", JS.Literal $ JS.Text fName)
+            field = (fieldName, JS.Variable fieldName)
+            record = JS.Literal $ JS.Record [discriminate, field]
 
 instance LanguageConverter (L.Function L.Type) JS.AST where
+    type ConverterState (L.Function L.Type) JS.AST = LogicConverterState
+
     convert = \case
         L.Function name _ arguments next ->
-            JS.Expression $ JS.Function (Just name) arguments (convert next)
+            JS.Expression . JS.Function (Just name) arguments <$> convert next
 
 instance LanguageConverter [L.AST L.Type] JS.AST where
-    convert = JS.Block . concatMap convert'
+    type ConverterState [L.AST L.Type] JS.AST = LogicConverterState
+
+    convert = fmap (JS.Block . concat) . traverse convert'
       where
         convert' = \case
             L.Assign left right ->
-                [JS.Assign (convert left) (convert right)]
+                sequence [liftA2 JS.Assign (convert left) (convert right)]
             L.Expression expression ->
-                [JS.Expression $ convert expression]
+                sequence [JS.Expression <$> convert expression]
             L.If expression true false ->
-                [JS.If (convert expression) (convert true) (tryElse false)]
+                sequence [liftA3 JS.If (convert expression) (convert true) (tryElse false)]
             L.Match expression branches ->
                 convertMatch expression branches
             L.Return expression ->
-                [JS.Return (convert <$> expression)]
+                sequence [JS.Return <$> (traverse convert expression)]
             L.Var name _ expression ->
-                [JS.Var name (convert expression)]
+                sequence [JS.Var name <$> convert expression]
             L.While expression body ->
-                [JS.While (convert expression) (convert body)]
+                sequence [liftA2 JS.While (convert expression) (convert body)]
 
-        tryElse []  = Nothing
-        tryElse ast = Just $ convert ast
+        tryElse []  = pure Nothing
+        tryElse ast = Just <$> convert ast
+
+nextVarName :: LogicConverter JS.Name
+nextVarName = do
+    modify \s -> s { lcsAdtCurrentIndex = lcsAdtCurrentIndex s + 1 }
+    varName
+
+varName :: LogicConverter JS.Name
+varName = do
+    index <- gets lcsAdtCurrentIndex
+    pure $ "$temp" <> show index
 
 -- FIXME: Create a name generator!
-convertMatch :: L.Expression L.Type -> [L.Branch L.Type] -> [JS.AST]
-convertMatch expr []       = [JS.Expression (convert expr)]
-convertMatch expr (b : bs) = [JS.Const varName (convert expr), mkMatches (b :| bs)]
+convertMatch :: L.Expression L.Type -> [L.Branch L.Type] -> LogicConverter [JS.AST]
+convertMatch expr []       = sequence [JS.Expression <$> convert expr]
+convertMatch expr (b : bs) = sequence [liftA2 JS.Const nextVarName (convert expr), mkMatches (b :| bs)]
   where
-    varName = "$temp"
-
-    mkMatches :: NonEmpty (L.Branch L.Type) -> JS.AST
-    mkMatches ((L.Branch pat ast) :| []) =
-        JS.If (cond exprs) (declareVars vars (convert ast)) (Just $ JS.Block [mkThrow])
+    mkMatches :: NonEmpty (L.Branch L.Type) -> LogicConverter JS.AST
+    mkMatches ((L.Branch pat ast) :| []) = finalize
       where
-        (names, exprs) = mkConds pat
-        vars = uncurry JS.Const <$> names
-
+        finalize = do
+            (names, exprs) <- mkConds pat
+            let vars = uncurry JS.Const <$> names
+            case pat of
+                L.DiscardPattern _ -> declareVars vars <$> convert ast
+                L.NamePattern _ -> declareVars vars <$> convert ast
+                _ -> do
+                    body <- convert ast
+                    pure $ JS.If (cond exprs) (declareVars vars body) (Just $ JS.Block [mkThrow])
         mkThrow = JS.Throw (JS.Call (JS.Variable "Error") [JS.Literal $ JS.Text "Non-exhaustive pattern matches."])
-    mkMatches ((L.Branch pat ast) :| (b' : bs')) =
-        JS.If (cond exprs) (declareVars vars (convert ast)) (Just (mkMatches (b' :| bs')))
-      where
-        (names, exprs) = mkConds pat
-        vars = uncurry JS.Const <$> names
+    mkMatches ((L.Branch pat ast) :| (b' : bs')) = do
+        (names, exprs) <- mkConds pat
+        let vars = uncurry JS.Const <$> names
+        body <- convert ast
+        matches <- mkMatches (b' :| bs')
+        pure $ JS.If (cond exprs) (declareVars vars body) (Just matches)
 
-    mkConds = second (reverse . ordNub) . mkCondition [] [] (JS.Variable varName)
+    mkConds pattern = do
+        name <- varName
+        conditions <- mkCondition [] [] (JS.Variable name) pattern
+        pure $ second ordNub conditions
 
     declareVars vars (JS.Block xs) = JS.Block (vars <> xs)
-    declareVars _    _             = error "Panic in convertMatch.declareVars: this is likely a bug. Please report it."
+    declareVars vars x             = JS.Block (vars <> [x])
 
-    cond []       = error "Panic in convertMatch.cond: this is likely a bug. Please report it."
+    cond []       = JS.Literal $ JS.Boolean True
     cond (x : xs) = intersperseAnds (x :| xs)
 
     intersperseAnds (x :| []) = x
@@ -98,61 +138,90 @@ convertMatch expr (b : bs) = [JS.Const varName (convert expr), mkMatches (b :| b
         -> [JS.Expression]
         -> JS.Expression
         -> L.MatchPattern
-        -> ([(JS.Name, JS.Expression)], [JS.Expression])
+        -> LogicConverter ([(JS.Name, JS.Expression)], [JS.Expression])
     mkCondition names exprs tree = \case
-        L.LiteralPattern value -> (names, tree === JS.Literal (convert value) : exprs)
-        L.NamePattern name -> ((name, tree) : names, exprs)
+        L.DiscardPattern _name -> pure (names, exprs)
+        L.LiteralPattern value -> do
+            value' <- convert value
+            pure (names, tree === JS.Literal value' : exprs)
+        L.NamePattern name -> pure ((name, tree) : names, exprs)
         L.StructurePattern struct -> case struct of
             L.Algebraic (L.Constructor adtName name Nothing)
-                | adtName == "Bool" && name == "True" -> (names, JS.Literal (JS.Boolean True) : exprs)
-                | adtName == "Bool" && name == "False" -> (names, JS.UnaryOp JS.Not (JS.Literal (JS.Boolean False)) : exprs)
-                | adtName == "Unit" && name == "Unit" -> (names, tree === JS.Literal (JS.Record []) : exprs)
-                | otherwise -> (names, mkDiscriminate name : exprs)
-            L.Algebraic (L.Constructor _ name (Just field)) ->
-                mkCondition names (mkDiscriminate name : exprs) (mkAccess "value") field
+                | adtName == "Bool" && name == "True" -> pure (names, JS.Literal (JS.Boolean True) : exprs)
+                | adtName == "Bool" && name == "False" -> pure (names, JS.UnaryOp JS.Not (JS.Literal (JS.Boolean False)) : exprs)
+                | adtName == "Unit" && name == "Unit" -> pure (names, tree === JS.Literal (JS.Record []) : exprs)
+                | otherwise -> pure (names, mkDiscriminate adtName name : exprs)
+            L.Algebraic (L.Constructor adtName name (Just field)) ->
+                mkCondition names (mkDiscriminate adtName name : exprs) (mkAccess "value") field
             L.Array positions ->
-                concatUnzip $ zipWith (mkCondition names (mkLength positions : mkIndexes <> exprs)) mkIndexes positions
+                concatUnzip <$> zipWithM (mkCondition names (mkLength positions : mkIndexes <> exprs)) mkIndexes positions
             L.Record fields ->
                 let (fieldNames, patterns) = unzip $ map (\(L.Field n v) -> (n, v)) fields
                     accesses = map mkAccess fieldNames
-                 in concatUnzip $ zipWith (mkCondition names exprs) accesses patterns
+                 in concatUnzip <$> zipWithM (mkCondition names exprs) accesses patterns
       where
         l === r = JS.BinaryOp l JS.Equal r
         mkAccess = JS.Access tree
         mkLength xs = mkAccess "length" === JS.Literal (JS.Int $ length xs)
         mkIndexes = [JS.Index tree (JS.Literal (JS.Int i)) | i <- [0..]]
-        mkDiscriminate name = mkAccess "$" === JS.Literal (JS.Text name)
+        mkDiscriminate adtName name = mkAccess "$" === JS.Literal (JS.Text $ mkAdtName adtName name)
 
 instance LanguageConverter (L.Expression L.Type) JS.Expression where
+    type ConverterState (L.Expression L.Type) JS.Expression = LogicConverterState
+
     convert = \case
-        L.Access _ expr name -> JS.Access (convert expr) name
-        L.BinaryOp _ left op right -> JS.BinaryOp (convert left) op (convert right)
-        L.Call _ expr exprs -> JS.Call (convert expr) (convert <$> exprs)
-        L.Index _ expr inner -> JS.Index (convert expr) (convert inner)
-        L.Literal _ literal -> JS.Literal (convert literal)
-        L.Parenthesis _ expr -> JS.Parenthesis $ convert expr
+        L.Access _ expr name -> liftA2 JS.Access (convert expr) (pure name)
+        L.BinaryOp _ left op right -> liftA3 JS.BinaryOp (convert left) (pure op) (convert right)
+        -- HACK: Along with accessArray in Analyzer, this is a workaound for the
+        -- lack of generics.
+        L.Call L.TextType (L.Access (L.FunctionType [L.CharType] L.TextType) left "push") [arg] ->
+            liftA3 JS.BinaryOp (convert left) (pure JS.Add) (convert arg)
+        L.Call _ expr exprs -> liftA2 JS.Call (convert expr) (traverse convert exprs)
+        L.Index _ expr inner -> liftA2 JS.Index (convert expr) (convert inner)
+        L.Literal _ literal -> JS.Literal <$> convert literal
+        L.Parenthesis _ expr -> JS.Parenthesis <$> convert expr
         L.Structure _ struct -> convert struct
-        L.UnaryOp _ op expr -> JS.UnaryOp op (convert expr)
-        L.Variable _ name -> JS.Variable name
+        L.UnaryOp _ op expr -> JS.UnaryOp op <$> convert expr
+        L.Variable _ name -> pure $ JS.Variable name
 
 instance LanguageConverter L.Literal JS.Literal where
-    convert = \case
-        L.Char c -> JS.Text (Text.singleton c)
+    type ConverterState L.Literal JS.Literal = LogicConverterState
+
+    convert = pure . \case
+        L.Char c -> JS.Text $ fromChar c
         L.Double d -> JS.Number d
         L.Integer i -> JS.Int (fromIntegral i)
-        L.Text t -> JS.Text t
+        L.Text t -> JS.Text $ strip t
+      where
+        fromChar :: Char -> Text
+        fromChar '"' = "\\\""
+        fromChar c   = strip c
+
+        strip :: (Show s) => s -> Text
+        strip = Text.init . Text.tail . Text.pack . show
 
 instance LanguageConverter (L.Structure (L.Expression L.Type)) JS.Expression where
+    type ConverterState (L.Structure (L.Expression L.Type)) JS.Expression = LogicConverterState
+
     convert = \case
         L.Algebraic constructor -> convertAlgebraic constructor
-        L.Array a -> JS.Literal $ JS.Array (convert <$> a)
-        L.Record fs -> JS.Literal $ JS.Record (fmap (\(L.Field n v) -> (n, convert v)) fs)
+        L.Array positions -> do
+            positions' <- traverse convert positions
+            pure $ JS.Literal $ JS.Array positions'
+        L.Record fields -> do
+            fields' <- traverse (sequence . (\(L.Field name value) -> (name, convert value))) fields
+            pure $ JS.Literal $ JS.Record fields'
 
-convertAlgebraic :: L.Constructor (L.Expression L.Type) -> JS.Expression
+convertAlgebraic :: L.Constructor (L.Expression L.Type) -> LogicConverter JS.Expression
 convertAlgebraic = \case
     L.Constructor adtName name Nothing
-        | adtName == "Bool" && name == "False" -> JS.Literal $ JS.Boolean False
-        | adtName == "Bool" && name == "True"  -> JS.Literal $ JS.Boolean True
-        | adtName == "Unit" && name == "Unit"  -> JS.Literal $ JS.Record []
-        | otherwise       -> JS.Variable name
-    L.Constructor _ name (Just field) -> JS.Call (JS.Variable name) [convert field]
+        | adtName == "Bool" && name == "False" -> pure $ JS.Literal $ JS.Boolean False
+        | adtName == "Bool" && name == "True"  -> pure $ JS.Literal $ JS.Boolean True
+        | adtName == "Unit" && name == "Unit"  -> pure $ JS.Literal $ JS.Record []
+        | otherwise -> pure $ JS.Variable $ mkAdtName adtName name
+    L.Constructor adtName name (Just field) -> do
+        field' <- convert field
+        pure $ JS.Call (JS.Variable $ mkAdtName adtName name) [field']
+
+mkAdtName :: L.Name -> L.Name -> JS.Name
+mkAdtName adtName cName = adtName <> "$" <> cName

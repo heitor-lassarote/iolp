@@ -32,7 +32,8 @@ data Error
     | ShadowedVariable !Name
     | TypeMismatch !Text !Type !Type
     | UndefinedVariable !Name
-    | UnknownArray
+    | UnknownPattern !MatchPattern !Type
+    | UnknownType !(Expression ())
     deriving (Eq, Show)
 
 prettyCyclic :: NonEmpty Name -> Text
@@ -100,10 +101,16 @@ prettyError = \case
         expected
         actual
     UndefinedVariable name -> sformat
-        -- TODO: Scan for similarly named variables.
+        -- TODO (optional): Scan for similarly named variables.
         ("'" % stext % "' was used but it was not defined. Perhaps you forgot to declare it or made a typo?")
         name
-    UnknownArray -> "Could not deduce type for array."
+    UnknownPattern pattern expectedType -> sformat
+        ("Could not deduce type for pattern expression: '" % stext % "'." % shown)
+        (unsafeCodegen' pattern)
+        expectedType
+    UnknownType expr -> sformat
+        ("Could not deduce type for '" % stext % "'.")
+        (unsafeCodegen' expr)
 
 data Warning
     = FloatingPointEquality !Double
@@ -114,7 +121,7 @@ data Warning
 prettyWarning :: Warning -> Text
 prettyWarning = \case
     FloatingPointEquality value -> sformat
-        ("Floating point is imprecise and equality may fail. Test for delta " % float % " - ε < x < " % float % " + ε instead.")
+        ("Floating point is imprecise and equality may fail. Test for delta " % float % " -ε < x < " % float % " + ε instead.")
         value
         value
     UnreachableStatement ast -> sformat
