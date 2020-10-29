@@ -155,36 +155,61 @@
                         >
                             <div class="row">
                                 <div class="col-md-3">
-                                    <select class="form-control">
+                                    <select
+                                        class="form-control"
+                                        (change)="
+                                            funcClTypeChange(
+                                                $event.target.value,
+                                                false,
+                                                func.funcName,
+                                                funcClIndex,
+                                                -1
+                                            )
+                                        "
+                                    >
                                         <option value="decision">
                                             Decisão
                                         </option>
                                         <option value="repetition">
                                             Repetição
                                         </option>
+                                        <option value="declaration">
+                                            Declaração
+                                        </option>
+                                        <option value="http">HTTP</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="col-md-12 m-b-sm column">
-                                        <div class="row">
-                                            <div class="col-md-5">
-                                                <select class="form-control">
-                                                    <option value="if">
-                                                        Se
-                                                    </option>
-                                                    <option value="switch">
-                                                        Switch
-                                                    </option>
-                                                </select>
-                                            </div>
-                                            <div class="col-md-7">
-                                                <input
-                                                    type="text"
-                                                    class="form-control"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                                <div class="col-md-8">
+                                    <ng-container
+                                        *ngIf="cl.type.name === 'decision'"
+                                        [ngTemplateOutlet]="ifDecision"
+                                        [ngTemplateOutletContext]="{
+                                            index: funcClIndex,
+                                            evtIndex: -1,
+                                            isEvt: false,
+                                            funcName: func.funcName
+                                        }"
+                                    ></ng-container>
+                                    <ng-container
+                                        *ngIf="cl.type.name === 'declaration'"
+                                        [ngTemplateOutlet]="declaration"
+                                        [ngTemplateOutletContext]="{
+                                            index: funcClIndex,
+                                            evtIndex: -1,
+                                            isEvt: false,
+                                            funcName: func.funcName
+                                        }"
+                                    ></ng-container>
+                                    <ng-container
+                                        *ngIf="cl.type.name === 'http'"
+                                        [ngTemplateOutlet]="http"
+                                        [ngTemplateOutletContext]="{
+                                            index: funcClIndex,
+                                            evtIndex: -1,
+                                            isEvt: false,
+                                            funcName: func.funcName
+                                        }"
+                                    ></ng-container>
                                 </div>
                                 <div class="col-md-1">
                                     <button
@@ -222,6 +247,22 @@
                                         >
                                             {{ element.name }}
                                         </option>
+                                    </select>
+                                    <select
+                                        class="m-l-sm form-control"
+                                        style="width: 150px"
+                                        (change)="
+                                            changeEventType(
+                                                $event.target.value,
+                                                evtIndex
+                                            )
+                                        "
+                                    >
+                                        <option value="onClick">Click</option>
+                                        <option value="onDoubleClick">
+                                            Double Click
+                                        </option>
+                                        <option value="onChange">Change</option>
                                     </select>
                                     <div class="ibox-tools">
                                         <div class="row-flex">
@@ -264,42 +305,68 @@
                                 >
                                     <div class="row">
                                         <div class="col-md-3">
-                                            <select class="form-control">
+                                            <select
+                                                class="form-control"
+                                                (change)="
+                                                    funcClTypeChange(
+                                                        $event.target.value,
+                                                        true,
+                                                        func.funcName,
+                                                        evtClIndex,
+                                                        evtIndex
+                                                    )
+                                                "
+                                            >
                                                 <option value="decision">
                                                     Decisão
                                                 </option>
                                                 <option value="repetition">
                                                     Repetição
                                                 </option>
+                                                <option value="declaration">
+                                                    Declaração
+                                                </option>
+                                                <option value="http">
+                                                    HTTP
+                                                </option>
                                             </select>
                                         </div>
-                                        <div class="col-md-6">
-                                            <div
-                                                class="col-md-12 m-b-sm column"
-                                            >
-                                                <div class="row">
-                                                    <div class="col-md-5">
-                                                        <select
-                                                            class="form-control"
-                                                        >
-                                                            <option value="if">
-                                                                Se
-                                                            </option>
-                                                            <option
-                                                                value="switch"
-                                                            >
-                                                                Switch
-                                                            </option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-7">
-                                                        <input
-                                                            type="text"
-                                                            class="form-control"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
+                                        <div class="col-md-8">
+                                            <ng-container
+                                                *ngIf="
+                                                    cl.type.name === 'decision'
+                                                "
+                                                [ngTemplateOutlet]="ifDecision"
+                                                [ngTemplateOutletContext]="{
+                                                    index: evtClIndex,
+                                                    evtIndex: evtIndex,
+                                                    isEvt: true,
+                                                    funcName: func.funcName
+                                                }"
+                                            ></ng-container>
+                                            <ng-container
+                                                *ngIf="
+                                                    cl.type.name ===
+                                                    'declaration'
+                                                "
+                                                [ngTemplateOutlet]="declaration"
+                                                [ngTemplateOutletContext]="{
+                                                    index: evtClIndex,
+                                                    evtIndex: evtIndex,
+                                                    isEvt: true,
+                                                    funcName: func.funcName
+                                                }"
+                                            ></ng-container>
+                                            <ng-container
+                                                *ngIf="cl.type.name === 'http'"
+                                                [ngTemplateOutlet]="http"
+                                                [ngTemplateOutletContext]="{
+                                                    index: evtClIndex,
+                                                    evtIndex: evtIndex,
+                                                    isEvt: true,
+                                                    funcName: func.funcName
+                                                }"
+                                            ></ng-container>
                                         </div>
                                         <div class="col-md-1">
                                             <button
@@ -334,3 +401,254 @@
         Aplicar
     </button>
 </div>
+
+<ng-template
+    #ifDecision
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <div class="col-md-12">
+        <div class="column">
+            <div class="row m-b-sm">
+                <div class="col-1">
+                    <h4>Se</h4>
+                </div>
+                <div class="col-3">
+                    <select
+                        class="form-control"
+                        (change)="
+                            changeIfCondition(
+                                $event.target.value,
+                                funcName,
+                                isEvt,
+                                index,
+                                evtIndex
+                            )
+                        "
+                    >
+                        <option value="comparison">Comparação</option>
+                        <option value="booleanLogic">Lógica Booleana</option>
+                    </select>
+                </div>
+                <div class="col-8">
+                    <ng-container
+                        *ngIf="
+                            ifCondition(funcName, isEvt, index, evtIndex) ===
+                            'comparison'
+                        "
+                        [ngTemplateOutlet]="comparison"
+                        [ngTemplateOutletContext]="{
+                            index: index,
+                            evtIndex: evtIndex,
+                            isEvt: isEvt,
+                            funcName: funcName
+                        }"
+                    ></ng-container>
+                    <ng-container
+                        *ngIf="
+                            ifCondition(funcName, isEvt, index, evtIndex) ===
+                            'booleanLogic'
+                        "
+                        [ngTemplateOutlet]="booleanLogic"
+                    ></ng-container>
+                </div>
+            </div>
+        </div>
+    </div>
+</ng-template>
+
+<ng-template
+    #declaration
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        [formGroup]="getDeclarationFormGroup(index, isEvt, evtIndex, funcName)"
+        role="form"
+    >
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-4">
+                    <select class="form-control" formControlName="varType">
+                        <option value="adt">Algébrico</option>
+                        <option value="array">Array</option>
+                        <option value="char">Caracter</option>
+                        <option value="double">Double</option>
+                        <option value="integer">Inteiro</option>
+                        <option value="record">Registro</option>
+                        <option value="text">Texto</option>
+                    </select>
+                </div>
+                <div class="col-4">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="varName"
+                    />
+                </div>
+                <div class="col-4">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="varValue"
+                    />
+                </div>
+            </div>
+        </div>
+    </form>
+</ng-template>
+
+<ng-template
+    #comparison
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        [formGroup]="getComparisonFormGroup(index, isEvt, evtIndex, funcName)"
+        role="form"
+    >
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-5">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="leftExpression"
+                    />
+                </div>
+                <div class="col-2">
+                    <select
+                        class="form-control"
+                        style="padding: 0 0 0 5px"
+                        formControlName="symbol"
+                    >
+                        <option value="Different">&ne;</option>
+                        <option value="Equal">=</option>
+                        <option value="Greater">></option>
+                        <option value="GreaterEqual">&ge;</option>
+                        <option value="Less"><</option>
+                        <option value="LessEqual">&le;</option>
+                    </select>
+                </div>
+                <div class="col-5">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="rightExpression"
+                    />
+                </div>
+            </div>
+        </div>
+    </form>
+</ng-template>
+
+<ng-template #booleanLogic>
+    <div class="col-md-12">
+        <div class="row">
+            <div class="col-5">
+                <input type="text" class="form-control" />
+            </div>
+            <div class="col-2">
+                <select class="form-control" style="padding: 0 0 0 5px">
+                    <option value="And">and</option>
+                    <option value="Or">or</option>
+                    <option value="Not">not</option>
+                </select>
+            </div>
+            <div class="col-5">
+                <input type="text" class="form-control" />
+            </div>
+        </div>
+    </div>
+</ng-template>
+
+<ng-template
+    #http
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        role="form"
+        [formGroup]="getHttpFormGroup(index, isEvt, evtIndex, funcName)"
+    >
+        <div class="col-md-12">
+            <div class="column">
+                <div class="row m-b-sm">
+                    <div class="col-4">
+                        <select
+                            class="form-control"
+                            formControlName="httpMethod"
+                        >
+                            <option value="get">GET</option>
+                            <option value="post">POST</option>
+                            <option value="put">PUT</option>
+                            <option value="delete">DELETE</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <input
+                            type="text"
+                            class="form-control"
+                            formControlName="httpUrl"
+                        />
+                    </div>
+                    <div class="col-2">
+                        <button
+                            type="button"
+                            class="btn btn-primary add-btn m-l-sm"
+                            (click)="
+                                addHeader(index, isEvt, evtIndex, funcName)
+                            "
+                        >
+                            <i class="fa fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div
+                    class="row m-b-sm"
+                    *ngFor="
+                        let header of getHttpHeaderArrayData(
+                            index,
+                            isEvt,
+                            evtIndex,
+                            funcName
+                        ).controls;
+                        let i = index
+                    "
+                    [formGroup]="header"
+                >
+                    <div class="col-5">
+                        <input
+                            type="text"
+                            class="form-control"
+                            formControlName="httpHeaderName"
+                        />
+                    </div>
+                    <div class="col-5">
+                        <input
+                            type="text"
+                            class="form-control"
+                            formControlName="httpHeaderValue"
+                        />
+                    </div>
+                    <div class="col-2">
+                        <button
+                            class="m-l-md btn btn-remove"
+                            (click)="removeHeader(index, isEvt, evtIndex, funcName, i)"
+                        >
+                            <i class="fa fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</ng-template>

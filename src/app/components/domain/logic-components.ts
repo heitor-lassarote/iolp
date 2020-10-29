@@ -1,16 +1,25 @@
-export class logicFunction {
+import { AST } from "./output";
+
+export interface LogicFunction {
     funcName: string;
     commandLine: CommandLine[];
     readonly: boolean;
-    events: logicEvent[];
+    events: LogicEvent[];
 }
 
-export class logicEvent {
+export interface LogicEvent {
     eventName: string;
+    eventType: string;
     commandLine: CommandLine[];
 }
 
-export class CommandLine {
-    type: string;
-    exec: string;
+export interface CommandLine {
+    type: CommandLineType;
+    exec: AST;
+    formIndex: number;
+}
+
+export interface CommandLineType {
+    name: string;
+    clType: string;
 }
