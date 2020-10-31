@@ -1,10 +1,12 @@
-import { AST } from "./output";
+import { AST, Type } from "./output";
 
 export interface LogicFunction {
     funcName: string;
     commandLine: CommandLine[];
     readonly: boolean;
     events: LogicEvent[];
+    arguments: string[];
+    returnType: Type;
 }
 
 export interface LogicEvent {

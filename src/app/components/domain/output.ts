@@ -1,7 +1,6 @@
 export class Output {
     name: string;
     ast: {
-        mainModule: Module;
         pages: Page[];
     };
 }
@@ -91,7 +90,6 @@ export class TextType extends Type {
 }
 
 export class Function {
-    metadata: any = [];
     name: string;
     type: Type;
     arguments: string[];

@@ -14,6 +14,20 @@ import {
     Var,
     Expression,
     BinaryOp,
+    Literal,
+    Literal_,
+    Char,
+    Double,
+    Integer,
+    Text,
+    Type,
+    AlgebraicType,
+    ArrayType,
+    CharType,
+    DoubleType,
+    IntegerType,
+    RecordType,
+    TextType,
 } from "./../../domain/output";
 import { Info } from "./../../domain/info";
 import { Element } from "src/app/components/domain/element";
@@ -63,10 +77,12 @@ export class CanvasComponent implements OnInit {
     cssObject: CssOut[] = [];
     logicElements: LogicFunction[] = [
         {
-            funcName: "onReady",
+            funcName: "main",
             readonly: true,
             events: [],
             commandLine: [],
+            arguments: [],
+            returnType: { tag: "adt", name: "Unit" } as AlgebraicType,
         },
     ];
 
@@ -461,16 +477,19 @@ export class CanvasComponent implements OnInit {
             let funct: Function = {
                 name: func.funcName,
                 arguments: [],
-                type: new FunctionType(),
+                type: this.getType("function", func.arguments, func.returnType),
                 body: [],
-                metadata: [],
             };
             let ast: AST;
             func.commandLine.forEach((cl: CommandLine) => {
-                let controls = this.checkFormControlType(cl.type.clType);
+                let controls = this.checkFormControlType(
+                    cl.type.name,
+                    cl.type.clType
+                );
                 let expression: Expression;
                 let curControl = controls[cl.formIndex];
                 expression = this.checkExpressionTypeByCommandLineType(
+                    cl.type.name,
                     cl.type.clType
                 );
                 expression = this.getExpressionType(
@@ -478,7 +497,7 @@ export class CanvasComponent implements OnInit {
                     curControl as FormGroup
                 );
                 ast = this.checkCommandLineTypeByName(cl.type.name);
-                ast = this.getAstType(ast, expression);
+                ast = this.getAstType(ast, expression, curControl);
                 funct.body.push(ast);
             });
 
@@ -490,39 +509,38 @@ export class CanvasComponent implements OnInit {
     }
 
     async apply() {
-        // this.spinner.show("loadingSpinner");
-        // let value: Output = {
-        //     name: sessionStorage.getItem("projectName"),
-        //     ast: {
-        //         pages: [],
-        //         mainModule: null,
-        //     },
-        // };
-        // let pages: Page[] = [];
-        // let pageTest: Page = {
-        //     name: "Page Test",
-        //     css: [],
-        //     logic: [],
-        //     html: [],
-        // };
-        // $("#canvas")
-        //     .children()
-        //     .each((index: number, child: HTMLElement) => {
-        //         let nodes = child.childNodes;
-        //         let element: HTMLElement;
-        //         let htmlObject: HtmlTagOut = {
-        //             tag: "",
-        //             ast: [],
-        //             attributes: [],
-        //         };
-        //         for (let i = 0; i < nodes.length; i++) {
-        //             if (nodes[i].nodeType !== Node.COMMENT_NODE) {
-        //                 element = nodes[i] as HTMLElement;
-        //             }
-        //         }
-        //         htmlObject = this.createComponent(element, htmlObject, false);
-        //         pageTest.html.push(htmlObject);
-        //     });
+        this.spinner.show("loadingSpinner");
+        let value: Output = {
+            name: sessionStorage.getItem("projectName"),
+            ast: {
+                pages: [],
+            },
+        };
+        let pages: Page[] = [];
+        let pageTest: Page = {
+            name: "Page Test",
+            css: [],
+            logic: [],
+            html: [],
+        };
+        $("#canvas")
+            .children()
+            .each((index: number, child: HTMLElement) => {
+                let nodes = child.childNodes;
+                let element: HTMLElement;
+                let htmlObject: HtmlTagOut = {
+                    tag: "",
+                    ast: [],
+                    attributes: [],
+                };
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i].nodeType !== Node.COMMENT_NODE) {
+                        element = nodes[i] as HTMLElement;
+                    }
+                }
+                htmlObject = this.createComponent(element, htmlObject, false);
+                pageTest.html.push(htmlObject);
+            });
         let logicObject: Module = {
             adtTemplates: new Map(),
             externs: new Map(),
@@ -531,49 +549,63 @@ export class CanvasComponent implements OnInit {
             moduleName: "main",
         };
         logicObject.functions = this.getLogicFunctions();
-        // pageTest.css = this.cssObject;
-        // value.ast.pages.push(pageTest);
-        // try {
-        //     let projectID = await this.sendService.postCode(value);
-        //     sessionStorage.setItem("projectID", projectID.toString());
-        //     this.toastr.success("Aplicado com sucesso!", "Sucesso!", {
-        //         progressBar: true,
-        //         closeButton: true,
-        //     });
-        // } catch (e) {
-        //     if (e instanceof HttpErrorResponse) {
-        //         switch (e.status) {
-        //             case 404:
-        //                 this.toastr.error(
-        //                     `Motivo: ${e.message}`,
-        //                     `Erro ${e.status}`,
-        //                     { progressBar: true, closeButton: true }
-        //                 );
-        //                 break;
-        //             default:
-        //                 this.toastr.error(
-        //                     `Motivo: ${e.message}`,
-        //                     `Erro ${e.status}`,
-        //                     { progressBar: true, closeButton: true }
-        //                 );
-        //                 break;
-        //         }
-        //     }
-        // } finally {
-        //     this.spinner.hide("loadingSpinner");
-        // }
+        pageTest.css = this.cssObject;
+        pageTest.logic.push(logicObject);
+        value.ast.pages.push(pageTest);
+        console.log(value);
+        try {
+            let projectID = await this.sendService.postCode(value);
+            sessionStorage.setItem("projectID", projectID.toString());
+            this.toastr.success("Aplicado com sucesso!", "Sucesso!", {
+                progressBar: true,
+                closeButton: true,
+            });
+        } catch (e) {
+            if (e instanceof HttpErrorResponse) {
+                let error = e.error.errors.join("; ");
+                switch (e.status) {
+                    case 404:
+                        this.toastr.error(
+                            `Motivo(s): ${error}`,
+                            `Erro ${e.status} - ${e.error.message}`,
+                            { progressBar: true, closeButton: true }
+                        );
+                        break;
+                    default:
+                        this.toastr.error(
+                            `Motivo(s): ${error}`,
+                            `Erro ${e.status} - ${e.error.message}`,
+                            { progressBar: true, closeButton: true }
+                        );
+                        break;
+                }
+            }
+        } finally {
+            this.spinner.hide("loadingSpinner");
+        }
     }
 
-    checkFormControlType(clType: string): AbstractControl[] {
-        switch (clType) {
-            case "comparison":
-                return this.comparisonArrayData.controls;
+    checkFormControlType(clName: string, clType: string): AbstractControl[] {
+        switch (clName) {
+            case "decision":
+                switch (clType) {
+                    case "comparison":
+                        return this.comparisonArrayData.controls;
+                    default:
+                        return null;
+                }
+            case "declaration":
+                return this.declarationArrayData.controls;
             default:
                 return null;
         }
     }
 
-    getAstType(ast: AST, expression: Expression): AST {
+    getAstType(
+        ast: AST,
+        expression: Expression,
+        control: AbstractControl
+    ): AST {
         let newAst: any;
         if (ast instanceof If) {
             newAst = {
@@ -592,11 +624,67 @@ export class CanvasComponent implements OnInit {
             newAst = {
                 tag: ast.tag,
                 expression: expression,
-                name: "",
-                type: null,
+                name: control.get("varName").value,
+                type: this.getType(control.get("varType").value, [], null),
             } as Var;
         }
         return newAst;
+    }
+
+    getType(type: string, funcArguments: string[], funcReturnType: Type): Type {
+        let newType: Type;
+        switch (type) {
+            case "adt":
+                newType = {
+                    tag: "adt",
+                    name: null,
+                } as AlgebraicType;
+                break;
+            case "array":
+                newType = {
+                    tag: "array",
+                    elements: null,
+                } as ArrayType;
+                break;
+            case "char":
+                newType = {
+                    tag: "char",
+                } as CharType;
+                break;
+            case "double":
+                newType = {
+                    tag: "double",
+                } as DoubleType;
+                break;
+            case "function":
+                let args: Type[] = [];
+                funcArguments.forEach((argument) => {
+                    args.push(this.getType(argument, [], null));
+                });
+                newType = {
+                    tag: "function",
+                    arguments: args,
+                    return: funcReturnType,
+                } as FunctionType;
+                break;
+            case "integer":
+                newType = {
+                    tag: "integer",
+                } as IntegerType;
+                break;
+            case "record":
+                newType = {
+                    tag: "record",
+                    fields: [],
+                } as RecordType;
+                break;
+            case "text":
+                newType = {
+                    tag: "text",
+                } as TextType;
+                break;
+        }
+        return newType;
     }
 
     checkCommandLineTypeByName(typeName: string): AST {
@@ -612,13 +700,21 @@ export class CanvasComponent implements OnInit {
         }
     }
 
-    checkExpressionTypeByCommandLineType(clType: string): Expression {
-        switch (clType) {
-            case "comparison":
-            case "booleanLogic":
-                return new BinaryOp();
-            default:
-                return null;
+    checkExpressionTypeByCommandLineType(
+        clName: string,
+        clType: string
+    ): Expression {
+        switch (clName) {
+            case "decision":
+                switch (clType) {
+                    case "comparison":
+                    case "booleanLogic":
+                        return new BinaryOp();
+                    default:
+                        return null;
+                }
+            case "declaration":
+                return new Literal_();
         }
     }
 
@@ -631,10 +727,71 @@ export class CanvasComponent implements OnInit {
                 symbol: control.get("symbol").value,
                 rightExpression: control.get("rightExpression").value,
             } as BinaryOp;
+        } else if (expression instanceof Literal_) {
+            newExpression = {
+                tag: expression.tag,
+                value: this.getLiteralByVarType(
+                    control.get("varType").value,
+                    this.getValueByVarType(
+                        control.get("varType").value,
+                        control.get("varValue").value
+                    )
+                ),
+            } as Literal_;
         } else {
             newExpression = null;
         }
         return newExpression;
+    }
+
+    getValueByVarType(varType: string, value: string): number | string {
+        let newValue: number | string;
+        switch (varType) {
+            case "integer":
+                newValue = parseInt(value, 10);
+                break;
+            case "double":
+                newValue = parseFloat(value);
+            default:
+                newValue = value;
+        }
+        return newValue;
+    }
+
+    private getLiteralByVarType(type: string, value: any): Literal {
+        let newLiteral: Literal;
+        switch (type) {
+            case "char":
+                newLiteral = new Char();
+                newLiteral = {
+                    tag: newLiteral.tag,
+                    value,
+                } as Char;
+                break;
+            case "double":
+                newLiteral = new Double();
+                newLiteral = {
+                    tag: newLiteral.tag,
+                    value,
+                } as Double;
+                break;
+            case "integer":
+                newLiteral = new Integer();
+                newLiteral = {
+                    tag: newLiteral.tag,
+                    value,
+                } as Integer;
+                break;
+            case "text":
+                newLiteral = new Text();
+                newLiteral = {
+                    tag: newLiteral.tag,
+                    value,
+                } as Text;
+                break;
+        }
+
+        return newLiteral;
     }
 
     get formData() {
@@ -648,6 +805,8 @@ export class CanvasComponent implements OnInit {
             readonly: false,
             commandLine: [],
             events: [],
+            arguments: [],
+            returnType: { tag: "adt", name: "Unit" } as AlgebraicType,
         });
     }
 
@@ -666,7 +825,7 @@ export class CanvasComponent implements OnInit {
                 control.push(
                     this.initComparisonFormArray({
                         leftExpression: "",
-                        symbol: "",
+                        symbol: "Different",
                         rightExpression: "",
                         funcName: func,
                         index: curElement.commandLine.length - 1,
@@ -833,7 +992,7 @@ export class CanvasComponent implements OnInit {
                 control = this.declarationArrayData.controls;
                 control.push(
                     this.initDeclarationFormArray({
-                        varType: "",
+                        varType: "adt",
                         varName: "",
                         varValue: "",
                         funcName,

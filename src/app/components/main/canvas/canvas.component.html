@@ -412,9 +412,7 @@
     <div class="col-md-12">
         <div class="column">
             <div class="row m-b-sm">
-                <div class="col-1">
-                    <h4>Se</h4>
-                </div>
+                <div class="col-1 m-h-auto">Se</div>
                 <div class="col-3">
                     <select
                         class="form-control"
@@ -488,6 +486,7 @@
                         type="text"
                         class="form-control"
                         formControlName="varName"
+                        placeholder="Nome"
                     />
                 </div>
                 <div class="col-4">
@@ -495,6 +494,7 @@
                         type="text"
                         class="form-control"
                         formControlName="varValue"
+                        placeholder="Valor"
                     />
                 </div>
             </div>
@@ -598,6 +598,7 @@
                             type="text"
                             class="form-control"
                             formControlName="httpUrl"
+                            placeholder="URL"
                         />
                     </div>
                     <div class="col-2">
@@ -642,7 +643,15 @@
                     <div class="col-2">
                         <button
                             class="m-l-md btn btn-remove"
-                            (click)="removeHeader(index, isEvt, evtIndex, funcName, i)"
+                            (click)="
+                                removeHeader(
+                                    index,
+                                    isEvt,
+                                    evtIndex,
+                                    funcName,
+                                    i
+                                )
+                            "
                         >
                             <i class="fa fa-trash"></i>
                         </button>

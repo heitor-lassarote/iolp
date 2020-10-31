@@ -84,8 +84,9 @@ export class CompInfosComponent implements OnInit {
         let number = "";
         let unity = "";
         strArray.forEach((letter, i) => {
-            if (Number.isNaN(parseInt(letter))) unity += letter;
-            else number += letter;
+            if (!Number.isNaN(parseInt(letter)) || letter === ".")
+                number += letter;
+            else unity += letter;
         });
 
         return {
