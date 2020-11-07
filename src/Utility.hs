@@ -2,6 +2,7 @@ module Utility
     ( biject
     , concatUnzip
     , findMap
+    , keyNub
     , unsafeRight
     , withTag
     ) where
@@ -23,6 +24,16 @@ findMap f = foldr go Nothing
   where
     go x Nothing = f x
     go _ found   = found
+
+keyNub :: (Ord k) => (a -> k) -> [a] -> [a]
+keyNub f = go Map.empty
+  where
+    go _ [] = []
+    go m (x : xs)
+        | y `Map.member` m = go m xs
+        | otherwise        = x : go (Map.insert y x m) xs
+      where
+        y = f x
 
 unsafeRight :: Either a b -> b
 unsafeRight (Left  _) = error "fromRight called with Left."

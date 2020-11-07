@@ -31,11 +31,13 @@ instance Default LogicConverterState where
 instance LanguageConverter (L.Module L.Type) JS.Module where
     type ConverterState (L.Module L.Type) JS.Module = LogicConverterState
 
-    convert m = do
-        functions <- traverse convert $ L.functions m
-        pure $ JS.Module (algebraics <> functions)
+    convert L.Module {..} = do
+        functions' <- traverse convert functions
+        pure $ JS.Module (algebraics <> functions') hasMain
       where
-        algebraics = Map.foldr go [] $ Map.filterWithKey filterBuiltin $ L.adtTemplates m
+        algebraics = Map.foldr go [] $ Map.filterWithKey filterBuiltin adtTemplates
+
+        hasMain = any L.isMainFunction functions
 
         filterBuiltin k _ = k `notElem` ["Bool", "Unit"]
 
@@ -74,8 +76,10 @@ instance LanguageConverter [L.AST L.Type] JS.AST where
                 sequence [liftA3 JS.If (convert expression) (convert true) (tryElse false)]
             L.Match expression branches ->
                 convertMatch expression branches
-            L.Return expression ->
-                sequence [JS.Return <$> (traverse convert expression)]
+            L.Return Nothing ->
+                pure [JS.Return $ Just $ JS.Literal $ JS.Record []]
+            L.Return (Just expression) ->
+                sequence [JS.Return . Just <$> convert expression]
             L.Var name _ expression ->
                 sequence [JS.Var name <$> convert expression]
             L.While expression body ->

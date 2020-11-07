@@ -19,7 +19,8 @@ import qualified Data.Text as T
 import Language.Common
 
 data Module = Module
-    { functions :: ![AST]
+    { functions      :: ![AST]
+    , shouldCallMain :: !Bool
     } deriving (Eq, Ord, Show)
 
 -- Simplified version good enough to create the conversion.

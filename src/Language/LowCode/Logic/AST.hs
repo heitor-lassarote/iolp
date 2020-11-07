@@ -1,9 +1,8 @@
 module Language.LowCode.Logic.AST
     ( module Language.Common
     , HasMetadata (..)
-    , Field (..)
-    , Constructor (..)
     , Function (..)
+    , isMainFunction
     , MatchPattern (..)
     , Branch (..)
     , AST (..)
@@ -33,9 +32,7 @@ import           Text.Megaparsec hiding (match, unexpected)
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as Lexer
 
-import           Language.Codegen
 import           Language.Common
-import           Language.Emit
 import           Language.LowCode.Logic.Parser
 import           Language.LowCode.Logic.Structure
 import           Language.LowCode.Logic.Type
@@ -48,6 +45,10 @@ class HasMetadata f where
 data Function exprMetadata
     = Function !Name !Type ![Name] ![AST exprMetadata]
     deriving (Eq, Functor, Show)
+
+isMainFunction :: Function exprMetadata -> Bool
+isMainFunction (Function "main" (FunctionType [] (AlgebraicType "Unit")) _ _) = True
+isMainFunction _ = False
 
 instance FromJSON (Function ()) where
     parseJSON = withObject "Language.LowCode.Logic.AST.Function" \o ->
@@ -86,15 +87,6 @@ instance ToJSON MatchPattern where
         LiteralPattern value' -> withTag "literal" ["value" .= value']
         NamePattern name -> withTag "name" ["name" .= name]
         StructurePattern struct -> withTag "structure" ["struct" .= struct]
-
-instance Codegen MatchPattern where
-    type GeneratorState MatchPattern = ()
-
-    codegen = \case
-        DiscardPattern name -> emitM $ Text.cons '?' name
-        LiteralPattern lit -> codegen lit
-        NamePattern name -> emitM name
-        StructurePattern struct -> codegen struct
 
 data Branch exprMetadata
     = Branch MatchPattern [AST exprMetadata]
@@ -273,54 +265,12 @@ instance ToJSON (Expression metadata) where
             [ "name"            .= name
             ]
 
-instance Codegen (Expression metadata) where
-    type GeneratorState (Expression metadata) = ()
-
-    codegen = \case
-        Access _ expr name -> mconcat <$> sequence
-            [ codegen expr
-            , emitM "."
-            , emitM name
-            ]
-        BinaryOp _ left symbol' right -> mconcat <$> sequence
-            [ codegen left
-            , emitM " "
-            , emitM (binaryToText symbol')
-            , emitM " "
-            , codegen right
-            ]
-        Call _ expr exprs -> mconcat <$> sequence
-            [ codegen expr
-            , emitBetween' "(" ")" $ exprs `separatedBy'` ", "
-            ]
-        Index _ expr inner -> mconcat <$> sequence
-            [ codegen expr
-            , emitBetween' "[" "]" $ codegen inner
-            ]
-        Literal _ value' -> codegen value'
-        Parenthesis _ expr -> emitBetween' "(" ")" $ codegen expr
-        Structure _ structure' -> codegen structure'
-        UnaryOp _ symbol' expr -> mconcat <$> sequence
-            [ emitM $ unaryToText symbol'
-            , codegen expr
-            ]
-        Variable _ name' -> emitM name'
-
 data Literal
     = Char !Char
     | Double !Double
     | Integer !Integer
     | Text !Text
     deriving (Eq, Show)
-
-instance Codegen Literal where
-    type GeneratorState Literal = ()
-
-    codegen = \case
-        Char c -> emitBetween' "'" "'" $ emitM (Text.singleton c)
-        Double d -> emitM $ show d
-        Integer i -> emitM $ show i
-        Text t -> emitBetween' "\""  "\"" $ emitM t
 
 instance FromJSON Literal where
     parseJSON = withObject "Language.LowCode.Logic.AST.Literal" \o -> o .: "tag" >>= \case

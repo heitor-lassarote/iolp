@@ -12,6 +12,13 @@ name:                low-code
 synopsis:            A low-code platform for generating builds and source codes.
 version:             0.1.0.0
 
+data-files:
+    jsbits/jquery-3.5.1.min.js
+  , jsbits/LowCode.js
+  , jsbits/Prelude.js
+  , jsbits/JSON.js
+  , jsbits/REST.js
+
 source-repository head
   type: git
   location: https://github.com/heitor-lassarote/low-code
@@ -131,12 +138,15 @@ library
     , Language.LowCode.Logic
     , Language.LowCode.Logic.Analyzer
     , Language.LowCode.Logic.AST
+    , Language.LowCode.Logic.Codegen
     , Language.LowCode.Logic.Error
     , Language.LowCode.Logic.JavaScriptConverter
     , Language.LowCode.Logic.Module
     , Language.LowCode.Logic.Parser
+    , Language.LowCode.Logic.Standard
     , Language.LowCode.Logic.Standard.JSON
     , Language.LowCode.Logic.Standard.Prelude
+    , Language.LowCode.Logic.Standard.REST
     , Language.LowCode.Logic.Structure
     , Language.LowCode.Logic.Type
     , Utility

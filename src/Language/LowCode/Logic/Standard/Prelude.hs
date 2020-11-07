@@ -1,5 +1,5 @@
 module Language.LowCode.Logic.Standard.Prelude
-    ( prelude
+    ( modulePrelude
     , boolType
     , false
     , true
@@ -18,8 +18,8 @@ import Language.LowCode.Logic.Module
 import Language.LowCode.Logic.Structure
 import Language.LowCode.Logic.Type
 
-prelude :: Module e
-prelude = Module
+modulePrelude :: Module e
+modulePrelude = Module
     { adtTemplates = Map.unions
         [ bool
         , unit
@@ -31,7 +31,9 @@ prelude = Module
         , ("integerToText", FunctionType [IntegerType] TextType)
         , ("textToDouble", FunctionType [TextType] DoubleType)
         , ("textToInteger", FunctionType [TextType] IntegerType)
+        , ("textToIntegerRadix", FunctionType [TextType, IntegerType] IntegerType)
         , ("trunc", FunctionType [DoubleType] IntegerType)
+        , ("event", FunctionType [TextType, TextType, FunctionType [] unitType] unitType)
         ]
     , functions = []
     , importedModules = []

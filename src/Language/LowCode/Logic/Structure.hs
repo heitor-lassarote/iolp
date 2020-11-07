@@ -14,9 +14,7 @@ import Data.Aeson hiding (Array)
 import Text.Megaparsec
 import Text.Megaparsec.Char
 
-import Language.Codegen
 import Language.Common
-import Language.Emit
 import Language.LowCode.Logic.Parser
 import Utility (withTag)
 
@@ -25,30 +23,6 @@ data Structure a
     | Array ![a]
     | Record ![Field a]
     deriving (Eq, Functor, Show)
-
-instance (Codegen a) => Codegen (Structure a) where
-    type GeneratorState (Structure a) = GeneratorState a
-
-    codegen = \case
-        Algebraic constructor -> codegenAlgebraic constructor
-        Array a -> emitBetween' "[" "]" $ a `separatedBy'` ", "
-        Record fs -> codegenRecord fs
-      where
-        codegenAlgebraic (Constructor adtName name value') = mconcat <$> sequence
-            [ emitM adtName
-            , emitM "::"
-            , emitM name
-            , maybe (emitM "") (emitBetween' "(" ")" . codegen) value'
-            ]
-
-        codegenField (Field fieldName expr) = mconcat <$> sequence
-            [ emitM fieldName
-            , emitM " = "
-            , codegen expr
-            ]
-
-        codegenRecord fields =
-            emitBetween' "{" "}" $ separatedByF codegenField (emit ", ") fields
 
 instance (FromJSON a) => FromJSON (Structure a) where
     parseJSON = withObject "Language.LowCode.Logic.Structure.Structure" \o -> o .: "tag" >>= \case

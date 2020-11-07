@@ -1,16 +1,25 @@
-module Language.Bundles where
+module Language.Bundles
+    ( GeneratedSuccess (..)
+    , GeneratedFail (..)
+    , Bundle (..)
+    , mkBundleZip
+    , PageCssHtmlLogic (..)
+    , BundleCssHtmlLogic (..)
+    ) where
 
-import Universum
+import           Universum
 
 import qualified Codec.Archive.Zip as Zip
 import           Data.Aeson hiding (Error)
 import           Data.Default.Class
 import qualified Data.Map.Strict as Map
 import qualified Data.Map.Merge.Strict as Map.Merge
+import qualified Data.Text.IO as Text.IO
 import           Data.These
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath
 import qualified System.IO.Temp as Temp
+import qualified System.IO.Unsafe as Unsafe
 
 import           Language.Codegen
 import           Language.Common (Name)
@@ -20,6 +29,7 @@ import           Language.LanguageConverter
 import qualified Language.HTML as HTML
 import qualified Language.JavaScript as JS
 import qualified Language.LowCode.Logic as L
+import qualified Language.LowCode.Logic.Standard as L
 
 data GeneratedSuccess gen = GeneratedSuccess
     { file     :: !gen
@@ -52,6 +62,12 @@ mkBundleZip tempFolderName name files = do
     Zip.createArchive file (traverse_ (uncurry (Zip.addEntry Zip.Store)) entries)
     pure file
 
+jsBitsDir :: FilePath
+jsBitsDir = "jsbits"
+
+inJsBitsDir :: FilePath -> FilePath
+inJsBitsDir = (jsBitsDir </>)
+
 data PageCssHtmlLogic = PageCssHtmlLogic
     { css   :: !CSS.AST
     , html  :: ![HTML.AST]
@@ -60,19 +76,21 @@ data PageCssHtmlLogic = PageCssHtmlLogic
     } deriving (Generic, FromJSON, ToJSON)
 
 data BundleCssHtmlLogic = BundleCssHtmlLogic
-    { cssOptions   :: !CSS.Options
-    , extraJsFiles :: !(Map Name Text)
-    , htmlOptions  :: !HTML.Options
-    , jsOptions    :: !JS.Options
-    , pages        :: ![PageCssHtmlLogic]
+    { cssOptions      :: !CSS.Options
+    , extraJsFiles    :: !(Map Name Text)
+    , htmlOptions     :: !HTML.Options
+    , includeStandard :: !Bool
+    , jsOptions       :: !JS.Options
+    , pages           :: ![PageCssHtmlLogic]
     } deriving (Generic, ToJSON)
 
 instance FromJSON BundleCssHtmlLogic where
     parseJSON = withObject "Language.Bundles.BundleCssHtmlLogic" \o ->
-        BundleCssHtmlLogic <$> o .:? "cssOptions"   .!= def
-                           <*> o .:? "extraJsFiles" .!= Map.empty
-                           <*> o .:? "htmlOptions"  .!= def
-                           <*> o .:? "jsOptions"    .!= def
+        BundleCssHtmlLogic <$> o .:? "cssOptions"      .!= def
+                           <*> o .:? "extraJsFiles"    .!= Map.empty
+                           <*> o .:? "htmlOptions"     .!= def
+                           <*> o .:? "includeStandard" .!= True
+                           <*> o .:? "jsOptions"       .!= def
                            <*> o .:  "pages"
 
 instance Bundle BundleCssHtmlLogic where
@@ -82,7 +100,12 @@ instance Bundle BundleCssHtmlLogic where
       where
         errors = lefts result
         files = concat $ rights result
-        result = case L.analyze $ concatMap logic pages of
+        logics
+            | includeStandard = userLogic <> Map.elems L.standardModules
+            | otherwise       = userLogic
+          where
+            userLogic = concatMap logic pages
+        result = case L.analyze logics of
             This writer  -> mkLeft writer
             That imports -> linkHtml imports Map.empty <$> pages
             These writer imports
@@ -100,7 +123,15 @@ instance Bundle BundleCssHtmlLogic where
                     (L.errors writer)
                     (L.warnings writer)
 
-        extraJsFiles' = Map.toList extraJsFiles
+        extraJsFiles' = standard <> Map.toList extraJsFiles
+          where
+            -- TODO: Dear mr. H. B. Curry, please forgive me. My time is running out.
+            unsafeReadFile = Unsafe.unsafePerformIO . Text.IO.readFile
+
+            standard = map (id &&& unsafeReadFile . inJsBitsDir . toString)
+                [ "jquery-3.5.1.min.js"
+                , "LowCode.js"
+                ]
 
         jsFiles :: (Emit gen, Monoid gen) => [GeneratedSuccess gen]
         jsFiles = fmap (\(path, file) -> GeneratedSuccess (emit file) (toString path) []) extraJsFiles'
@@ -121,7 +152,7 @@ instance Bundle BundleCssHtmlLogic where
             cssName = pName <> ".css"
             cssNames = if css page == CSS.CSS [] then [] else [cssName]
             jsName = (<> ".js")
-            jsNames = map (view _2) $ sortOn (view _4) $ Map.elems modulesAndErrors
+            jsNames = map (jsName . view _2) $ sortOn (view _4) $ Map.elems modulesAndErrors
             htmlName = pName <> ".html"
 
             uiResult name =

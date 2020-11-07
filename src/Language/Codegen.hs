@@ -3,6 +3,7 @@ module Language.Codegen where
 import           Universum
 import qualified Universum.Unsafe as Unsafe
 
+import           Data.Default.Class
 import qualified Data.Text as T
 
 import Language.Emit
@@ -30,10 +31,10 @@ unsafeCodegen
 unsafeCodegen st = Unsafe.fromJust . rightToMaybe . evalCodegenT st . codegen
 
 unsafeCodegen'
-    :: (GeneratorState ast ~ (), Codegen ast, Emit gen, Monoid gen)
+    :: (Default (GeneratorState ast), Codegen ast, Emit gen, Monoid gen)
     => ast
     -> gen
-unsafeCodegen' = unsafeCodegen ()
+unsafeCodegen' = unsafeCodegen def
 
 evalCodegenT
     :: (Emit gen, Monoid gen)

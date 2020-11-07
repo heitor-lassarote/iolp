@@ -9,8 +9,8 @@ import Universum hiding (Type)
 
 import Formatting (float, int, sformat, shown, stext, (%))
 
-import Language.Codegen (unsafeCodegen')
 import Language.LowCode.Logic.AST
+import Language.LowCode.Logic.Codegen
 import Language.LowCode.Logic.Type (Type)
 
 -- TODO: Add information about where the error is coming from.
@@ -23,6 +23,7 @@ data Error
     | IncompatibleSignatures !Name !Int !Int
     | IncompatibleTypes1 !UnarySymbol !(Expression ())
     | IncompatibleTypes2 !(Expression ()) !BinarySymbol !(Expression ())
+    | MainNotFound
     | MissingFields !(NonEmpty Name)
     | NoSuchConstructor !Name !Name
     | NoSuchModule !Name
@@ -74,6 +75,7 @@ prettyError = \case
         (unsafeCodegen' left)
         (unsafeCodegen' right)
         (binaryToText symbol)
+    MainNotFound -> "No function with name 'main' and type () -> Unit could be found."
     MissingFields (name :| names) -> sformat
         ("Record does not have the required fields: " % shown % ".")
         (name : names)
@@ -126,8 +128,7 @@ prettyWarning = \case
         value
     UnreachableStatement ast -> sformat
         ("Unreachable statement: " % stext)
-        "TODO: Add codegen for Logic.AST"
-        --(unsafeCodegen' ast)
+        (unsafeCodegen' ast)
     UnusedVariable name -> sformat
         ("Declared but not used: '" % stext % "'.")
         name

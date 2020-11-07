@@ -83,10 +83,11 @@ data AnalyzerState exprMetadata = AnalyzerState
     , modulesAnalyzedSoFar :: !(Map Name (ModuleImports Type))
     , functionName         :: !Name
     , returnType           :: !Type
+    , foundAcceptableMain  :: !Bool
     } deriving (Show)
 
 instance Default (AnalyzerState exprMetadata) where
-    def = AnalyzerState Map.empty (mkModule "") Map.empty Map.empty "" unitType
+    def = AnalyzerState Map.empty (mkModule "") Map.empty Map.empty "" unitType False
 
 type AnalyzerT exprMetadata m
     = ChronicleT AnalyzerWriter (ReaderT AnalyzerReader (StateT (AnalyzerState exprMetadata) m))
@@ -308,14 +309,24 @@ analyze mods = nonFatalToFatal $ fst $ runAnalyzer (analyze' mods) def def
         other -> other
 
 analyze' :: [Module e] -> Analyzer e (Map Name AnalyzedModule)
-analyze' mods = fmap getMods . analyzeImpl =<< linkModules mods
+analyze' mods = do
+    analysis <- analyzeImpl =<< linkModules mods
+    modify \st -> st { currentModule = mkModule "" }
+    foundMain <- gets foundAcceptableMain
+    if foundMain
+        then pass
+        else addError MainNotFound
+    pure $ getMods analysis
   where
     getMods = Map.foldr go Map.empty
     go (ModuleImports _ ms m i) acc =
         Map.insert (moduleName m) (AnalyzedModule m i) (Map.union acc (getMods ms))
 
 analyzeFunction :: Function e -> Analyzer e' (Function Type)
-analyzeFunction (Function name (FunctionType argTypes ret) arguments body) = do
+analyzeFunction f@(Function name (FunctionType argTypes ret) arguments body) = do
+    when (isMainFunction f) $
+        modify \st -> st { foundAcceptableMain = True }
+
     zipped <- zipExact name arguments argTypes
     asts <- withScope do
         void (addVars zipped)
@@ -461,7 +472,11 @@ analyzeAstsImpl asts = do
     when (isReachable && returnType st /= unitType) $
         addError $ TypeMismatch (functionName st) (returnType st) unitType
     traverse_ (addWarning . UnreachableStatement . void) unreachableAsts
-    analyzeAsts asts
+
+    -- Explicitly add a return at the end if none exists:
+    if isReachable && returnType st == unitType
+        then analyzeAsts asts <&> (<> [Return $ Just $ Structure unitType unit'])
+        else analyzeAsts asts
 
 analyzeAst :: AST e -> Analyzer e' (AST Type)
 analyzeAst = \case

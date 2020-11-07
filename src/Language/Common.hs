@@ -77,4 +77,4 @@ instance FromJSON UnarySymbol where
         toSymbol sym = maybe (fail $ unknownSymbol sym) pure (readMaybe sym)
 
 instance ToJSON UnarySymbol where
-    toJSON symbol = object [ "symbol" .= String (show symbol) ]
+    toJSON = String . show

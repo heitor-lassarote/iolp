@@ -12,8 +12,9 @@ import           Text.Megaparsec
 import           Text.Megaparsec.Char
 
 import Language.Common (Name)
-import Language.LowCode.Logic.AST (Constructor, Function, function)
+import Language.LowCode.Logic.AST (Function, function)
 import Language.LowCode.Logic.Parser
+import Language.LowCode.Logic.Structure (Constructor)
 import Language.LowCode.Logic.Type (Constructor (..), Type, typeName)
 
 data Module exprMetadata = Module
@@ -22,7 +23,7 @@ data Module exprMetadata = Module
     , functions       :: ![Function exprMetadata]
     , importedModules :: ![Name]
     , moduleName      :: !Name
-    } deriving (Eq, Generic, Show, ToJSON)
+    } deriving (Eq, Functor, Generic, Show, ToJSON)
 
 instance FromJSON (Module ()) where
     parseJSON = withObject "Language.LowCode.Logic.Module.Module" \o ->

@@ -230,7 +230,11 @@ javaScriptCodegen m = do
     liftA2 (<>) useStrict (genModule m)
 
 genModule :: (Emit gen, Monoid gen) => Module -> JavaScriptCodegen gen
-genModule (Module functions) = mconcat <$> traverse genAst functions
+genModule Module {..} = liftA2 (<>) (mconcat <$> traverse genAst functions) callMain
+  where
+    callMain
+        | shouldCallMain = emitM "main();"
+        | otherwise      = emitM ""
 
 genIf :: (Emit gen, Monoid gen) => Expression -> AST -> Maybe AST -> JavaScriptCodegen gen
 genIf expr'' ifB' elseB' = mconcatA [indent, mkIfElse expr'' ifB' elseB']

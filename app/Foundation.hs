@@ -1,6 +1,6 @@
 module Foundation where
 
-import Universum hiding (get, traverse_, (^.))
+import Universum hiding (get, (^.))
 
 import           Crypto.KDF.BCrypt
 import           Data.Aeson
@@ -119,13 +119,13 @@ getBuildR pid = do
     project <- runDB $ get404 pid
     let bundle = fromJSON $ projectAst project :: Result BundleCssHtmlLogic
     status <- case bundle of
-        Error err -> sendResponseStatus status500 err
+        Error err -> sendResponseStatus status400 err
         Success bundle' -> pure $ generate bundle'
     case status of
         Right files -> do
             zipPath <- mkBundleZip (show $ fromSqlKey pid) (toString $ projectName project) $ map toTuple files
             sendFile "application/zip" zipPath
-        Left errors -> sendResponseStatus status500 $ toJSON errors
+        Left errors -> sendResponseStatus status400 $ toJSON errors
   where
     toTuple GeneratedSuccess {..} = (path, file)
 
