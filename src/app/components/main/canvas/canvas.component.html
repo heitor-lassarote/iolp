@@ -76,27 +76,27 @@
 </div>
 
 <div id="logic" class="col-md-12" *ngIf="isLogicContainer">
-    <form [formGroup]="logicForm">
-        <div class="ibox">
-            <div class="ibox-title">
-                <div class="ibox-tools">
-                    <div class="row-flex">
-                        <h4 class="add-title">Nova função</h4>
-                        <button
-                            type="button"
-                            class="btn btn-primary add-btn m-l-sm"
-                            (click)="addAction()"
-                        >
-                            <i class="fa fa-plus"></i>
-                        </button>
-                    </div>
+    <div class="ibox">
+        <div class="ibox-title">
+            <div class="ibox-tools">
+                <div class="row-flex">
+                    <h4 class="add-title">Nova função</h4>
+                    <button
+                        type="button"
+                        class="btn btn-primary add-btn m-l-sm"
+                        (click)="addAction()"
+                    >
+                        <i class="fa fa-plus"></i>
+                    </button>
                 </div>
             </div>
-            <div class="ibox-content">
-                <div
-                    class="ibox"
-                    *ngFor="let func of logicElements; let funcIndex = index"
-                >
+        </div>
+        <div class="ibox-content">
+            <div
+                class="ibox"
+                *ngFor="let func of logicElements; let funcIndex = index"
+            >
+                <form role="form" [formGroup]="getCurFunction(funcIndex)">
                     <div class="ibox-title inside-ibox">
                         <h5 class="func-name">Nome da função:</h5>
                         <input
@@ -104,6 +104,7 @@
                             style="width: 200px"
                             type="text"
                             [value]="func.funcName"
+                            formControlName="funcName"
                             [attr.readOnly]="func.readonly ? '' : null"
                         />
                         <div class="ibox-tools">
@@ -177,6 +178,9 @@
                                             Declaração
                                         </option>
                                         <option value="http">HTTP</option>
+                                        <option value="call">
+                                            Chamada de Função
+                                        </option>
                                     </select>
                                 </div>
                                 <div class="col-md-8">
@@ -203,6 +207,16 @@
                                     <ng-container
                                         *ngIf="cl.type.name === 'http'"
                                         [ngTemplateOutlet]="http"
+                                        [ngTemplateOutletContext]="{
+                                            index: funcClIndex,
+                                            evtIndex: -1,
+                                            isEvt: false,
+                                            funcName: func.funcName
+                                        }"
+                                    ></ng-container>
+                                    <ng-container
+                                        *ngIf="cl.type.name === 'call'"
+                                        [ngTemplateOutlet]="call"
                                         [ngTemplateOutletContext]="{
                                             index: funcClIndex,
                                             evtIndex: -1,
@@ -329,6 +343,9 @@
                                                 <option value="http">
                                                     HTTP
                                                 </option>
+                                                <option value="call">
+                                                    Chamada de Função
+                                                </option>
                                             </select>
                                         </div>
                                         <div class="col-md-8">
@@ -367,6 +384,16 @@
                                                     funcName: func.funcName
                                                 }"
                                             ></ng-container>
+                                            <ng-container
+                                                *ngIf="cl.type.name === 'call'"
+                                                [ngTemplateOutlet]="call"
+                                                [ngTemplateOutletContext]="{
+                                                    index: evtClIndex,
+                                                    evtIndex: evtIndex,
+                                                    isEvt: true,
+                                                    funcName: func.funcName
+                                                }"
+                                            ></ng-container>
                                         </div>
                                         <div class="col-md-1">
                                             <button
@@ -386,10 +413,10 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
-    </form>
+    </div>
 </div>
 
 <div class="col-12 text-right">
@@ -605,9 +632,7 @@
                         <button
                             type="button"
                             class="btn btn-primary add-btn m-l-sm"
-                            (click)="
-                                addHeader(index, isEvt, evtIndex, funcName)
-                            "
+                            (click)="addBody(index, isEvt, evtIndex, funcName)"
                         >
                             <i class="fa fa-plus"></i>
                         </button>
@@ -616,7 +641,7 @@
                 <div
                     class="row m-b-sm"
                     *ngFor="
-                        let header of getHttpHeaderArrayData(
+                        let body of getHttpBodyArrayData(
                             index,
                             isEvt,
                             evtIndex,
@@ -624,37 +649,154 @@
                         ).controls;
                         let i = index
                     "
-                    [formGroup]="header"
+                    [formGroup]="body"
                 >
                     <div class="col-5">
                         <input
                             type="text"
                             class="form-control"
-                            formControlName="httpHeaderName"
+                            formControlName="httpBodyName"
                         />
                     </div>
                     <div class="col-5">
                         <input
                             type="text"
                             class="form-control"
-                            formControlName="httpHeaderValue"
+                            formControlName="httpBodyValue"
                         />
                     </div>
                     <div class="col-2">
                         <button
                             class="m-l-md btn btn-remove"
                             (click)="
-                                removeHeader(
-                                    index,
-                                    isEvt,
-                                    evtIndex,
-                                    funcName,
-                                    i
-                                )
+                                removeBody(index, isEvt, evtIndex, funcName, i)
                             "
                         >
                             <i class="fa fa-trash"></i>
                         </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</ng-template>
+
+<ng-template
+    #call
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        role="form"
+        [formGroup]="getCallFuncFormGroup(index, isEvt, evtIndex, funcName)"
+    >
+        <div class="col-md-12 column">
+            <div class="row">
+                <div class="col-3">
+                    <select class="form-control" formControlName="returnType">
+                        <option value="with-return">Atribuição</option>
+                        <option value="without-return">Execução</option>
+                    </select>
+                </div>
+                <div
+                    class="col-4"
+                    *ngIf="
+                        callFuncChangeReturnType(
+                            index,
+                            isEvt,
+                            evtIndex,
+                            funcName
+                        ) === 'with-return'
+                    "
+                >
+                    <select class="form-control" formControlName="varName">
+                        <ng-container
+                            *ngFor="
+                                let variable of declarationArrayData.controls;
+                                let i = index
+                            "
+                        >
+                            <option [value]="variable.get('varName').value">
+                                {{ variable.get("varName").value }}
+                            </option>
+                        </ng-container>
+                    </select>
+                </div>
+                <div
+                    class="col-5"
+                    [class.col-9]="
+                        callFuncChangeReturnType(
+                            index,
+                            isEvt,
+                            evtIndex,
+                            funcName
+                        ) === 'without-return'
+                    "
+                >
+                    <select
+                        class="form-control"
+                        formControlName="function"
+                        (change)="
+                            onChangeFunctionCall(
+                                $event.target.value,
+                                index,
+                                isEvt,
+                                evtIndex,
+                                funcName
+                            )
+                        "
+                    >
+                        <ng-container
+                            *ngFor="let funct of externFunc; let i = index"
+                        >
+                            <option [value]="funct.name">
+                                {{ funct.name }}
+                            </option>
+                        </ng-container>
+                        <ng-container
+                            *ngFor="
+                                let func of formData.controls;
+                                let i = index
+                            "
+                        >
+                            <option
+                                [value]="func.get('funcName').value"
+                                *ngIf="i !== 0"
+                            >
+                                {{ func.get("funcName").value }}
+                            </option>
+                        </ng-container>
+                    </select>
+                </div>
+            </div>
+            <div *ngIf="hasFunction(index, isEvt, evtIndex, funcName)">
+                <div
+                    class="row m-t-sm"
+                    *ngFor="
+                        let param of getFunctionParameters(
+                            index,
+                            isEvt,
+                            evtIndex,
+                            funcName
+                        );
+                        let i = index
+                    "
+                    [formGroup]="param"
+                >
+                    <div class="col-3"></div>
+                    <div class="col-4 text-center m-h-auto">
+                        <h4>
+                            {{ param.get("paramName").value }}
+                        </h4>
+                    </div>
+                    <div class="col-5">
+                        <input
+                            type="text"
+                            class="form-control"
+                            formControlName="paramValue"
+                        />
                     </div>
                 </div>
             </div>

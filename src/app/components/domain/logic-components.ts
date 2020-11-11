@@ -5,7 +5,7 @@ export interface LogicFunction {
     commandLine: CommandLine[];
     readonly: boolean;
     events: LogicEvent[];
-    arguments: string[];
+    arguments: Argument[];
     returnType: Type;
 }
 
@@ -24,4 +24,15 @@ export interface CommandLine {
 export interface CommandLineType {
     name: string;
     clType: string;
+}
+
+export interface Argument {
+    returnType: string;
+    name: string;
+}
+
+export interface ExternFunction {
+    name: string;
+    parametersQuantity: number;
+    parameters: string[];
 }
