@@ -735,7 +735,19 @@
                         ) === 'without-return'
                     "
                 >
-                    <select class="form-control" formControlName="function">
+                    <select
+                        class="form-control"
+                        formControlName="function"
+                        (change)="
+                            onChangeCallFunction(
+                                $event.target.value,
+                                index,
+                                isEvt,
+                                evtIndex,
+                                funcName
+                            )
+                        "
+                    >
                         <ng-container
                             *ngFor="
                                 let func of formData.controls;
@@ -760,7 +772,7 @@
                         isEvt,
                         evtIndex,
                         funcName
-                    )
+                    ).controls
                 "
                 [formGroup]="param"
             >

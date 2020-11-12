@@ -208,9 +208,7 @@ export class CanvasComponent implements OnInit {
             funcName
         );
 
-        return parameterFormGroup === null
-            ? []
-            : (parameterFormGroup.get("parameters") as FormArray).controls;
+        return <FormArray>parameterFormGroup.get("parameters");
     }
 
     private initComparisonFormArray(comparison: {
@@ -368,6 +366,48 @@ export class CanvasComponent implements OnInit {
         return this.callFuncArrayData.controls[formIndex] as FormGroup;
     }
 
+    onChangeCallFunction(
+        func: string,
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ) {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        let funcControl = this.formData.controls.find(
+            (ctr) => ctr.get("funcName").value === func
+        );
+
+        let control = this.callFuncArrayData.controls[formIndex];
+        let funcParams = funcControl.get("parameters") as FormArray;
+        let callParams = control.get("parameters") as FormArray;
+
+        callParams.clear();
+
+        for (let formControl of funcParams.controls) {
+            callParams.controls.push(
+                this.formBuilder.group({
+                    paramName: formControl.value["paramName"],
+                    paramValue: formControl.value["paramValue"],
+                    paramType: formControl.value["paramType"],
+                })
+            );
+        }
+        control
+            .get("parametersQuantity")
+            .patchValue(funcControl.get("parametersQuantity").value);
+    }
+
     getFunctionFormGroup(
         index: number,
         isEvt: boolean,
@@ -387,23 +427,7 @@ export class CanvasComponent implements OnInit {
                 curElement.events[evtIndex].commandLine[index].formIndex;
         }
 
-        let functionName: string = this.callFuncArrayData.controls[
-            formIndex
-        ].get("function").value;
-
-        let funcIndex: number;
-
-        let func: ExternFunction =
-            functionName !== ""
-                ? this.externFunc.find((funct, index) => {
-                      funcIndex = index;
-                      return funct.name === functionName;
-                  })
-                : null;
-
-        return func === null
-            ? null
-            : (this.formData.controls[funcIndex + 1] as FormGroup);
+        return this.callFuncArrayData.controls[formIndex] as FormGroup;
     }
 
     private checkLogicContainerState(isLogicContainer: boolean) {
