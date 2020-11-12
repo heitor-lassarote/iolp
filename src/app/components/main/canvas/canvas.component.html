@@ -735,26 +735,7 @@
                         ) === 'without-return'
                     "
                 >
-                    <select
-                        class="form-control"
-                        formControlName="function"
-                        (change)="
-                            onChangeFunctionCall(
-                                $event.target.value,
-                                index,
-                                isEvt,
-                                evtIndex,
-                                funcName
-                            )
-                        "
-                    >
-                        <ng-container
-                            *ngFor="let funct of externFunc; let i = index"
-                        >
-                            <option [value]="funct.name">
-                                {{ funct.name }}
-                            </option>
-                        </ng-container>
+                    <select class="form-control" formControlName="function">
                         <ng-container
                             *ngFor="
                                 let func of formData.controls;
@@ -771,33 +752,31 @@
                     </select>
                 </div>
             </div>
-            <div *ngIf="hasFunction(index, isEvt, evtIndex, funcName)">
-                <div
-                    class="row m-t-sm"
-                    *ngFor="
-                        let param of getFunctionParameters(
-                            index,
-                            isEvt,
-                            evtIndex,
-                            funcName
-                        );
-                        let i = index
-                    "
-                    [formGroup]="param"
-                >
-                    <div class="col-3"></div>
-                    <div class="col-4 text-center m-h-auto">
-                        <h4>
-                            {{ param.get("paramName").value }}
-                        </h4>
-                    </div>
-                    <div class="col-5">
-                        <input
-                            type="text"
-                            class="form-control"
-                            formControlName="paramValue"
-                        />
-                    </div>
+            <div
+                class="row m-t-sm"
+                *ngFor="
+                    let param of getParamentersArrayData(
+                        index,
+                        isEvt,
+                        evtIndex,
+                        funcName
+                    )
+                "
+                [formGroup]="param"
+            >
+                <div class="col-3"></div>
+                <div class="col-4 text-center m-h-auto">
+                    <h4>
+                        {{ param.value["paramName"] }}
+                    </h4>
+                </div>
+                <div class="col-5">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="paramValue"
+                        [value]="param.value['paramValue']"
+                    />
                 </div>
             </div>
         </div>

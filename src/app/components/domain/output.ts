@@ -53,11 +53,21 @@ export abstract class Type {
 }
 
 export class AlgebraicType extends Type {
+    constructor(name: string) {
+        super();
+        this.name = name;
+    }
+
     tag = "adt";
     name: string;
 }
 
 export class ArrayType extends Type {
+    constructor(elements: Type) {
+        super();
+        this.elements = elements;
+    }
+
     tag = "array";
     elements: Type;
 }
@@ -71,6 +81,12 @@ export class DoubleType extends Type {
 }
 
 export class FunctionType extends Type {
+    constructor(args: Type[], rtrn: Type) {
+        super();
+        this.arguments = args;
+        this.return = rtrn;
+    }
+
     tag = "function";
     arguments: Type[];
     return: Type;
@@ -81,6 +97,11 @@ export class IntegerType extends Type {
 }
 
 export class RecordType extends Type {
+    constructor(fields: Field<Type>[]) {
+        super();
+        this.fields = fields;
+    }
+
     tag = "record";
     fields: Field<Type>[];
 }
@@ -90,6 +111,13 @@ export class TextType extends Type {
 }
 
 export class Function {
+    constructor(name: string, type: Type, args: string[], body: AST[]) {
+        this.name = name;
+        this.type = type;
+        this.arguments = args;
+        this.body = body;
+    }
+
     name: string;
     type: Type;
     arguments: string[];
@@ -101,6 +129,12 @@ export abstract class AST {
 }
 
 export class Assign extends AST {
+    constructor(leftExpression: Expression, rightExpression: Expression) {
+        super();
+        this.leftExpression = leftExpression;
+        this.rightExpression = rightExpression;
+    }
+
     tag = "assign";
     leftExpression: Expression;
     rightExpression: Expression;
@@ -111,11 +145,27 @@ export class End extends AST {
 }
 
 export class Expression_ extends AST {
+    constructor(expression: Expression) {
+        super();
+        this.expression = expression;
+    }
+
     tag = "expression";
     expression: Expression;
 }
 
 export class If extends AST {
+    constructor(
+        expression: Expression,
+        trueBranchAst: AST[],
+        falseBranchAst: AST[]
+    ) {
+        super();
+        this.expression = expression;
+        this.trueBranchAst = trueBranchAst;
+        this.falseBranchAst = falseBranchAst;
+    }
+
     tag = "if";
     expression: Expression;
     trueBranchAst: AST[];
@@ -123,17 +173,36 @@ export class If extends AST {
 }
 
 export class Match extends AST {
+    constructor(expression: Expression, branches: Branch[]) {
+        super();
+        this.expression = expression;
+        this.branches = branches;
+    }
+
     tag = "match";
     expression: Expression;
     branches: Branch[];
 }
 
 export class Return extends AST {
+    constructor(expression?: Expression) {
+        super();
+
+        this.expression = expression;
+    }
+
     tag = "return";
     expression?: Expression;
 }
 
 export class Var extends AST {
+    constructor(name: string, type: Type, expression: Expression) {
+        super();
+        this.name = name;
+        this.type = type;
+        this.expression = expression;
+    }
+
     tag = "var";
     name: string;
     type: Type;
@@ -141,12 +210,23 @@ export class Var extends AST {
 }
 
 export class While extends AST {
+    constructor(expression: Expression, whileAst: AST[]) {
+        super();
+        this.expression = expression;
+        this.whileAst = whileAst;
+    }
+
     tag = "while";
     expression: Expression;
     whileAst: AST[];
 }
 
 export class Branch {
+    constructor(pattern: MatchPattern, ast: AST[]) {
+        this.pattern = pattern;
+        this.ast = ast;
+    }
+
     pattern: MatchPattern;
     ast: AST[];
 }
@@ -157,16 +237,31 @@ export abstract class MatchPattern {
 
 // FIXME: Change constructor_ to constructor.
 export class LiteralPattern extends MatchPattern {
+    constructor(value: Literal) {
+        super();
+        this.value = value;
+    }
+
     tag = "literal";
     value: Literal;
 }
 
 export class NamePattern extends MatchPattern {
+    constructor(name: string) {
+        super();
+        this.name = name;
+    }
+
     tag = "name";
     name: string;
 }
 
 export class StructurePattern extends MatchPattern {
+    constructor(struct: Structure<MatchPattern>) {
+        super();
+        this.struct = struct;
+    }
+
     tag = "structure";
     struct: Structure<MatchPattern>;
 }
@@ -176,6 +271,12 @@ export abstract class Expression {
 }
 
 export class Access extends Expression {
+    constructor(expression: Expression, name: string) {
+        super();
+        this.expression = expression;
+        this.name = name;
+    }
+
     tag = "access";
     expression: Expression;
     name: string;
@@ -195,6 +296,17 @@ export class Access extends Expression {
 //    | And
 //    | Or
 export class BinaryOp extends Expression {
+    constructor(
+        leftExpression: Expression,
+        symbol: string,
+        rightExpression: Expression
+    ) {
+        super();
+        this.leftExpression = leftExpression;
+        this.symbol = symbol;
+        this.rightExpression = rightExpression;
+    }
+
     tag = "binaryOp";
     leftExpression: Expression;
     symbol: string;
@@ -202,28 +314,55 @@ export class BinaryOp extends Expression {
 }
 
 export class Call extends Expression {
+    constructor(expression: Expression, args: Expression[]) {
+        super();
+        this.expression = expression;
+        this.arguments = args;
+    }
+
     tag = "call";
     expression: Expression;
     arguments: Expression[];
 }
 
 export class Index extends Expression {
+    constructor(leftExpression: Expression, rightExpression: Expression) {
+        super();
+        this.leftExpression = leftExpression;
+        this.rightExpression = rightExpression;
+    }
+
     tag = "index";
     leftExpression: Expression;
     rightExpression: Expression;
 }
 
 export class Literal_ extends Expression {
+    constructor(value: Literal) {
+        super();
+        this.value = value;
+    }
+
     tag = "literal";
     value: Literal;
 }
 
 export class Parenthesis extends Expression {
+    constructor(expression: Expression) {
+        super();
+        this.expression = expression;
+    }
+
     tag = "parenthesis";
     expression: Expression;
 }
 
 export class Structure_ extends Expression {
+    constructor(structure: Structure<Expression>) {
+        super();
+        this.structure = structure;
+    }
+
     tag = "structure";
     structure: Structure<Expression>;
 }
@@ -232,12 +371,23 @@ export class Structure_ extends Expression {
 //    = Negate
 //    | Not
 export class UnaryOp extends Expression {
+    constructor(symbol: string, expression: Expression) {
+        super();
+        this.symbol = symbol;
+        this.expression = expression;
+    }
+
     tag = "unaryOp";
     symbol: string;
     expression: Expression;
 }
 
 export class Variable extends Expression {
+    constructor(name: string) {
+        super();
+        this.name = name;
+    }
+
     tag = "variable";
     name: string;
 }
@@ -247,21 +397,41 @@ export abstract class Literal {
 }
 
 export class Char extends Literal {
+    constructor(value: string) {
+        super();
+        this.value = value;
+    }
+
     tag = "char";
     value: string;
 }
 
 export class Double extends Literal {
+    constructor(value: number) {
+        super();
+        this.value = value;
+    }
+
     tag = "double";
     value: number;
 }
 
 export class Integer extends Literal {
+    constructor(value: number) {
+        super();
+        this.value = value;
+    }
+
     tag = "integer";
     value: number;
 }
 
 export class Text extends Literal {
+    constructor(value: string) {
+        super();
+        this.value = value;
+    }
+
     tag = "text";
     value: string;
 }
@@ -272,16 +442,31 @@ export abstract class Structure<T> {
 
 // FIXME: Change constructor_ to constructor.
 export class Algebraic<T> extends Structure<T> {
+    constructor(construc: Constructor<T>) {
+        super();
+        this.constructor_ = construc;
+    }
+
     tag = "adt";
     constructor_: Constructor<T>;
 }
 
 export class Array<T> extends Structure<T> {
+    constructor(positions: T[]) {
+        super();
+        this.positions = positions;
+    }
+
     tag = "array";
     positions: T[];
 }
 
 export class Record<T> extends Structure<T> {
+    constructor(fields: Field<T>[]) {
+        super();
+        this.fields = fields;
+    }
+
     tag = "record";
     fields: Field<T>[];
 }

@@ -34,5 +34,5 @@ export interface Argument {
 export interface ExternFunction {
     name: string;
     parametersQuantity: number;
-    parameters: string[];
+    parameters: { paramName: string; paramValue: any; paramType: Type }[];
 }

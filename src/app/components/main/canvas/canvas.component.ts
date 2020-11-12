@@ -28,6 +28,8 @@ import {
     IntegerType,
     RecordType,
     TextType,
+    Call,
+    Variable,
 } from "./../../domain/output";
 import { Info } from "./../../domain/info";
 import { Element } from "src/app/components/domain/element";
@@ -50,6 +52,7 @@ import {
     AbstractControl,
     FormArray,
     FormBuilder,
+    FormControl,
     FormGroup,
     Validators,
 } from "@angular/forms";
@@ -60,6 +63,12 @@ import { LOWCODEFUNCTIONS } from "../../constants/low-code-functions.constant";
 
 declare let $: any;
 declare let css: any;
+
+// Constants
+const UNIT = {
+    tag: "adt",
+    name: "Unit",
+} as AlgebraicType;
 
 @Component({
     selector: "app-canvas",
@@ -88,7 +97,7 @@ export class CanvasComponent implements OnInit {
             events: [],
             commandLine: [],
             arguments: [],
-            returnType: { tag: "adt", name: "Unit" } as AlgebraicType,
+            returnType: UNIT,
         },
     ];
 
@@ -121,8 +130,22 @@ export class CanvasComponent implements OnInit {
         });
 
         (this.logicForm.get("functions") as FormArray).push(
-            this.initForm({ funcName: "main" })
+            this.initForm({
+                funcName: "main",
+                parametersQuantity: 0,
+                parameters: [],
+            })
         );
+
+        this.externFunc.forEach((func) => {
+            this.formData.controls.push(
+                this.initForm({
+                    funcName: func.name,
+                    parametersQuantity: func.parametersQuantity,
+                    parameters: func.parameters,
+                })
+            );
+        });
 
         this.comparisonForm = this.formBuilder.group({
             comparisonArray: this.formBuilder.array([]),
@@ -178,13 +201,16 @@ export class CanvasComponent implements OnInit {
         evtIndex: number,
         funcName: string
     ) {
-        let parameterFormGroup: FormGroup = this.getCallFuncFormGroup(
+        let parameterFormGroup: FormGroup = this.getFunctionFormGroup(
             index,
             isEvt,
             evtIndex,
             funcName
         );
-        return <FormArray>parameterFormGroup.get("parameters");
+
+        return parameterFormGroup === null
+            ? []
+            : (parameterFormGroup.get("parameters") as FormArray).controls;
     }
 
     private initComparisonFormArray(comparison: {
@@ -248,32 +274,17 @@ export class CanvasComponent implements OnInit {
         varName: string;
         function: string;
         parametersQuantity: number;
+        parameters: { paramName: string; paramValue: any; paramType: Type }[];
     }): FormGroup {
         return this.formBuilder.group({
             returnType: callFunc.returnType,
             varName: callFunc.varName,
             function: callFunc.function,
             parametersQuantity: callFunc.parametersQuantity,
-            parameters: this.formBuilder.array([]),
+            parameters: this.formBuilder.array(callFunc.parameters),
             index: callFunc.index,
             funcName: callFunc.funcName,
             evtIndex: callFunc.evtIndex,
-        });
-    }
-
-    private initParametersFormArray(parameter: {
-        index: number;
-        funcName: string;
-        evtIndex: number;
-        paramName: string;
-        paramValue: any;
-    }): FormGroup {
-        return this.formBuilder.group({
-            paramName: parameter.paramName,
-            paramValue: [parameter.paramValue, [Validators.required]],
-            index: parameter.index,
-            funcName: parameter.funcName,
-            evtIndex: parameter.evtIndex,
         });
     }
 
@@ -357,36 +368,12 @@ export class CanvasComponent implements OnInit {
         return this.callFuncArrayData.controls[formIndex] as FormGroup;
     }
 
-    hasFunction(
+    getFunctionFormGroup(
         index: number,
         isEvt: boolean,
         evtIndex: number,
         funcName: string
-    ): boolean {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return (
-            this.callFuncArrayData.controls[formIndex].get("function").value !==
-            ""
-        );
-    }
-
-    getFunctionParameters(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): AbstractControl[] | Array<number> {
+    ): FormGroup {
         let curElement: LogicFunction = this.logicElements.find(
             (element) => funcName === element.funcName
         );
@@ -404,54 +391,20 @@ export class CanvasComponent implements OnInit {
             formIndex
         ].get("function").value;
 
-        let func: ExternFunction = this.externFunc.find(
-            (funct) => funct.name === functionName
-        );
+        let funcIndex: number;
 
-        let formGroup = this.getParamentersArrayData(
-            index,
-            isEvt,
-            evtIndex,
-            funcName
-        );
-        formGroup.clear();
+        let func: ExternFunction =
+            functionName !== ""
+                ? this.externFunc.find((funct, index) => {
+                      funcIndex = index;
+                      return funct.name === functionName;
+                  })
+                : null;
 
-        let control = formGroup.controls;
-
-        if (func) {
-            for (let i = 0; i < func.parametersQuantity; i++) {
-                control.push(
-                    this.initParametersFormArray({
-                        index: index,
-                        evtIndex: evtIndex,
-                        funcName: funcName,
-                        paramName: "",
-                        paramValue: "",
-                    })
-                );
-            }
-        } else {
-            control.push(
-                this.initParametersFormArray({
-                    index: index,
-                    evtIndex: evtIndex,
-                    funcName: funcName,
-                    paramName: "",
-                    paramValue: "",
-                })
-            );
-        }
-
-        return control;
+        return func === null
+            ? null
+            : (this.formData.controls[funcIndex + 1] as FormGroup);
     }
-
-    onChangeFunctionCall(
-        functionCall: string,
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ) {}
 
     private checkLogicContainerState(isLogicContainer: boolean) {
         if (isLogicContainer) {
@@ -661,16 +614,12 @@ export class CanvasComponent implements OnInit {
                 );
                 let expression: Expression;
                 let curControl = controls[cl.formIndex];
-                expression = this.checkExpressionTypeByCommandLineType(
-                    cl.type.name,
-                    cl.type.clType
-                );
                 expression = this.getExpressionType(
-                    expression,
+                    cl.type.name,
+                    cl.type.clType,
                     curControl as FormGroup
                 );
-                ast = this.checkCommandLineTypeByName(cl.type.name);
-                ast = this.getAstType(ast, expression, curControl);
+                ast = this.getAstType(cl.type.name, expression, curControl);
                 funct.body.push(ast);
             });
 
@@ -782,31 +731,26 @@ export class CanvasComponent implements OnInit {
     }
 
     private getAstType(
-        ast: AST,
+        clTypeName: string,
         expression: Expression,
         control: AbstractControl
     ): AST {
         let newAst: any;
-        if (ast instanceof If) {
-            newAst = {
-                tag: ast.tag,
-                expression: expression,
-                trueBranchAst: [],
-                falseBranchAst: [],
-            } as If;
-        } else if (ast instanceof While) {
-            newAst = {
-                tag: ast.tag,
-                expression: expression,
-                whileAst: [],
-            } as While;
-        } else if (ast instanceof Var) {
-            newAst = {
-                tag: ast.tag,
-                expression: expression,
-                name: control.get("varName").value,
-                type: this.getType(control.get("varType").value, [], null),
-            } as Var;
+        switch (clTypeName) {
+            case "decision":
+                newAst = new If(expression, [], []);
+                break;
+            case "repetition":
+                newAst = new While(expression, []);
+                break;
+            case "declaration":
+                return new Var(
+                    control.get("varName").value,
+                    this.getType(control.get("varType").value, [], null),
+                    expression
+                );
+            default:
+                return null;
         }
         return newAst;
     }
@@ -819,115 +763,75 @@ export class CanvasComponent implements OnInit {
         let newType: Type;
         switch (type) {
             case "adt":
-                newType = {
-                    tag: "adt",
-                    name: null,
-                } as AlgebraicType;
+                newType = new AlgebraicType(null);
                 break;
             case "array":
-                newType = {
-                    tag: "array",
-                    elements: null,
-                } as ArrayType;
+                newType = new ArrayType(null);
                 break;
             case "char":
-                newType = {
-                    tag: "char",
-                } as CharType;
+                newType = new CharType();
                 break;
             case "double":
-                newType = {
-                    tag: "double",
-                } as DoubleType;
+                newType = new DoubleType();
                 break;
             case "function":
                 let args: Type[] = [];
                 funcArguments.forEach((argument) => {
                     args.push(this.getType(argument.returnType, [], null));
                 });
-                newType = {
-                    tag: "function",
-                    arguments: args,
-                    return: funcReturnType,
-                } as FunctionType;
+                newType = new FunctionType(args, funcReturnType);
                 break;
             case "integer":
-                newType = {
-                    tag: "integer",
-                } as IntegerType;
+                newType = new IntegerType();
                 break;
             case "record":
-                newType = {
-                    tag: "record",
-                    fields: [],
-                } as RecordType;
+                newType = new RecordType([]);
                 break;
             case "text":
-                newType = {
-                    tag: "text",
-                } as TextType;
+                newType = new TextType();
                 break;
         }
         return newType;
     }
 
-    private checkCommandLineTypeByName(typeName: string): AST {
-        switch (typeName) {
-            case "decision":
-                return new If();
-            case "repetition":
-                return new While();
-            case "declaration":
-                return new Var();
-            default:
-                return null;
-        }
-    }
-
-    private checkExpressionTypeByCommandLineType(
+    private getExpressionType(
         clName: string,
-        clType: string
+        clType: string,
+        control: FormGroup
     ): Expression {
+        let newExpression: Expression;
+
         switch (clName) {
             case "decision":
                 switch (clType) {
                     case "comparison":
                     case "booleanLogic":
-                        return new BinaryOp();
+                        newExpression = new BinaryOp(
+                            control.get("leftExpression").value,
+                            control.get("symbol").value,
+                            control.get("rightExpression").value
+                        );
+                        break;
                     default:
-                        return null;
+                        newExpression = null;
                 }
+                break;
             case "declaration":
-                return new Literal_();
-        }
-    }
-
-    private getExpressionType(
-        expression: Expression,
-        control: FormGroup
-    ): Expression {
-        let newExpression: Expression;
-        if (expression instanceof BinaryOp) {
-            newExpression = {
-                tag: expression.tag,
-                leftExpression: control.get("leftExpression").value,
-                symbol: control.get("symbol").value,
-                rightExpression: control.get("rightExpression").value,
-            } as BinaryOp;
-        } else if (expression instanceof Literal_) {
-            newExpression = {
-                tag: expression.tag,
-                value: this.getLiteralByVarType(
-                    control.get("varType").value,
-                    this.getValueByVarType(
+                newExpression = new Literal_(
+                    this.getLiteralByVarType(
                         control.get("varType").value,
-                        control.get("varValue").value
+                        this.getValueByVarType(
+                            control.get("varType").value,
+                            control.get("varValue").value
+                        )
                     )
-                ),
-            } as Literal_;
-        } else {
-            newExpression = null;
+                );
+            case "call":
+                return new Call(new Variable(""), []);
+            default:
+                newExpression = null;
         }
+
         return newExpression;
     }
 
@@ -949,32 +853,16 @@ export class CanvasComponent implements OnInit {
         let newLiteral: Literal;
         switch (type) {
             case "char":
-                newLiteral = new Char();
-                newLiteral = {
-                    tag: newLiteral.tag,
-                    value,
-                } as Char;
+                newLiteral = new Char(value);
                 break;
             case "double":
-                newLiteral = new Double();
-                newLiteral = {
-                    tag: newLiteral.tag,
-                    value,
-                } as Double;
+                newLiteral = new Double(value);
                 break;
             case "integer":
-                newLiteral = new Integer();
-                newLiteral = {
-                    tag: newLiteral.tag,
-                    value,
-                } as Integer;
+                newLiteral = new Integer(value);
                 break;
             case "text":
-                newLiteral = new Text();
-                newLiteral = {
-                    tag: newLiteral.tag,
-                    value,
-                } as Text;
+                newLiteral = new Text(value);
                 break;
         }
 
@@ -985,9 +873,15 @@ export class CanvasComponent implements OnInit {
         return <FormArray>this.logicForm.get("functions");
     }
 
-    private initForm(func: { funcName: string }) {
+    private initForm(func: {
+        funcName: string;
+        parametersQuantity: number;
+        parameters: { paramName: string; paramValue: any; paramType: Type }[];
+    }) {
         return this.formBuilder.group({
             funcName: [func.funcName, [Validators.required]],
+            parametersQuantity: func.parametersQuantity,
+            parameters: this.formBuilder.array(func.parameters),
         });
     }
 
@@ -1003,10 +897,16 @@ export class CanvasComponent implements OnInit {
             commandLine: [],
             events: [],
             arguments: [],
-            returnType: { tag: "adt", name: "Unit" } as AlgebraicType,
+            returnType: UNIT,
         });
         const control = this.formData.controls;
-        control.push(this.initForm({ funcName: "" }));
+        control.push(
+            this.initForm({
+                funcName: "",
+                parametersQuantity: 0,
+                parameters: [],
+            })
+        );
     }
 
     removeFunc(index: number) {
@@ -1245,6 +1145,7 @@ export class CanvasComponent implements OnInit {
                         function: "",
                         funcName,
                         index,
+                        parameters: [],
                         evtIndex: isEvt ? evtIndex : -1,
                         parametersQuantity: -1,
                     })
