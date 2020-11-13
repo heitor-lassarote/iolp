@@ -32,6 +32,8 @@ import {
     Variable,
     Expression_,
     Assign,
+    Return,
+    StringExpression,
 } from "./../../domain/output";
 import { Info } from "./../../domain/info";
 import { Element } from "src/app/components/domain/element";
@@ -220,6 +222,10 @@ export class CanvasComponent implements OnInit {
 
     get returnArrayData() {
         return <FormArray>this.returnForm.get("returnArray");
+    }
+
+    getFunctionParams(funcIndex: number) {
+        return <FormArray>this.formData.controls[funcIndex].get("parameters");
     }
 
     private initComparisonFormArray(comparison: {
@@ -663,7 +669,7 @@ export class CanvasComponent implements OnInit {
 
     private getLogicFunctions(): Function[] {
         let functions: Function[] = [];
-        this.logicElements.forEach((func: LogicFunction) => {
+        this.logicElements.forEach((func: LogicFunction, funcIndex: number) => {
             let funct: Function = {
                 name: func.funcName,
                 arguments: [],
@@ -671,6 +677,15 @@ export class CanvasComponent implements OnInit {
                 body: [],
             };
             let ast: AST;
+            //Arguments
+            func.arguments.forEach((args: Argument, index: number) => {
+                const paramFormArray = this.formData.controls[funcIndex].get(
+                    "parameters"
+                ) as FormArray;
+                let control = paramFormArray.controls;
+                console.log(control);
+            });
+            //Command Lines
             func.commandLine.forEach((cl: CommandLine) => {
                 let controls = this.checkFormControlType(
                     cl.type.name,
@@ -789,6 +804,8 @@ export class CanvasComponent implements OnInit {
                 return this.httpArrayData.controls;
             case "call":
                 return this.callFuncArrayData.controls;
+            case "return":
+                return this.returnArrayData.controls;
             default:
                 return null;
         }
@@ -816,6 +833,15 @@ export class CanvasComponent implements OnInit {
                 break;
             case "call":
                 newAst = new Expression_(expression);
+                break;
+            case "return":
+                if (expression instanceof StringExpression) {
+                    newAst = new Return(expression.value);
+                } else {
+                    newAst = new Return(
+                        expression === null ? UNIT : expression
+                    );
+                }
                 break;
             default:
                 newAst = null;
@@ -948,6 +974,28 @@ export class CanvasComponent implements OnInit {
                             args
                         );
                         break;
+                }
+                break;
+            case "return":
+                const returnValue: string = control
+                    .get("returnValue")
+                    .value.trim();
+                if (returnValue !== "") {
+                    let variab = this.declarationArrayData.controls.find(
+                        (vari) => {
+                            return vari.get("varName").value === returnValue;
+                        }
+                    );
+
+                    if (variab) {
+                        newExpression = new Variable(
+                            variab.get("varName").value
+                        );
+                    } else {
+                        newExpression = new StringExpression(returnValue);
+                    }
+                } else {
+                    newExpression = null;
                 }
                 break;
             default:
@@ -1131,7 +1179,40 @@ export class CanvasComponent implements OnInit {
         curEvt.commandLine.splice(index, 1);
     }
 
-    addParameterToFunction(func: string, index: number) {}
+    addParameterToFunction(index: number) {
+        const paramFormArray = this.formData.controls[index].get(
+            "parameters"
+        ) as FormArray;
+        let control = paramFormArray.controls;
+        control.push(
+            this.initFuncParams({
+                paramName: "",
+                paramType: "",
+            })
+        );
+
+        this.logicElements[index].arguments.push({ name: "", returnType: "" });
+    }
+
+    removeParameterFromFunction(funcIndex: number, paramIndex: number) {
+        const paramFormArray = this.formData.controls[funcIndex].get(
+            "parameters"
+        ) as FormArray;
+        let control = paramFormArray.controls;
+        control.splice(paramIndex, 1);
+
+        this.logicElements[funcIndex].arguments.splice(paramIndex, 1);
+    }
+
+    private initFuncParams(params: {
+        paramName: string;
+        paramType: string;
+    }) {
+        return this.formBuilder.group({
+            paramName: [params.paramName, Validators.required],
+            paramType: params.paramType,
+        });
+    }
 
     funcClTypeChange(
         value: string,

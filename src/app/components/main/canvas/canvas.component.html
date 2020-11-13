@@ -98,25 +98,75 @@
             >
                 <form role="form" [formGroup]="getCurFunction(funcIndex)">
                     <div class="ibox-title inside-ibox">
-                        <h5 class="func-name">Nome da função:</h5>
-                        <input
-                            class="m-l-sm form-control"
-                            style="width: 200px"
-                            type="text"
-                            [value]="func.funcName"
-                            formControlName="funcName"
-                            [attr.readOnly]="func.readonly ? '' : null"
-                        />
-                        <button
-                            *ngIf="funcIndex !== 0"
-                            type="button"
-                            class="btn btn-primary add-btn m-l-sm"
-                            (click)="
-                                addParameterToFunction(func.funcName, funcIndex)
-                            "
-                        >
-                            <i class="fa fa-plus"></i>
-                        </button>
+                        <div class="column col-md-12">
+                            <div class="row">
+                                <h5 class="func-name">Nome da função:</h5>
+                                <input
+                                    class="m-l-sm form-control"
+                                    style="width: 200px"
+                                    type="text"
+                                    [value]="func.funcName"
+                                    formControlName="funcName"
+                                    [attr.readOnly]="func.readonly ? '' : null"
+                                />
+                                <button
+                                    *ngIf="funcIndex !== 0"
+                                    type="button"
+                                    class="btn btn-primary add-btn m-l-sm"
+                                    (click)="addParameterToFunction(funcIndex)"
+                                >
+                                    <i class="fa fa-plus"></i>
+                                </button>
+                            </div>
+
+                            <div
+                                class="row m-t-sm"
+                                *ngFor="
+                                    let param of getFunctionParams(funcIndex)
+                                        .controls;
+                                    let i = index
+                                "
+                                [formGroup]="param"
+                            >
+                                <div class="col-md-3">
+                                    <select
+                                        class="form-control"
+                                        formControlName="paramType"
+                                    >
+                                        <option value="adt">Algébrico</option>
+                                        <option value="array">Array</option>
+                                        <option value="char">Caracter</option>
+                                        <option value="double">Double</option>
+                                        <option value="integer">Inteiro</option>
+                                        <option value="record">Registro</option>
+                                        <option value="text">Texto</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <input
+                                        type="text"
+                                        class="form-control"
+                                        formControlName="paramName"
+                                        placeholder="Nome do parâmetro"
+                                    />
+                                </div>
+                                <div class="col-md-1">
+                                    <button
+                                        *ngIf="funcIndex !== 0"
+                                        class="m-l-md btn btn-remove"
+                                        (click)="
+                                            removeParameterFromFunction(
+                                                funcIndex,
+                                                i
+                                            )
+                                        "
+                                    >
+                                        <i class="fa fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="ibox-tools">
                             <div class="row-flex">
                                 <h4 class="add-title">Novo item</h4>

@@ -185,14 +185,14 @@ export class Match extends AST {
 }
 
 export class Return extends AST {
-    constructor(expression?: Expression) {
+    constructor(expression?: Expression | string) {
         super();
 
         this.expression = expression;
     }
 
     tag = "return";
-    expression?: Expression;
+    expression?: Expression | string;
 }
 
 export class Var extends AST {
@@ -390,6 +390,16 @@ export class Variable extends Expression {
 
     tag = "variable";
     name: string;
+}
+
+//Neutral Expression
+export class StringExpression extends Expression {
+    constructor(value: string) {
+        super();
+        this.value = value;
+    }
+
+    value: string;
 }
 
 export abstract class Literal {
