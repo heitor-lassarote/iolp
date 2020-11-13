@@ -107,17 +107,31 @@
                             formControlName="funcName"
                             [attr.readOnly]="func.readonly ? '' : null"
                         />
+                        <button
+                            *ngIf="funcIndex !== 0"
+                            type="button"
+                            class="btn btn-primary add-btn m-l-sm"
+                            (click)="
+                                addParameterToFunction(func.funcName, funcIndex)
+                            "
+                        >
+                            <i class="fa fa-plus"></i>
+                        </button>
                         <div class="ibox-tools">
                             <div class="row-flex">
                                 <h4 class="add-title">Novo item</h4>
                                 <button
+                                    *ngIf="funcIndex === 0"
                                     type="button"
                                     class="btn btn-primary add-btn m-l-sm dropdown-toggle"
                                     data-toggle="dropdown"
                                 >
                                     <i class="fa fa-plus"></i>
                                 </button>
-                                <ul class="dropdown-menu create-item">
+                                <ul
+                                    class="dropdown-menu create-item"
+                                    *ngIf="funcIndex === 0"
+                                >
                                     <li
                                         (click)="
                                             createItem(func.funcName, 'cl')
@@ -135,6 +149,15 @@
                                         </a>
                                     </li>
                                 </ul>
+
+                                <button
+                                    *ngIf="funcIndex !== 0"
+                                    type="button"
+                                    class="btn btn-primary add-btn m-l-sm"
+                                    (click)="createItem(func.funcName, 'cl')"
+                                >
+                                    <i class="fa fa-plus"></i>
+                                </button>
 
                                 <button
                                     *ngIf="funcIndex !== 0"
@@ -181,6 +204,12 @@
                                         <option value="call">
                                             Chamada de Função
                                         </option>
+                                        <option
+                                            value="return"
+                                            *ngIf="funcIndex !== 0"
+                                        >
+                                            Retorno
+                                        </option>
                                     </select>
                                 </div>
                                 <div class="col-md-8">
@@ -217,6 +246,16 @@
                                     <ng-container
                                         *ngIf="cl.type.name === 'call'"
                                         [ngTemplateOutlet]="call"
+                                        [ngTemplateOutletContext]="{
+                                            index: funcClIndex,
+                                            evtIndex: -1,
+                                            isEvt: false,
+                                            funcName: func.funcName
+                                        }"
+                                    ></ng-container>
+                                    <ng-container
+                                        *ngIf="cl.type.name === 'return'"
+                                        [ngTemplateOutlet]="return"
                                         [ngTemplateOutletContext]="{
                                             index: funcClIndex,
                                             evtIndex: -1,
@@ -772,11 +811,14 @@
                         isEvt,
                         evtIndex,
                         funcName
-                    ).controls
+                    ).controls;
+                    let i = index
                 "
                 [formGroup]="param"
             >
-                <div class="col-3"></div>
+                <div class="col-3 text-center m-h-auto">
+                    <h4 *ngIf="i === 0">Parâmetros</h4>
+                </div>
                 <div class="col-4 text-center m-h-auto">
                     <h4>
                         {{ param.value["paramName"] }}
@@ -787,10 +829,30 @@
                         type="text"
                         class="form-control"
                         formControlName="paramValue"
-                        [value]="param.value['paramValue']"
                     />
                 </div>
             </div>
+        </div>
+    </form>
+</ng-template>
+
+<ng-template
+    #return
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        role="form"
+        [formGroup]="getReturnFormGroup(index, isEvt, evtIndex, funcName)"
+    >
+        <div class="col-md-12">
+            <input
+                type="text"
+                class="form-control"
+                formControlName="returnValue"
+            />
         </div>
     </form>
 </ng-template>

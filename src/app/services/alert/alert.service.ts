@@ -28,4 +28,14 @@ export class AlertService {
             icon: "warning",
         });
     }
+
+    createErrorDialog(title: string, message: string, action: Function) {
+        swal({
+            title: title,
+            text: message,
+            icon: "error",
+        }).then(() => {
+            action();
+        });
+    }
 }
