@@ -83,8 +83,8 @@ export class CanvasComponent implements OnInit {
     booleanLogicForm: FormGroup;
     customIfConditionForm: FormGroup;
     declarationForm: FormGroup;
-    httpForm: FormGroup;
     callFuncForm: FormGroup;
+    attributionForm: FormGroup;
     returnForm: FormGroup;
 
     isLogicContainer: boolean = true; //TODO: Change to false
@@ -136,7 +136,6 @@ export class CanvasComponent implements OnInit {
         (this.logicForm.get("functions") as FormArray).push(
             this.initForm({
                 funcName: "main",
-                parametersQuantity: 0,
                 parameters: [],
                 returnType: UNIT,
             })
@@ -146,7 +145,6 @@ export class CanvasComponent implements OnInit {
             this.formData.controls.push(
                 this.initForm({
                     funcName: func.name,
-                    parametersQuantity: func.parametersQuantity,
                     parameters: func.parameters,
                     returnType: func.returnType,
                 })
@@ -169,12 +167,12 @@ export class CanvasComponent implements OnInit {
             declarationArray: this.formBuilder.array([]),
         });
 
-        this.httpForm = this.formBuilder.group({
-            httpArray: this.formBuilder.array([]),
-        });
-
         this.callFuncForm = this.formBuilder.group({
             callFuncArray: this.formBuilder.array([]),
+        });
+
+        this.attributionForm = this.formBuilder.group({
+            attributionArray: this.formBuilder.array([]),
         });
 
         this.returnForm = this.formBuilder.group({
@@ -200,27 +198,12 @@ export class CanvasComponent implements OnInit {
         return <FormArray>this.declarationForm.get("declarationArray");
     }
 
-    get httpArrayData() {
-        return <FormArray>this.httpForm.get("httpArray");
-    }
-
-    getHttpBodyArrayData(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ) {
-        let httpFormGroup: FormGroup = this.getHttpFormGroup(
-            index,
-            isEvt,
-            evtIndex,
-            funcName
-        );
-        return <FormArray>httpFormGroup.get("httpBodies");
-    }
-
     get callFuncArrayData() {
         return <FormArray>this.callFuncForm.get("callFuncArray");
+    }
+
+    get attributionArrayData() {
+        return <FormArray>this.attributionForm.get("attributionArray");
     }
 
     getParamentersArrayData(
@@ -318,23 +301,6 @@ export class CanvasComponent implements OnInit {
         });
     }
 
-    private initHttpFormArray(http: {
-        index: number;
-        funcName: string;
-        evtIndex: number;
-        httpUrl: string;
-        httpMethod: string;
-    }): FormGroup {
-        return this.formBuilder.group({
-            httpUrl: [http.httpUrl, [Validators.required]],
-            httpMethod: [http.httpMethod, [Validators.required]],
-            httpBodies: this.formBuilder.array([]),
-            index: http.index,
-            funcName: http.funcName,
-            evtIndex: http.evtIndex,
-        });
-    }
-
     private initCallFuncFormArray(callFunc: {
         index: number;
         funcName: string;
@@ -356,9 +322,28 @@ export class CanvasComponent implements OnInit {
         });
     }
 
+    private initAttributionFormArray(attribution: {
+        index: number;
+        funcName: string;
+        evtIndex: number;
+        varName: string;
+        attributionValue: string;
+    }) {
+        return this.formBuilder.group({
+            varName: attribution.varName,
+            attributionValue: [
+                attribution.attributionValue,
+                Validators.required,
+            ],
+            index: attribution.index,
+            funcName: attribution.funcName,
+            evtIndex: attribution.evtIndex,
+        });
+    }
+
     private initReturnFormArray(returnValue: { value: any }) {
         return this.formBuilder.group({
-            returnValue: returnValue.value,
+            returnValue: [returnValue.value, Validators.required],
         });
     }
 
@@ -442,26 +427,6 @@ export class CanvasComponent implements OnInit {
         return this.declarationArrayData.controls[formIndex] as FormGroup;
     }
 
-    getHttpFormGroup(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return this.httpArrayData.controls[formIndex] as FormGroup;
-    }
-
     getCallFuncFormGroup(
         index: number,
         isEvt: boolean,
@@ -480,6 +445,26 @@ export class CanvasComponent implements OnInit {
         }
 
         return this.callFuncArrayData.controls[formIndex] as FormGroup;
+    }
+
+    getAttributionFormGroup(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): FormGroup {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        return this.attributionArrayData.controls[formIndex] as FormGroup;
     }
 
     getReturnFormGroup(
@@ -895,6 +880,19 @@ export class CanvasComponent implements OnInit {
         }
     }
 
+    isValid(): boolean {
+        return (
+            this.logicForm.valid &&
+            this.comparisonForm.valid &&
+            this.booleanLogicForm.valid &&
+            this.customIfConditionForm.valid &&
+            this.declarationForm.valid &&
+            this.callFuncForm.valid &&
+            this.attributionForm.valid &&
+            this.returnForm.valid
+        );
+    }
+
     private checkFormControlType(
         clName: string,
         clType: string
@@ -913,10 +911,10 @@ export class CanvasComponent implements OnInit {
                 }
             case "declaration":
                 return this.declarationArrayData.controls;
-            case "http":
-                return this.httpArrayData.controls;
             case "call":
                 return this.callFuncArrayData.controls;
+            case "attribution":
+                return this.attributionArrayData.controls;
             case "return":
                 return this.returnArrayData.controls;
             default:
@@ -945,6 +943,9 @@ export class CanvasComponent implements OnInit {
                 );
                 break;
             case "call":
+                newAst = new Expression_(expression);
+                break;
+            case "attribution":
                 newAst = new Expression_(expression);
                 break;
             case "return":
@@ -1106,6 +1107,12 @@ export class CanvasComponent implements OnInit {
                         break;
                 }
                 break;
+            case "attribution":
+                newExpression = new Assign(
+                    new Variable(control.get("varName").value),
+                    new StringExpression(control.get("attributionValue").value)
+                );
+                break;
             case "return":
                 const returnValue: string = control
                     .get("returnValue")
@@ -1176,13 +1183,11 @@ export class CanvasComponent implements OnInit {
 
     private initForm(func: {
         funcName: string;
-        parametersQuantity: number;
         parameters: { paramName: string; paramValue: any; paramType: Type }[];
         returnType: string | Type;
     }) {
         return this.formBuilder.group({
             funcName: [func.funcName, [Validators.required]],
-            parametersQuantity: func.parametersQuantity,
             parameters: this.formBuilder.array(func.parameters),
             returnType: func.returnType,
         });
@@ -1208,9 +1213,8 @@ export class CanvasComponent implements OnInit {
             0,
             this.initForm({
                 funcName: `function${this.logicElements.length - 1}`,
-                parametersQuantity: 0,
                 parameters: [],
-                returnType: "",
+                returnType: "void",
             })
         );
     }
@@ -1508,18 +1512,6 @@ export class CanvasComponent implements OnInit {
                         break;
                 }
                 break;
-            case "http":
-                control = this.httpArrayData.controls;
-                control.push(
-                    this.initHttpFormArray({
-                        httpMethod: "get",
-                        httpUrl: "",
-                        funcName,
-                        index,
-                        evtIndex: isEvt ? evtIndex : -1,
-                    })
-                );
-                break;
             case "call":
                 control = this.callFuncArrayData.controls;
                 control.push(
@@ -1531,6 +1523,18 @@ export class CanvasComponent implements OnInit {
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
                         parametersQuantity: -1,
+                    })
+                );
+                break;
+            case "attribution":
+                control = this.attributionArrayData.controls;
+                control.push(
+                    this.initAttributionFormArray({
+                        varName: "",
+                        attributionValue: "",
+                        funcName,
+                        index,
+                        evtIndex: isEvt ? evtIndex : -1,
                     })
                 );
                 break;
@@ -1572,11 +1576,11 @@ export class CanvasComponent implements OnInit {
                         break;
                 }
                 break;
-            case "http":
-                control = this.httpArrayData.controls;
-                break;
             case "call":
                 control = this.callFuncArrayData.controls;
+                break;
+            case "attribution":
+                control = this.attributionArrayData.controls;
                 break;
             case "return":
                 control = this.returnArrayData.controls;
@@ -1606,37 +1610,6 @@ export class CanvasComponent implements OnInit {
 
     changeEventType(value: string, index: number) {
         this.logicElements[0].events[index].eventType = value;
-    }
-
-    addBody(index: number, isEvt: boolean, evtIndex: number, funcName: string) {
-        const control = this.getHttpBodyArrayData(
-            index,
-            isEvt,
-            evtIndex,
-            funcName
-        );
-        // control.push(
-        //     this.initHttpBodiesFormArray({
-        //         httpHeaderName: "",
-        //         httpHeaderValue: "",
-        //     })
-        // );
-    }
-
-    removeBody(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string,
-        headerIndex: number
-    ) {
-        const control = this.getHttpBodyArrayData(
-            index,
-            isEvt,
-            evtIndex,
-            funcName
-        ).controls;
-        control.splice(headerIndex, 1);
     }
 
     callFuncChangeReturnType(

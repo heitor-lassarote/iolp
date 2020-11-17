@@ -12,7 +12,6 @@ const UNIT = new AlgebraicType("Unit");
 export const LOWCODEFUNCTIONS: ExternFunction[] = [
     {
         name: "GET",
-        parametersQuantity: 5,
         parameters: [
             { paramName: "url", paramValue: "", paramType: new TextType() },
             {
@@ -40,7 +39,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "POST",
-        parametersQuantity: 6,
         parameters: [
             { paramName: "url", paramValue: "", paramType: new TextType() },
             { paramName: "value", paramValue: "", paramType: new TextType() },
@@ -69,7 +67,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "trunc",
-        parametersQuantity: 1,
         parameters: [
             {
                 paramName: "truncValue",
@@ -81,7 +78,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "doubleToInteger",
-        parametersQuantity: 1,
         parameters: [
             {
                 paramName: "doubleValue",
@@ -93,7 +89,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "doubleToText",
-        parametersQuantity: 1,
         parameters: [
             {
                 paramName: "doubleValue",
@@ -105,7 +100,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "integerToDouble",
-        parametersQuantity: 1,
         parameters: [
             {
                 paramName: "integerValue",
@@ -117,7 +111,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "integerToText",
-        parametersQuantity: 1,
         parameters: [
             {
                 paramName: "integerValue",
@@ -129,7 +122,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "textToDouble",
-        parametersQuantity: 1,
         parameters: [
             {
                 paramName: "textValue",
@@ -141,7 +133,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "textToInteger",
-        parametersQuantity: 1,
         parameters: [
             {
                 paramName: "textValue",
@@ -153,7 +144,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
     },
     {
         name: "textToIntegerRadix",
-        parametersQuantity: 2,
         parameters: [
             {
                 paramName: "textValue",

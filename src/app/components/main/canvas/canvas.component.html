@@ -20,7 +20,12 @@
         </button>
     </div>
     <div class="col-md-6 text-right" style="padding-right: 0 !important">
-        <button type="button" class="btn btn-primary tab-btn" (click)="apply()">
+        <button
+            type="button"
+            class="btn btn-primary tab-btn"
+            (click)="apply()"
+            [disabled]="!isValid()"
+        >
             Aplicar
         </button>
     </div>
@@ -262,6 +267,9 @@
                                         <option value="call">
                                             Chamada de Função
                                         </option>
+                                        <option value="attribution">
+                                            Atribuição
+                                        </option>
                                         <option
                                             value="return"
                                             *ngIf="funcIndex !== 0"
@@ -294,6 +302,16 @@
                                     <ng-container
                                         *ngIf="cl.type.name === 'call'"
                                         [ngTemplateOutlet]="call"
+                                        [ngTemplateOutletContext]="{
+                                            index: funcClIndex,
+                                            evtIndex: -1,
+                                            isEvt: false,
+                                            funcName: func.funcName
+                                        }"
+                                    ></ng-container>
+                                    <ng-container
+                                        *ngIf="cl.type.name === 'attribution'"
+                                        [ngTemplateOutlet]="attribution"
                                         [ngTemplateOutletContext]="{
                                             index: funcClIndex,
                                             evtIndex: -1,
@@ -430,6 +448,9 @@
                                                 <option value="call">
                                                     Chamada de Função
                                                 </option>
+                                                <option value="attribution">
+                                                    Atribuição
+                                                </option>
                                             </select>
                                         </div>
                                         <div class="col-md-8">
@@ -468,6 +489,19 @@
                                                     funcName: func.funcName
                                                 }"
                                             ></ng-container>
+                                            <ng-container
+                                                *ngIf="
+                                                    cl.type.name ===
+                                                    'attribution'
+                                                "
+                                                [ngTemplateOutlet]="attribution"
+                                                [ngTemplateOutletContext]="{
+                                                    index: evtClIndex,
+                                                    evtIndex: evtIndex,
+                                                    isEvt: true,
+                                                    funcName: func.funcName
+                                                }"
+                                            ></ng-container>
                                         </div>
                                         <div class="col-md-1">
                                             <button
@@ -497,6 +531,7 @@
     <button
         type="button"
         class="btn btn-primary m-t-sm tab-btn"
+        [disabled]="!isValid()"
         (click)="apply()"
     >
         Aplicar
@@ -773,7 +808,12 @@
                                 let i = index
                             "
                         >
-                            <option [value]="variable.get('varName').value">
+                            <option
+                                [value]="variable.get('varName').value"
+                                *ngIf="
+                                    variable.get('funcName').value === funcName
+                                "
+                            >
                                 {{ variable.get("varName").value }}
                             </option>
                         </ng-container>
@@ -845,6 +885,50 @@
                         type="text"
                         class="form-control"
                         formControlName="paramValue"
+                    />
+                </div>
+            </div>
+        </div>
+    </form>
+</ng-template>
+
+<ng-template
+    #attribution
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        role="form"
+        [formGroup]="getAttributionFormGroup(index, isEvt, evtIndex, funcName)"
+    >
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-5">
+                    <select class="form-control" formControlName="varName">
+                        <ng-container
+                            *ngFor="
+                                let variable of declarationArrayData.controls;
+                                let i = index
+                            "
+                        >
+                            <option
+                                [value]="variable.get('varName').value"
+                                *ngIf="
+                                    variable.get('funcName').value === funcName
+                                "
+                            >
+                                {{ variable.get("varName").value }}
+                            </option>
+                        </ng-container>
+                    </select>
+                </div>
+                <div class="col-7">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="attributionValue"
                     />
                 </div>
             </div>
