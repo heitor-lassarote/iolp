@@ -100,11 +100,25 @@
                     <div class="ibox-title inside-ibox">
                         <div class="column col-md-12">
                             <div class="row">
-                                <h5 class="func-name">Nome da função:</h5>
+                                <select
+                                    class="form-control col-3"
+                                    formControlName="returnType"
+                                    *ngIf="funcIndex !== 0"
+                                >
+                                    <option value="void">Void</option>
+                                    <option value="adt">Algébrico</option>
+                                    <option value="array">Array</option>
+                                    <option value="bool">Booleano</option>
+                                    <option value="char">Caracter</option>
+                                    <option value="double">Double</option>
+                                    <option value="integer">Inteiro</option>
+                                    <option value="record">Registro</option>
+                                    <option value="text">Texto</option>
+                                </select>
                                 <input
-                                    class="m-l-sm form-control"
-                                    style="width: 200px"
+                                    class="m-l-sm form-control col-4"
                                     type="text"
+                                    placeholder="Noma da função"
                                     [value]="func.funcName"
                                     formControlName="funcName"
                                     [attr.readOnly]="func.readonly ? '' : null"
@@ -128,42 +142,37 @@
                                 "
                                 [formGroup]="param"
                             >
-                                <div class="col-md-3">
-                                    <select
-                                        class="form-control"
-                                        formControlName="paramType"
-                                    >
-                                        <option value="adt">Algébrico</option>
-                                        <option value="array">Array</option>
-                                        <option value="char">Caracter</option>
-                                        <option value="double">Double</option>
-                                        <option value="integer">Inteiro</option>
-                                        <option value="record">Registro</option>
-                                        <option value="text">Texto</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <input
-                                        type="text"
-                                        class="form-control"
-                                        formControlName="paramName"
-                                        placeholder="Nome do parâmetro"
-                                    />
-                                </div>
-                                <div class="col-md-1">
-                                    <button
-                                        *ngIf="funcIndex !== 0"
-                                        class="m-l-md btn btn-remove"
-                                        (click)="
-                                            removeParameterFromFunction(
-                                                funcIndex,
-                                                i
-                                            )
-                                        "
-                                    >
-                                        <i class="fa fa-trash"></i>
-                                    </button>
-                                </div>
+                                <select
+                                    class="form-control col-3"
+                                    formControlName="paramType"
+                                >
+                                    <option value="adt">Algébrico</option>
+                                    <option value="array">Array</option>
+                                    <option value="bool">Booleano</option>
+                                    <option value="char">Caracter</option>
+                                    <option value="double">Double</option>
+                                    <option value="integer">Inteiro</option>
+                                    <option value="record">Registro</option>
+                                    <option value="text">Texto</option>
+                                </select>
+                                <input
+                                    type="text"
+                                    class="form-control col-4 m-l-sm"
+                                    formControlName="paramName"
+                                    placeholder="Nome do parâmetro"
+                                />
+                                <button
+                                    *ngIf="funcIndex !== 0"
+                                    class="m-l-sm btn btn-remove"
+                                    (click)="
+                                        removeParameterFromFunction(
+                                            funcIndex,
+                                            i
+                                        )
+                                    "
+                                >
+                                    <i class="fa fa-trash"></i>
+                                </button>
                             </div>
                         </div>
 
@@ -250,7 +259,6 @@
                                         <option value="declaration">
                                             Declaração
                                         </option>
-                                        <option value="http">HTTP</option>
                                         <option value="call">
                                             Chamada de Função
                                         </option>
@@ -276,16 +284,6 @@
                                     <ng-container
                                         *ngIf="cl.type.name === 'declaration'"
                                         [ngTemplateOutlet]="declaration"
-                                        [ngTemplateOutletContext]="{
-                                            index: funcClIndex,
-                                            evtIndex: -1,
-                                            isEvt: false,
-                                            funcName: func.funcName
-                                        }"
-                                    ></ng-container>
-                                    <ng-container
-                                        *ngIf="cl.type.name === 'http'"
-                                        [ngTemplateOutlet]="http"
                                         [ngTemplateOutletContext]="{
                                             index: funcClIndex,
                                             evtIndex: -1,
@@ -429,9 +427,6 @@
                                                 <option value="declaration">
                                                     Declaração
                                                 </option>
-                                                <option value="http">
-                                                    HTTP
-                                                </option>
                                                 <option value="call">
                                                     Chamada de Função
                                                 </option>
@@ -456,16 +451,6 @@
                                                     'declaration'
                                                 "
                                                 [ngTemplateOutlet]="declaration"
-                                                [ngTemplateOutletContext]="{
-                                                    index: evtClIndex,
-                                                    evtIndex: evtIndex,
-                                                    isEvt: true,
-                                                    funcName: func.funcName
-                                                }"
-                                            ></ng-container>
-                                            <ng-container
-                                                *ngIf="cl.type.name === 'http'"
-                                                [ngTemplateOutlet]="http"
                                                 [ngTemplateOutletContext]="{
                                                     index: evtClIndex,
                                                     evtIndex: evtIndex,
@@ -544,6 +529,7 @@
                     >
                         <option value="comparison">Comparação</option>
                         <option value="booleanLogic">Lógica Booleana</option>
+                        <option value="custom">Customizado</option>
                     </select>
                 </div>
                 <div class="col-8">
@@ -566,6 +552,25 @@
                             'booleanLogic'
                         "
                         [ngTemplateOutlet]="booleanLogic"
+                        [ngTemplateOutletContext]="{
+                            index: index,
+                            evtIndex: evtIndex,
+                            isEvt: isEvt,
+                            funcName: funcName
+                        }"
+                    ></ng-container>
+                    <ng-container
+                        *ngIf="
+                            ifCondition(funcName, isEvt, index, evtIndex) ===
+                            'custom'
+                        "
+                        [ngTemplateOutlet]="custom"
+                        [ngTemplateOutletContext]="{
+                            index: index,
+                            evtIndex: evtIndex,
+                            isEvt: isEvt,
+                            funcName: funcName
+                        }"
                     ></ng-container>
                 </div>
             </div>
@@ -590,6 +595,7 @@
                     <select class="form-control" formControlName="varType">
                         <option value="adt">Algébrico</option>
                         <option value="array">Array</option>
+                        <option value="bool">Booleano</option>
                         <option value="char">Caracter</option>
                         <option value="double">Double</option>
                         <option value="integer">Inteiro</option>
@@ -664,108 +670,68 @@
     </form>
 </ng-template>
 
-<ng-template #booleanLogic>
-    <div class="col-md-12">
-        <div class="row">
-            <div class="col-5">
-                <input type="text" class="form-control" />
-            </div>
-            <div class="col-2">
-                <select class="form-control" style="padding: 0 0 0 5px">
-                    <option value="And">and</option>
-                    <option value="Or">or</option>
-                    <option value="Not">not</option>
-                </select>
-            </div>
-            <div class="col-5">
-                <input type="text" class="form-control" />
-            </div>
-        </div>
-    </div>
-</ng-template>
-
 <ng-template
-    #http
+    #booleanLogic
     let-index="index"
     let-evtIndex="evtIndex"
     let-isEvt="isEvt"
     let-funcName="funcName"
 >
     <form
+        [formGroup]="getBooleanLogicFormGroup(index, isEvt, evtIndex, funcName)"
         role="form"
-        [formGroup]="getHttpFormGroup(index, isEvt, evtIndex, funcName)"
     >
         <div class="col-md-12">
-            <div class="column">
-                <div class="row m-b-sm">
-                    <div class="col-4">
-                        <select
-                            class="form-control"
-                            formControlName="httpMethod"
-                        >
-                            <option value="get">GET</option>
-                            <option value="post">POST</option>
-                            <option value="put">PUT</option>
-                            <option value="delete">DELETE</option>
-                        </select>
-                    </div>
-                    <div class="col-6">
-                        <input
-                            type="text"
-                            class="form-control"
-                            formControlName="httpUrl"
-                            placeholder="URL"
-                        />
-                    </div>
-                    <div class="col-2">
-                        <button
-                            type="button"
-                            class="btn btn-primary add-btn m-l-sm"
-                            (click)="addBody(index, isEvt, evtIndex, funcName)"
-                        >
-                            <i class="fa fa-plus"></i>
-                        </button>
-                    </div>
+            <div class="row">
+                <div class="col-5">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="leftExpression"
+                    />
                 </div>
-                <div
-                    class="row m-b-sm"
-                    *ngFor="
-                        let body of getHttpBodyArrayData(
-                            index,
-                            isEvt,
-                            evtIndex,
-                            funcName
-                        ).controls;
-                        let i = index
-                    "
-                    [formGroup]="body"
-                >
-                    <div class="col-5">
-                        <input
-                            type="text"
-                            class="form-control"
-                            formControlName="httpBodyName"
-                        />
-                    </div>
-                    <div class="col-5">
-                        <input
-                            type="text"
-                            class="form-control"
-                            formControlName="httpBodyValue"
-                        />
-                    </div>
-                    <div class="col-2">
-                        <button
-                            class="m-l-md btn btn-remove"
-                            (click)="
-                                removeBody(index, isEvt, evtIndex, funcName, i)
-                            "
-                        >
-                            <i class="fa fa-trash"></i>
-                        </button>
-                    </div>
+                <div class="col-2">
+                    <select
+                        class="form-control"
+                        style="padding: 0 0 0 5px"
+                        formControlName="symbol"
+                    >
+                        <option value="And">and</option>
+                        <option value="Or">or</option>
+                        <option value="Not">not</option>
+                    </select>
+                </div>
+                <div class="col-5">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="rightExpression"
+                    />
                 </div>
             </div>
+        </div>
+    </form>
+</ng-template>
+
+<ng-template
+    #custom
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        [formGroup]="
+            getCustomIfConditionFormGroup(index, isEvt, evtIndex, funcName)
+        "
+        role="form"
+    >
+        <div class="col-md-12">
+            <input
+                type="text"
+                class="form-control"
+                formControlName="customCondition"
+            />
         </div>
     </form>
 </ng-template>

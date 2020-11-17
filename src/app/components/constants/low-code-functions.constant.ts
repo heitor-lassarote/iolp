@@ -7,10 +7,7 @@ import {
     TextType,
 } from "../domain/output";
 
-const UNIT = {
-    tag: "adt",
-    name: "Unit",
-} as AlgebraicType;
+const UNIT = new AlgebraicType("Unit");
 
 export const LOWCODEFUNCTIONS: ExternFunction[] = [
     {
@@ -39,6 +36,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new FunctionType([], UNIT),
             },
         ],
+        returnType: UNIT,
     },
     {
         name: "POST",
@@ -67,6 +65,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new FunctionType([], UNIT),
             },
         ],
+        returnType: UNIT,
     },
     {
         name: "trunc",
@@ -78,6 +77,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new DoubleType(),
             },
         ],
+        returnType: "integer",
     },
     {
         name: "doubleToInteger",
@@ -89,6 +89,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new DoubleType(),
             },
         ],
+        returnType: "integer",
     },
     {
         name: "doubleToText",
@@ -100,6 +101,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new DoubleType(),
             },
         ],
+        returnType: "text",
     },
     {
         name: "integerToDouble",
@@ -111,6 +113,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new IntegerType(),
             },
         ],
+        returnType: "double",
     },
     {
         name: "integerToText",
@@ -122,6 +125,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new IntegerType(),
             },
         ],
+        returnType: "text",
     },
     {
         name: "textToDouble",
@@ -133,6 +137,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new TextType(),
             },
         ],
+        returnType: "double",
     },
     {
         name: "textToInteger",
@@ -144,6 +149,7 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new TextType(),
             },
         ],
+        returnType: "integer",
     },
     {
         name: "textToIntegerRadix",
@@ -160,5 +166,6 @@ export const LOWCODEFUNCTIONS: ExternFunction[] = [
                 paramType: new IntegerType(),
             },
         ],
+        returnType: "integer",
     },
 ];

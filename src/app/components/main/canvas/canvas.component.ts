@@ -69,10 +69,7 @@ declare let $: any;
 declare let css: any;
 
 // Constants
-const UNIT = {
-    tag: "adt",
-    name: "Unit",
-} as AlgebraicType;
+const UNIT = new AlgebraicType("Unit");
 
 @Component({
     selector: "app-canvas",
@@ -83,6 +80,8 @@ export class CanvasComponent implements OnInit {
     // Forms
     logicForm: FormGroup;
     comparisonForm: FormGroup;
+    booleanLogicForm: FormGroup;
+    customIfConditionForm: FormGroup;
     declarationForm: FormGroup;
     httpForm: FormGroup;
     callFuncForm: FormGroup;
@@ -139,6 +138,7 @@ export class CanvasComponent implements OnInit {
                 funcName: "main",
                 parametersQuantity: 0,
                 parameters: [],
+                returnType: UNIT,
             })
         );
 
@@ -148,12 +148,21 @@ export class CanvasComponent implements OnInit {
                     funcName: func.name,
                     parametersQuantity: func.parametersQuantity,
                     parameters: func.parameters,
+                    returnType: func.returnType,
                 })
             );
         });
 
         this.comparisonForm = this.formBuilder.group({
             comparisonArray: this.formBuilder.array([]),
+        });
+
+        this.booleanLogicForm = this.formBuilder.group({
+            booleanLogicArray: this.formBuilder.array([]),
+        });
+
+        this.customIfConditionForm = this.formBuilder.group({
+            customIfConditionArray: this.formBuilder.array([]),
         });
 
         this.declarationForm = this.formBuilder.group({
@@ -175,6 +184,16 @@ export class CanvasComponent implements OnInit {
 
     get comparisonArrayData() {
         return <FormArray>this.comparisonForm.get("comparisonArray");
+    }
+
+    get booleanLogicArrayData() {
+        return <FormArray>this.booleanLogicForm.get("booleanLogicArray");
+    }
+
+    get customIfConditionArrayData() {
+        return <FormArray>(
+            this.customIfConditionForm.get("customIfConditionArray")
+        );
     }
 
     get declarationArrayData() {
@@ -243,6 +262,41 @@ export class CanvasComponent implements OnInit {
             index: comparison.index,
             funcName: comparison.funcName,
             evtIndex: comparison.evtIndex,
+        });
+    }
+
+    private initBooleanLogicFormArray(booleanLogic: {
+        index: number;
+        funcName: string;
+        evtIndex: number;
+        leftExpression: string;
+        symbol: string;
+        rightExpression: string;
+    }): FormGroup {
+        return this.formBuilder.group({
+            leftExpression: [booleanLogic.leftExpression, Validators.required],
+            symbol: [booleanLogic.symbol, Validators.required],
+            rightExpression: [
+                booleanLogic.rightExpression,
+                Validators.required,
+            ],
+            index: booleanLogic.index,
+            funcName: booleanLogic.funcName,
+            evtIndex: booleanLogic.evtIndex,
+        });
+    }
+
+    private initCustomIfConditionFormArray(custom: {
+        index: number;
+        funcName: string;
+        evtIndex: number;
+        customCondition: string;
+    }) {
+        return this.formBuilder.group({
+            customCondition: custom.customCondition,
+            index: custom.index,
+            funcName: custom.funcName,
+            evtIndex: custom.evtIndex,
         });
     }
 
@@ -326,6 +380,46 @@ export class CanvasComponent implements OnInit {
         }
 
         return this.comparisonArrayData.controls[formIndex] as FormGroup;
+    }
+
+    getBooleanLogicFormGroup(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): FormGroup {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        return this.booleanLogicArrayData.controls[formIndex] as FormGroup;
+    }
+
+    getCustomIfConditionFormGroup(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): FormGroup {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        return this.customIfConditionArrayData.controls[formIndex] as FormGroup;
     }
 
     getDeclarationFormGroup(
@@ -671,20 +765,35 @@ export class CanvasComponent implements OnInit {
         let functions: Function[] = [];
         this.logicElements.forEach((func: LogicFunction, funcIndex: number) => {
             let funct: Function = {
-                name: func.funcName,
+                name: this.formData.controls[funcIndex].get("funcName").value,
                 arguments: [],
-                type: this.getType("function", func.arguments, func.returnType),
+                type: null,
                 body: [],
             };
             let ast: AST;
             //Arguments
+            let paramTypes: Argument[] = [];
             func.arguments.forEach((args: Argument, index: number) => {
                 const paramFormArray = this.formData.controls[funcIndex].get(
                     "parameters"
                 ) as FormArray;
-                let control = paramFormArray.controls;
-                console.log(control);
+                let control = paramFormArray.controls[index];
+                funct.arguments.push(control.get("paramName").value);
+                paramTypes.push({
+                    name: control.get("paramName").value,
+                    returnType: control.get("paramType").value,
+                });
             });
+            const returnValue = this.formData.controls[funcIndex].get(
+                "returnType"
+            ).value;
+            funct.type = this.getType(
+                "function",
+                paramTypes,
+                typeof returnValue === "string"
+                    ? this.getType(returnValue, [], null)
+                    : UNIT
+            );
             //Command Lines
             func.commandLine.forEach((cl: CommandLine) => {
                 let controls = this.checkFormControlType(
@@ -702,7 +811,7 @@ export class CanvasComponent implements OnInit {
                 funct.body.push(ast);
             });
 
-            console.log(funct);
+            console.log(JSON.stringify(funct));
             functions.push(funct);
         });
 
@@ -753,7 +862,7 @@ export class CanvasComponent implements OnInit {
         pageTest.css = this.cssObject;
         pageTest.logic.push(logicObject);
         value.ast.pages.push(pageTest);
-        console.log(value);
+        console.log(JSON.stringify(value));
         try {
             let projectID = await this.sendService.postCode(value);
             sessionStorage.setItem("projectID", projectID.toString());
@@ -795,6 +904,10 @@ export class CanvasComponent implements OnInit {
                 switch (clType) {
                     case "comparison":
                         return this.comparisonArrayData.controls;
+                    case "booleanLogic":
+                        return this.booleanLogicArrayData.controls;
+                    case "custom":
+                        return this.customIfConditionArrayData.controls;
                     default:
                         return null;
                 }
@@ -863,6 +976,9 @@ export class CanvasComponent implements OnInit {
             case "array":
                 newType = new ArrayType(null);
                 break;
+            case "bool":
+                newType = new AlgebraicType("Bool");
+                break;
             case "char":
                 newType = new CharType();
                 break;
@@ -884,6 +1000,9 @@ export class CanvasComponent implements OnInit {
                 break;
             case "text":
                 newType = new TextType();
+                break;
+            case "void":
+                newType = UNIT;
                 break;
         }
         return newType;
@@ -907,6 +1026,10 @@ export class CanvasComponent implements OnInit {
                             control.get("rightExpression").value
                         );
                         break;
+                    case "custom":
+                        newExpression = new StringExpression(
+                            control.get("customCondition").value
+                        );
                     default:
                         newExpression = null;
                         break;
@@ -930,15 +1053,22 @@ export class CanvasComponent implements OnInit {
                 paramControls.forEach((param) => {
                     let exp: Expression;
                     let paramType = param.get("paramType").value;
+                    if (typeof paramType === "string") {
+                        paramType = this.getType(paramType, [], null);
+                    }
                     switch (paramType.constructor) {
                         case DoubleType:
                             exp = new Literal_(
-                                new Double(param.get("paramValue").value)
+                                new Double(
+                                    parseFloat(param.get("paramValue").value)
+                                )
                             );
                             break;
                         case IntegerType:
                             exp = new Literal_(
-                                new Integer(param.get("paramValue").value)
+                                new Integer(
+                                    parseInt(param.get("paramValue").value)
+                                )
                             );
                             break;
                         case TextType:
@@ -1048,11 +1178,13 @@ export class CanvasComponent implements OnInit {
         funcName: string;
         parametersQuantity: number;
         parameters: { paramName: string; paramValue: any; paramType: Type }[];
+        returnType: string | Type;
     }) {
         return this.formBuilder.group({
             funcName: [func.funcName, [Validators.required]],
             parametersQuantity: func.parametersQuantity,
             parameters: this.formBuilder.array(func.parameters),
+            returnType: func.returnType,
         });
     }
 
@@ -1078,6 +1210,7 @@ export class CanvasComponent implements OnInit {
                 funcName: `function${this.logicElements.length - 1}`,
                 parametersQuantity: 0,
                 parameters: [],
+                returnType: "",
             })
         );
     }
@@ -1204,10 +1337,7 @@ export class CanvasComponent implements OnInit {
         this.logicElements[funcIndex].arguments.splice(paramIndex, 1);
     }
 
-    private initFuncParams(params: {
-        paramName: string;
-        paramType: string;
-    }) {
+    private initFuncParams(params: { paramName: string; paramType: string }) {
         return this.formBuilder.group({
             paramName: [params.paramName, Validators.required],
             paramType: params.paramType,
@@ -1352,6 +1482,30 @@ export class CanvasComponent implements OnInit {
                             })
                         );
                         break;
+                    case "booleanLogic":
+                        control = this.booleanLogicArrayData.controls;
+                        control.push(
+                            this.initBooleanLogicFormArray({
+                                leftExpression: "",
+                                symbol: "",
+                                rightExpression: "",
+                                funcName,
+                                index,
+                                evtIndex: isEvt ? evtIndex : -1,
+                            })
+                        );
+                        break;
+                    case "custom":
+                        control = this.customIfConditionArrayData.controls;
+                        control.push(
+                            this.initCustomIfConditionFormArray({
+                                customCondition: "",
+                                funcName,
+                                index,
+                                evtIndex: isEvt ? evtIndex : -1,
+                            })
+                        );
+                        break;
                 }
                 break;
             case "http":
@@ -1409,6 +1563,12 @@ export class CanvasComponent implements OnInit {
                 switch (lastClType) {
                     case "comparison":
                         control = this.comparisonArrayData.controls;
+                        break;
+                    case "booleanLogic":
+                        control = this.booleanLogicArrayData.controls;
+                        break;
+                    case "custom":
+                        control = this.customIfConditionArrayData.controls;
                         break;
                 }
                 break;
