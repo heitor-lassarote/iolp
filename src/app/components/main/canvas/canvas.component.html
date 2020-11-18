@@ -53,6 +53,7 @@
                 class="btn btn-default draggable"
                 [id]="e.name"
                 (click)="click($event, $event.target)"
+                (dblclick)="onDoubleClick($event, $event.target)"
                 cdkDrag
                 cdkDragBoundary=".screen"
             >
@@ -290,6 +291,16 @@
                                         }"
                                     ></ng-container>
                                     <ng-container
+                                        *ngIf="cl.type.name === 'repetition'"
+                                        [ngTemplateOutlet]="whileLoop"
+                                        [ngTemplateOutletContext]="{
+                                            index: funcClIndex,
+                                            evtIndex: -1,
+                                            isEvt: false,
+                                            funcName: func.funcName
+                                        }"
+                                    ></ng-container>
+                                    <ng-container
                                         *ngIf="cl.type.name === 'declaration'"
                                         [ngTemplateOutlet]="declaration"
                                         [ngTemplateOutletContext]="{
@@ -391,9 +402,11 @@
                                             <button
                                                 type="button"
                                                 class="btn btn-primary add-btn m-l-sm"
-                                                data-toggle="dropdown"
                                                 (click)="
-                                                    createEvtCl(evt.eventName)
+                                                    createEvtCl(
+                                                        evt.eventName,
+                                                        func.funcName
+                                                    )
                                                 "
                                             >
                                                 <i class="fa fa-plus"></i>
@@ -459,6 +472,19 @@
                                                     cl.type.name === 'decision'
                                                 "
                                                 [ngTemplateOutlet]="ifDecision"
+                                                [ngTemplateOutletContext]="{
+                                                    index: evtClIndex,
+                                                    evtIndex: evtIndex,
+                                                    isEvt: true,
+                                                    funcName: func.funcName
+                                                }"
+                                            ></ng-container>
+                                            <ng-container
+                                                *ngIf="
+                                                    cl.type.name ===
+                                                    'repetition'
+                                                "
+                                                [ngTemplateOutlet]="whileLoop"
                                                 [ngTemplateOutletContext]="{
                                                     index: evtClIndex,
                                                     evtIndex: evtIndex,
@@ -598,6 +624,93 @@
                         *ngIf="
                             ifCondition(funcName, isEvt, index, evtIndex) ===
                             'custom'
+                        "
+                        [ngTemplateOutlet]="custom"
+                        [ngTemplateOutletContext]="{
+                            index: index,
+                            evtIndex: evtIndex,
+                            isEvt: isEvt,
+                            funcName: funcName
+                        }"
+                    ></ng-container>
+                </div>
+            </div>
+        </div>
+    </div>
+</ng-template>
+
+<ng-template
+    #whileLoop
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <div class="col-md-12">
+        <div class="column">
+            <div class="row m-b-sm">
+                <div class="col-1 m-h-auto">Enquanto</div>
+                <div class="col-3">
+                    <select
+                        class="form-control"
+                        (change)="
+                            changeWhileLoop(
+                                $event.target.value,
+                                funcName,
+                                isEvt,
+                                index,
+                                evtIndex
+                            )
+                        "
+                    >
+                        <option value="comparison">Comparação</option>
+                        <option value="booleanLogic">Lógica Booleana</option>
+                        <option value="custom">Customizado</option>
+                    </select>
+                </div>
+                <div class="col-8">
+                    <ng-container
+                        *ngIf="
+                            whileLoopCondition(
+                                funcName,
+                                isEvt,
+                                index,
+                                evtIndex
+                            ) === 'comparison'
+                        "
+                        [ngTemplateOutlet]="comparison"
+                        [ngTemplateOutletContext]="{
+                            index: index,
+                            evtIndex: evtIndex,
+                            isEvt: isEvt,
+                            funcName: funcName
+                        }"
+                    ></ng-container>
+                    <ng-container
+                        *ngIf="
+                            whileLoopCondition(
+                                funcName,
+                                isEvt,
+                                index,
+                                evtIndex
+                            ) === 'booleanLogic'
+                        "
+                        [ngTemplateOutlet]="booleanLogic"
+                        [ngTemplateOutletContext]="{
+                            index: index,
+                            evtIndex: evtIndex,
+                            isEvt: isEvt,
+                            funcName: funcName
+                        }"
+                    ></ng-container>
+                    <ng-container
+                        *ngIf="
+                            whileLoopCondition(
+                                funcName,
+                                isEvt,
+                                index,
+                                evtIndex
+                            ) === 'custom'
                         "
                         [ngTemplateOutlet]="custom"
                         [ngTemplateOutletContext]="{
@@ -757,7 +870,7 @@
 >
     <form
         [formGroup]="
-            getCustomIfConditionFormGroup(index, isEvt, evtIndex, funcName)
+            getCustomConditionFormGroup(index, isEvt, evtIndex, funcName)
         "
         role="form"
     >

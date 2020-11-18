@@ -66,13 +66,11 @@ export class CompInfosComponent implements OnInit {
         let size: { value: number; unity: string } = this.getSizePart(
             css.width
         );
-        console.log(size);
         form.get("width").setValue(size.value);
         form.get("widthUnity").setValue(size.unity);
         this.infosForm.get("width").enable();
         this.infosForm.get("widthUnity").enable();
         size = this.getSizePart(css.height);
-        console.log(size);
         form.get("height").setValue(size.value);
         form.get("heightUnity").setValue(size.unity);
         this.infosForm.get("height").enable();
