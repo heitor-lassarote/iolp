@@ -521,6 +521,33 @@ export class CanvasComponent implements OnInit {
             .patchValue(funcControl.get("parametersQuantity").value);
     }
 
+    onChangeVarType(
+        value: string,
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ) {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        let control = this.declarationArrayData.controls[formIndex];
+
+        if (value === "bool") {
+            control.get("varValue").setValue("true");
+        } else {
+            control.get("varValue").setValue("");
+        }
+    }
+
     private initParams(params: FormControl): FormGroup {
         return this.formBuilder.group({
             paramName: params.value["paramName"],

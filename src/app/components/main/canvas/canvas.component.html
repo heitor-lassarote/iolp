@@ -740,7 +740,19 @@
         <div class="col-md-12">
             <div class="row">
                 <div class="col-4">
-                    <select class="form-control" formControlName="varType">
+                    <select
+                        class="form-control"
+                        formControlName="varType"
+                        (change)="
+                            onChangeVarType(
+                                $event.target.value,
+                                index,
+                                isEvt,
+                                evtIndex,
+                                funcName
+                            )
+                        "
+                    >
                         <option value="adt">Algébrico</option>
                         <option value="array">Array</option>
                         <option value="bool">Booleano</option>
@@ -760,11 +772,34 @@
                     />
                 </div>
                 <div class="col-4">
+                    <select
+                        class="form-control"
+                        formControlName="varValue"
+                        *ngIf="
+                            getDeclarationFormGroup(
+                                index,
+                                isEvt,
+                                evtIndex,
+                                funcName
+                            ).get('varType').value === 'bool'
+                        "
+                    >
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
                     <input
                         type="text"
                         class="form-control"
                         formControlName="varValue"
                         placeholder="Valor"
+                        *ngIf="
+                            getDeclarationFormGroup(
+                                index,
+                                isEvt,
+                                evtIndex,
+                                funcName
+                            ).get('varType').value !== 'bool'
+                        "
                     />
                 </div>
             </div>
