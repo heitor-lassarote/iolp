@@ -79,6 +79,8 @@ const UNIT = new AlgebraicType("Unit");
 export class CanvasComponent implements OnInit {
     // Forms
     logicForm: FormGroup;
+    decisionForm: FormGroup;
+    repetitionForm: FormGroup;
     comparisonForm: FormGroup;
     booleanLogicForm: FormGroup;
     customConditionForm: FormGroup;
@@ -151,6 +153,14 @@ export class CanvasComponent implements OnInit {
             );
         });
 
+        this.decisionForm = this.formBuilder.group({
+            decisionArray: this.formBuilder.array([]),
+        });
+
+        this.repetitionForm = this.formBuilder.group({
+            repetitionArray: this.formBuilder.array([]),
+        });
+
         this.comparisonForm = this.formBuilder.group({
             comparisonArray: this.formBuilder.array([]),
         });
@@ -178,6 +188,46 @@ export class CanvasComponent implements OnInit {
         this.returnForm = this.formBuilder.group({
             returnArray: this.formBuilder.array([]),
         });
+    }
+
+    get decisionArrayData() {
+        return <FormArray>this.decisionForm.get("decisionArray");
+    }
+
+    getTrueBranch(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ) {
+        let decisionFormGroup: FormGroup = this.getDecisionFormGroup(
+            index,
+            isEvt,
+            evtIndex,
+            funcName
+        );
+
+        return <FormArray>decisionFormGroup.get("trueBranchAst");
+    }
+
+    getFalseBranch(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ) {
+        let decisionFormGroup: FormGroup = this.getDecisionFormGroup(
+            index,
+            isEvt,
+            evtIndex,
+            funcName
+        );
+
+        return <FormArray>decisionFormGroup.get("falseBranchAst");
+    }
+
+    get repetitionArrayData() {
+        return <FormArray>this.repetitionForm.get("repetitionArray");
     }
 
     get comparisonArrayData() {
@@ -226,6 +276,37 @@ export class CanvasComponent implements OnInit {
 
     getFunctionParams(funcIndex: number) {
         return <FormArray>this.formData.controls[funcIndex].get("parameters");
+    }
+
+    private initDecisionFormArray(decision: {
+        index: number;
+        funcName: string;
+        evtIndex: number;
+        expression: AbstractControl;
+    }): FormGroup {
+        return this.formBuilder.group({
+            expression: decision.expression,
+            trueBranchAst: this.formBuilder.array([]),
+            falseBranchAst: this.formBuilder.array([]),
+            index: decision.index,
+            funcName: decision.funcName,
+            evtIndex: decision.evtIndex,
+        });
+    }
+
+    private initRepetitionFormArray(repetition: {
+        index: number;
+        funcName: string;
+        evtIndex: number;
+        expression: AbstractControl;
+    }): FormGroup {
+        return this.formBuilder.group({
+            expression: repetition.expression,
+            whileAst: this.formBuilder.array([]),
+            index: repetition.index,
+            funcName: repetition.funcName,
+            evtIndex: repetition.evtIndex,
+        });
     }
 
     private initComparisonFormArray(comparison: {
@@ -341,6 +422,46 @@ export class CanvasComponent implements OnInit {
         return this.formBuilder.group({
             returnValue: [returnValue.value, Validators.required],
         });
+    }
+
+    getDecisionFormGroup(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): FormGroup {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        return this.decisionArrayData.controls[formIndex] as FormGroup;
+    }
+
+    getRepetitionFormGroup(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): FormGroup {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        return this.repetitionArrayData.controls[formIndex] as FormGroup;
     }
 
     getComparisonFormGroup(
@@ -1265,9 +1386,10 @@ export class CanvasComponent implements OnInit {
 
     createItem(func: string, type: string) {
         let curElement: LogicFunction;
-        const control = this.comparisonArrayData.controls;
         switch (type) {
             case "cl":
+                const decisionControl = this.decisionArrayData.controls;
+                const control = this.comparisonArrayData.controls;
                 curElement = this.logicElements.find(
                     (element) => func === element.funcName
                 );
@@ -1281,10 +1403,19 @@ export class CanvasComponent implements OnInit {
                         evtIndex: -1,
                     })
                 );
+                const formIndex: number = control.length - 1;
+                decisionControl.push(
+                    this.initDecisionFormArray({
+                        expression: control[formIndex],
+                        funcName: func,
+                        index: curElement.commandLine.length - 1,
+                        evtIndex: -1,
+                    })
+                );
                 curElement.commandLine.push({
                     exec: null,
                     type: { name: "decision", clType: "comparison" },
-                    formIndex: control.length - 1,
+                    formIndex,
                 });
                 break;
             case "evt":
@@ -1362,6 +1493,18 @@ export class CanvasComponent implements OnInit {
             curEvt = element.events.find((ev) => eventName === ev.eventName);
         });
         curEvt.commandLine.splice(index, 1);
+    }
+
+    addClToDecisionBranch(
+        branch: string,
+        funcName: string,
+        isEvt: boolean,
+        index: number,
+        evtIndex: number
+    ) {}
+
+    removeClToDecisionBranch(branch: string, cl, clIndex: number) {
+        console.log(cl);
     }
 
     addParameterToFunction(index: number) {
