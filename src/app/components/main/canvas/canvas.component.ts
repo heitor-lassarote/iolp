@@ -198,13 +198,15 @@ export class CanvasComponent implements OnInit {
         index: number,
         isEvt: boolean,
         evtIndex: number,
-        funcName: string
+        funcName: string,
+        cascade: boolean
     ) {
         let decisionFormGroup: FormGroup = this.getDecisionFormGroup(
             index,
             isEvt,
             evtIndex,
-            funcName
+            funcName,
+            cascade
         );
 
         return <FormArray>decisionFormGroup.get("trueBranchAst");
@@ -214,13 +216,15 @@ export class CanvasComponent implements OnInit {
         index: number,
         isEvt: boolean,
         evtIndex: number,
-        funcName: string
+        funcName: string,
+        cascade: boolean
     ) {
         let decisionFormGroup: FormGroup = this.getDecisionFormGroup(
             index,
             isEvt,
             evtIndex,
-            funcName
+            funcName,
+            cascade
         );
 
         return <FormArray>decisionFormGroup.get("falseBranchAst");
@@ -428,7 +432,8 @@ export class CanvasComponent implements OnInit {
         index: number,
         isEvt: boolean,
         evtIndex: number,
-        funcName: string
+        funcName: string,
+        cascade: boolean
     ): FormGroup {
         let curElement: LogicFunction = this.logicElements.find(
             (element) => funcName === element.funcName
@@ -1500,11 +1505,23 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         isEvt: boolean,
         index: number,
-        evtIndex: number
+        evtIndex: number,
+        cascade: boolean
     ) {}
 
-    removeClToDecisionBranch(branch: string, cl, clIndex: number) {
+    removeClToDecisionBranch(branch: string, cl: any, clIndex: number) {
         console.log(cl);
+        let control: AbstractControl[];
+        switch (branch) {
+            case "trueBranch":
+                control = (cl.get("trueBranchAst") as FormArray).controls;
+                control.splice(clIndex, 1);
+                break;
+            case "falseBranch":
+                control = (cl.get("falseBranchAst") as FormArray).controls;
+                control.splice(clIndex, 1);
+                break;
+        }
     }
 
     addParameterToFunction(index: number) {
