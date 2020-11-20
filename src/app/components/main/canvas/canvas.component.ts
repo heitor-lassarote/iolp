@@ -89,12 +89,12 @@ export class CanvasComponent implements OnInit {
     attributionForm: FormGroup;
     returnForm: FormGroup;
 
+    // Attributes
     isLogicContainer: boolean = true; //TODO: Change to false
     $logicContainer: BehaviorSubject<boolean>;
     public style: object = {};
     elements: Element[] = [];
     cssObject: CssOut[] = [];
-    variables: Variab[] = [];
     externFunc: ExternFunction[] = [...LOWCODEFUNCTIONS];
     logicElements: LogicFunction[] = [
         {
@@ -131,6 +131,10 @@ export class CanvasComponent implements OnInit {
             this.checkLogicContainerState(value);
         });
 
+        this.createForms();
+    }
+
+    private createForms() {
         this.logicForm = this.formBuilder.group({
             functions: this.formBuilder.array([]),
         });
@@ -188,6 +192,41 @@ export class CanvasComponent implements OnInit {
         this.returnForm = this.formBuilder.group({
             returnArray: this.formBuilder.array([]),
         });
+    }
+
+    private checkLogicContainerState(isLogicContainer: boolean) {
+        if (isLogicContainer) {
+            $("#infos-container").prop("hidden", true);
+            $("#canvas-container")
+                .addClass("col-lg-12")
+                .removeClass("col-lg-9");
+            let children = document.getElementById("side-menu").childNodes;
+            children.forEach((child: HTMLElement) => {
+                if (child.className === "") {
+                    child.setAttribute("hidden", "true");
+                }
+            });
+        } else {
+            $("#infos-container").prop("hidden", false);
+            $("#canvas-container")
+                .removeClass("col-lg-12")
+                .addClass("col-lg-9");
+            let children = document.getElementById("side-menu").childNodes;
+            children.forEach((child: HTMLElement) => {
+                if (child.className === "") {
+                    child.removeAttribute("hidden");
+                }
+            });
+        }
+    }
+
+    // Begin Get Form Array Datas
+    get formData() {
+        return <FormArray>this.logicForm.get("functions");
+    }
+
+    getCurFunction(index: number): FormGroup {
+        return this.formData.controls[index] as FormGroup;
     }
 
     get decisionArrayData() {
@@ -282,7 +321,7 @@ export class CanvasComponent implements OnInit {
         evtIndex: number,
         funcName: string
     ) {
-        let parameterFormGroup: FormGroup = this.getFunctionFormGroup(
+        let parameterFormGroup: FormGroup = this.getCallFuncFormGroup(
             index,
             isEvt,
             evtIndex,
@@ -298,6 +337,27 @@ export class CanvasComponent implements OnInit {
 
     getFunctionParams(funcIndex: number) {
         return <FormArray>this.formData.controls[funcIndex].get("parameters");
+    }
+    // End Get Form Array Datas
+
+    // Begin Create Array Data
+    private initForm(func: {
+        funcName: string;
+        parameters: { paramName: string; paramValue: any; paramType: Type }[];
+        returnType: string | Type;
+    }) {
+        return this.formBuilder.group({
+            funcName: [func.funcName, [Validators.required]],
+            parameters: this.formBuilder.array(func.parameters),
+            returnType: func.returnType,
+        });
+    }
+
+    private initFuncParams(params: { paramName: string; paramType: string }) {
+        return this.formBuilder.group({
+            paramName: [params.paramName, Validators.required],
+            paramType: params.paramType,
+        });
     }
 
     private initDecisionFormArray(decision: {
@@ -463,6 +523,14 @@ export class CanvasComponent implements OnInit {
         });
     }
 
+    private initParams(params: FormControl): FormGroup {
+        return this.formBuilder.group({
+            paramName: params.value["paramName"],
+            paramType: params.value["paramType"],
+            paramValue: params.value["paramValue"],
+        });
+    }
+
     private initAttributionFormArray(attribution: {
         index: number;
         funcName: string;
@@ -487,7 +555,9 @@ export class CanvasComponent implements OnInit {
             returnValue: [returnValue.value, Validators.required],
         });
     }
+    // End Create Array Data
 
+    // Get Form Group
     getDecisionFormGroup(
         index: number,
         isEvt: boolean,
@@ -674,127 +744,6 @@ export class CanvasComponent implements OnInit {
         return this.returnArrayData.controls[formIndex] as FormGroup;
     }
 
-    onChangeCallFunction(
-        func: string,
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ) {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        let funcControl = this.formData.controls.find(
-            (ctr) => ctr.get("funcName").value === func
-        );
-
-        let control = this.callFuncArrayData.controls[formIndex];
-        let funcParams = funcControl.get("parameters") as FormArray;
-        let callParams = control.get("parameters") as FormArray;
-
-        callParams.clear();
-
-        for (let formControl of funcParams.controls) {
-            callParams.controls.push(
-                this.initParams(formControl as FormControl)
-            );
-        }
-        control
-            .get("parametersQuantity")
-            .patchValue(funcControl.get("parametersQuantity").value);
-    }
-
-    onChangeVarType(
-        value: string,
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ) {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        let control = this.declarationArrayData.controls[formIndex];
-
-        if (value === "bool") {
-            control.get("varValue").setValue("true");
-        } else {
-            control.get("varValue").setValue("");
-        }
-    }
-
-    private initParams(params: FormControl): FormGroup {
-        return this.formBuilder.group({
-            paramName: params.value["paramName"],
-            paramType: params.value["paramType"],
-            paramValue: params.value["paramValue"],
-        });
-    }
-
-    getFunctionFormGroup(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-
-        let formIndex: number;
-
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return this.callFuncArrayData.controls[formIndex] as FormGroup;
-    }
-
-    private checkLogicContainerState(isLogicContainer: boolean) {
-        if (isLogicContainer) {
-            $("#infos-container").prop("hidden", true);
-            $("#canvas-container")
-                .addClass("col-lg-12")
-                .removeClass("col-lg-9");
-            let children = document.getElementById("side-menu").childNodes;
-            children.forEach((child: HTMLElement) => {
-                if (child.className === "") {
-                    child.setAttribute("hidden", "true");
-                }
-            });
-        } else {
-            $("#infos-container").prop("hidden", false);
-            $("#canvas-container")
-                .removeClass("col-lg-12")
-                .addClass("col-lg-9");
-            let children = document.getElementById("side-menu").childNodes;
-            children.forEach((child: HTMLElement) => {
-                if (child.className === "") {
-                    child.removeAttribute("hidden");
-                }
-            });
-        }
-    }
-
     // Change Container listeners
     setLogicContainer(value: boolean) {
         this.isLogicContainer = value;
@@ -805,6 +754,7 @@ export class CanvasComponent implements OnInit {
         return this.$logicContainer.asObservable();
     }
 
+    // Resize Components
     validate(event: ResizeEvent): boolean {
         console.log(event);
         const MIN_DIMENSIONS_PX: number = 50;
@@ -829,6 +779,7 @@ export class CanvasComponent implements OnInit {
         };
     }
 
+    // Send component data to info
     click(ev: MouseEvent, targ: HTMLElement) {
         let comp: string = `#${targ.id}`;
         let infos: Info = {
@@ -848,6 +799,7 @@ export class CanvasComponent implements OnInit {
         this.showInfosService.setComponentInfos(infos);
     }
 
+    // Create an event to component
     onDoubleClick(ev: MouseEvent, targ: HTMLElement) {
         const id = targ.id;
 
@@ -861,6 +813,85 @@ export class CanvasComponent implements OnInit {
         this.setLogicContainer(true);
     }
 
+    // Project apply
+    async apply() {
+        this.spinner.show("loadingSpinner");
+        let value: Output = {
+            name: sessionStorage.getItem("projectName"),
+            ast: {
+                pages: [],
+            },
+        };
+        let pages: Page[] = [];
+        let pageTest: Page = {
+            name: "Page Test",
+            css: [],
+            logic: [],
+            html: [],
+        };
+        $("#canvas")
+            .children()
+            .each((index: number, child: HTMLElement) => {
+                let nodes = child.childNodes;
+                let element: HTMLElement;
+                let htmlObject: HtmlTagOut = {
+                    tag: "",
+                    ast: [],
+                    attributes: [],
+                };
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i].nodeType !== Node.COMMENT_NODE) {
+                        element = nodes[i] as HTMLElement;
+                    }
+                }
+                htmlObject = this.createComponent(element, htmlObject, false);
+                pageTest.html.push(htmlObject);
+            });
+        let logicObject: Module = {
+            adtTemplates: new Map(),
+            externs: new Map(),
+            functions: [],
+            importedModules: ["Prelude", "JSON", "REST"],
+            moduleName: "main",
+        };
+        logicObject.functions = this.getLogicFunctions();
+        pageTest.css = this.cssObject;
+        pageTest.logic.push(logicObject);
+        value.ast.pages.push(pageTest);
+        console.log(JSON.stringify(value));
+        try {
+            let projectID = await this.sendService.postCode(value);
+            sessionStorage.setItem("projectID", projectID.toString());
+            this.toastr.success("Aplicado com sucesso!", "Sucesso!", {
+                progressBar: true,
+                closeButton: true,
+            });
+        } catch (e) {
+            if (e instanceof HttpErrorResponse) {
+                let error = e.error.errors.join("; ");
+                switch (e.status) {
+                    case 404:
+                        this.toastr.error(
+                            `Motivo(s): ${error}`,
+                            `Erro ${e.status} - ${e.error.message}`,
+                            { progressBar: true, closeButton: true }
+                        );
+                        break;
+                    default:
+                        this.toastr.error(
+                            `Motivo(s): ${error}`,
+                            `Erro ${e.status} - ${e.error.message}`,
+                            { progressBar: true, closeButton: true }
+                        );
+                        break;
+                }
+            }
+        } finally {
+            this.spinner.hide("loadingSpinner");
+        }
+    }
+
+    // begin HTML part
     private createComponent(
         element: HTMLElement,
         htmlObject: HtmlTagOut,
@@ -972,7 +1003,9 @@ export class CanvasComponent implements OnInit {
         }
         return htmlObject;
     }
+    // end HTML part
 
+    // Begin Logic Part
     private getLogicFunctions(): Function[] {
         let functions: Function[] = [];
         this.logicElements.forEach((func: LogicFunction, funcIndex: number) => {
@@ -1028,96 +1061,6 @@ export class CanvasComponent implements OnInit {
         });
 
         return functions;
-    }
-
-    async apply() {
-        this.spinner.show("loadingSpinner");
-        let value: Output = {
-            name: sessionStorage.getItem("projectName"),
-            ast: {
-                pages: [],
-            },
-        };
-        let pages: Page[] = [];
-        let pageTest: Page = {
-            name: "Page Test",
-            css: [],
-            logic: [],
-            html: [],
-        };
-        $("#canvas")
-            .children()
-            .each((index: number, child: HTMLElement) => {
-                let nodes = child.childNodes;
-                let element: HTMLElement;
-                let htmlObject: HtmlTagOut = {
-                    tag: "",
-                    ast: [],
-                    attributes: [],
-                };
-                for (let i = 0; i < nodes.length; i++) {
-                    if (nodes[i].nodeType !== Node.COMMENT_NODE) {
-                        element = nodes[i] as HTMLElement;
-                    }
-                }
-                htmlObject = this.createComponent(element, htmlObject, false);
-                pageTest.html.push(htmlObject);
-            });
-        let logicObject: Module = {
-            adtTemplates: new Map(),
-            externs: new Map(),
-            functions: [],
-            importedModules: ["Prelude", "JSON", "REST"],
-            moduleName: "main",
-        };
-        logicObject.functions = this.getLogicFunctions();
-        pageTest.css = this.cssObject;
-        pageTest.logic.push(logicObject);
-        value.ast.pages.push(pageTest);
-        console.log(JSON.stringify(value));
-        try {
-            let projectID = await this.sendService.postCode(value);
-            sessionStorage.setItem("projectID", projectID.toString());
-            this.toastr.success("Aplicado com sucesso!", "Sucesso!", {
-                progressBar: true,
-                closeButton: true,
-            });
-        } catch (e) {
-            if (e instanceof HttpErrorResponse) {
-                let error = e.error.errors.join("; ");
-                switch (e.status) {
-                    case 404:
-                        this.toastr.error(
-                            `Motivo(s): ${error}`,
-                            `Erro ${e.status} - ${e.error.message}`,
-                            { progressBar: true, closeButton: true }
-                        );
-                        break;
-                    default:
-                        this.toastr.error(
-                            `Motivo(s): ${error}`,
-                            `Erro ${e.status} - ${e.error.message}`,
-                            { progressBar: true, closeButton: true }
-                        );
-                        break;
-                }
-            }
-        } finally {
-            this.spinner.hide("loadingSpinner");
-        }
-    }
-
-    isValid(): boolean {
-        return (
-            this.logicForm.valid &&
-            this.comparisonForm.valid &&
-            this.booleanLogicForm.valid &&
-            this.customConditionForm.valid &&
-            this.declarationForm.valid &&
-            this.callFuncForm.valid &&
-            this.attributionForm.valid &&
-            this.returnForm.valid
-        );
     }
 
     private checkFormControlType(
@@ -1405,28 +1348,10 @@ export class CanvasComponent implements OnInit {
 
         return newLiteral;
     }
+    // End Logic Part
+    // End Project Apply
 
-    get formData() {
-        return <FormArray>this.logicForm.get("functions");
-    }
-
-    private initForm(func: {
-        funcName: string;
-        parameters: { paramName: string; paramValue: any; paramType: Type }[];
-        returnType: string | Type;
-    }) {
-        return this.formBuilder.group({
-            funcName: [func.funcName, [Validators.required]],
-            parameters: this.formBuilder.array(func.parameters),
-            returnType: func.returnType,
-        });
-    }
-
-    getCurFunction(index: number): FormGroup {
-        return this.formData.controls[index] as FormGroup;
-    }
-
-    // Logic interface handle
+    // Begin Logic interface handle
     addAction() {
         this.logicElements.push({
             funcName: `function${this.logicElements.length - 1}`,
@@ -1721,12 +1646,107 @@ export class CanvasComponent implements OnInit {
 
         this.logicElements[funcIndex].arguments.splice(paramIndex, 1);
     }
+    // End Logic interface handle
 
-    private initFuncParams(params: { paramName: string; paramType: string }) {
-        return this.formBuilder.group({
-            paramName: [params.paramName, Validators.required],
-            paramType: params.paramType,
-        });
+    // Begin On Change Values
+    changeEventType(value: string, index: number) {
+        this.logicElements[0].events[index].eventType = value;
+    }
+
+    callFuncChangeReturnType(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): string {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let control: AbstractControl[];
+        let formIndex: number;
+        if (!isEvt) {
+            control = this.checkFormControlType(
+                curElement.commandLine[index].type.name,
+                curElement.commandLine[index].type.clType
+            );
+            formIndex = curElement.commandLine[index].formIndex;
+            let returnType = control[formIndex].get("returnType").value;
+            return returnType;
+        } else {
+            control = this.checkFormControlType(
+                curElement.events[evtIndex].commandLine[index].type.name,
+                curElement.events[evtIndex].commandLine[index].type.clType
+            );
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+            let returnType = control[formIndex].get("returnType").value;
+            return returnType;
+        }
+    }
+
+    onChangeCallFunction(
+        func: string,
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ) {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        let funcControl = this.formData.controls.find(
+            (ctr) => ctr.get("funcName").value === func
+        );
+
+        let control = this.callFuncArrayData.controls[formIndex];
+        let funcParams = funcControl.get("parameters") as FormArray;
+        let callParams = control.get("parameters") as FormArray;
+
+        callParams.clear();
+
+        for (let formControl of funcParams.controls) {
+            callParams.controls.push(
+                this.initParams(formControl as FormControl)
+            );
+        }
+        control
+            .get("parametersQuantity")
+            .patchValue(funcControl.get("parametersQuantity").value);
+    }
+
+    onChangeVarType(
+        value: string,
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ) {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        let control = this.declarationArrayData.controls[formIndex];
+
+        if (value === "bool") {
+            control.get("varValue").setValue("true");
+        } else {
+            control.get("varValue").setValue("");
+        }
     }
 
     funcClTypeChange(
@@ -1910,11 +1930,6 @@ export class CanvasComponent implements OnInit {
         switch (value) {
             case "declaration":
                 control = this.declarationArrayData.controls;
-                this.variables.push({
-                    name: "",
-                    type: this.getType("adt", [], null),
-                    value: "",
-                });
                 control.push(
                     this.initDeclarationFormArray({
                         varType: "adt",
@@ -1959,7 +1974,6 @@ export class CanvasComponent implements OnInit {
                         ),
                     })
                 );
-                break;
                 break;
             case "call":
                 control = this.callFuncArrayData.controls;
@@ -2014,7 +2028,7 @@ export class CanvasComponent implements OnInit {
                 control.push(
                     this.initComparisonFormArray({
                         leftExpression: "",
-                        symbol: "",
+                        symbol: "Different",
                         rightExpression: "",
                         funcName,
                         index,
@@ -2027,7 +2041,7 @@ export class CanvasComponent implements OnInit {
                 control.push(
                     this.initBooleanLogicFormArray({
                         leftExpression: "",
-                        symbol: "",
+                        symbol: "and",
                         rightExpression: "",
                         funcName,
                         index,
@@ -2059,12 +2073,12 @@ export class CanvasComponent implements OnInit {
         let control: AbstractControl[];
         switch (lastValue) {
             case "declaration":
-                this.variables.splice(lastFormIndex, 1);
                 control = this.declarationArrayData.controls;
                 break;
             case "decision":
                 control = this.decisionArrayData.controls;
                 this.removeLastClType(lastClType, lastFormIndex);
+                break;
             case "repetition":
                 control = this.repetitionArrayData.controls;
                 this.removeLastClType(lastClType, lastFormIndex);
@@ -2132,39 +2146,19 @@ export class CanvasComponent implements OnInit {
             return curElement.events[evtIndex].commandLine[index].type.clType;
         }
     }
+    // End On Change Values
 
-    changeEventType(value: string, index: number) {
-        this.logicElements[0].events[index].eventType = value;
-    }
-
-    callFuncChangeReturnType(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): string {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
+    // Check if all forms are valid
+    isValid(): boolean {
+        return (
+            this.logicForm.valid &&
+            this.comparisonForm.valid &&
+            this.booleanLogicForm.valid &&
+            this.customConditionForm.valid &&
+            this.declarationForm.valid &&
+            this.callFuncForm.valid &&
+            this.attributionForm.valid &&
+            this.returnForm.valid
         );
-        let control: AbstractControl[];
-        let formIndex: number;
-        if (!isEvt) {
-            control = this.checkFormControlType(
-                curElement.commandLine[index].type.name,
-                curElement.commandLine[index].type.clType
-            );
-            formIndex = curElement.commandLine[index].formIndex;
-            let returnType = control[formIndex].get("returnType").value;
-            return returnType;
-        } else {
-            control = this.checkFormControlType(
-                curElement.events[evtIndex].commandLine[index].type.name,
-                curElement.events[evtIndex].commandLine[index].type.clType
-            );
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-            let returnType = control[formIndex].get("returnType").value;
-            return returnType;
-        }
     }
 }
