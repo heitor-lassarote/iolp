@@ -234,6 +234,24 @@ export class CanvasComponent implements OnInit {
         return <FormArray>this.repetitionForm.get("repetitionArray");
     }
 
+    getWhileAst(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string,
+        cascade: boolean
+    ) {
+        let repetitionFormGroup: FormGroup = this.getRepetitionFormGroup(
+            index,
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade
+        );
+
+        return <FormArray>repetitionFormGroup.get("whileAst");
+    }
+
     get comparisonArrayData() {
         return <FormArray>this.comparisonForm.get("comparisonArray");
     }
@@ -286,7 +304,7 @@ export class CanvasComponent implements OnInit {
         index: number;
         funcName: string;
         evtIndex: number;
-        expression: AbstractControl;
+        expression: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
             expression: decision.expression,
@@ -295,6 +313,34 @@ export class CanvasComponent implements OnInit {
             index: decision.index,
             funcName: decision.funcName,
             evtIndex: decision.evtIndex,
+        });
+    }
+
+    private initTrueBranchAstFormArray(trueBranch: {
+        exec: FormGroup;
+        clType: string;
+        clTypeName: string;
+        parentIndex: number;
+    }): FormGroup {
+        return this.formBuilder.group({
+            exec: trueBranch.exec,
+            clType: trueBranch.clType,
+            clTypeName: trueBranch.clTypeName,
+            parentIndex: trueBranch.parentIndex,
+        });
+    }
+
+    private initFalseBranchAstFormArray(falseBranch: {
+        exec: FormGroup;
+        clType: string;
+        clTypeName: string;
+        parentIndex: number;
+    }): FormGroup {
+        return this.formBuilder.group({
+            exec: falseBranch.exec,
+            clType: falseBranch.clType,
+            clTypeName: falseBranch.clTypeName,
+            parentIndex: falseBranch.parentIndex,
         });
     }
 
@@ -310,6 +356,20 @@ export class CanvasComponent implements OnInit {
             index: repetition.index,
             funcName: repetition.funcName,
             evtIndex: repetition.evtIndex,
+        });
+    }
+
+    private initWhileAstFormArray(whileAst: {
+        exec: FormGroup;
+        clType: string;
+        clTypeName: string;
+        parentIndex: number;
+    }): FormGroup {
+        return this.formBuilder.group({
+            exec: whileAst.exec,
+            clType: whileAst.clType,
+            clTypeName: whileAst.clTypeName,
+            parentIndex: whileAst.parentIndex,
         });
     }
 
@@ -435,38 +495,43 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         cascade: boolean
     ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
+        if (!cascade) {
+            let curElement: LogicFunction = this.logicElements.find(
+                (element) => funcName === element.funcName
+            );
+            let formIndex: number;
+            if (!isEvt) {
+                formIndex = curElement.commandLine[index].formIndex;
+            } else {
+                formIndex =
+                    curElement.events[evtIndex].commandLine[index].formIndex;
+            }
 
-        return this.decisionArrayData.controls[formIndex] as FormGroup;
+            return this.decisionArrayData.controls[formIndex] as FormGroup;
+        }
     }
 
     getRepetitionFormGroup(
         index: number,
         isEvt: boolean,
         evtIndex: number,
-        funcName: string
+        funcName: string,
+        cascade: boolean
     ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
+        if (!cascade) {
+            let curElement: LogicFunction = this.logicElements.find(
+                (element) => funcName === element.funcName
+            );
+            let formIndex: number;
+            if (!isEvt) {
+                formIndex = curElement.commandLine[index].formIndex;
+            } else {
+                formIndex =
+                    curElement.events[evtIndex].commandLine[index].formIndex;
+            }
 
-        return this.repetitionArrayData.controls[formIndex] as FormGroup;
+            return this.repetitionArrayData.controls[formIndex] as FormGroup;
+        }
     }
 
     getComparisonFormGroup(
@@ -1411,7 +1476,7 @@ export class CanvasComponent implements OnInit {
                 const formIndex: number = control.length - 1;
                 decisionControl.push(
                     this.initDecisionFormArray({
-                        expression: control[formIndex],
+                        expression: control[formIndex] as FormGroup,
                         funcName: func,
                         index: curElement.commandLine.length - 1,
                         evtIndex: -1,
@@ -1507,9 +1572,70 @@ export class CanvasComponent implements OnInit {
         index: number,
         evtIndex: number,
         cascade: boolean
-    ) {}
+    ) {
+        let decisionFormGroup = this.getDecisionFormGroup(
+            index,
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade
+        );
+        let control: AbstractControl[];
+        switch (branch) {
+            case "trueBranch":
+                control = (decisionFormGroup.get("trueBranchAst") as FormArray)
+                    .controls;
+                console.log(control);
+                control.push(
+                    this.initTrueBranchAstFormArray({
+                        exec: this.initDecisionFormArray({
+                            index,
+                            evtIndex,
+                            funcName,
+                            expression: this.initComparisonFormArray({
+                                index,
+                                evtIndex,
+                                funcName,
+                                leftExpression: "",
+                                rightExpression: "",
+                                symbol: "Different",
+                            }),
+                        }),
+                        clTypeName: "decision",
+                        clType: "comparison",
+                        parentIndex: control.length - 1,
+                    })
+                );
+                console.log(control);
+                break;
+            case "falseBranch":
+                control = (decisionFormGroup.get("falseBranchAst") as FormArray)
+                    .controls;
+                control.push(
+                    this.initFalseBranchAstFormArray({
+                        exec: this.initDecisionFormArray({
+                            index,
+                            evtIndex,
+                            funcName,
+                            expression: this.initComparisonFormArray({
+                                index,
+                                evtIndex,
+                                funcName,
+                                leftExpression: "",
+                                rightExpression: "",
+                                symbol: "Different",
+                            }),
+                        }),
+                        clTypeName: "decision",
+                        clType: "comparison",
+                        parentIndex: control.length - 1,
+                    })
+                );
+                break;
+        }
+    }
 
-    removeClToDecisionBranch(branch: string, cl: any, clIndex: number) {
+    removeClFromDecisionBranch(branch: string, cl: any, clIndex: number) {
         console.log(cl);
         let control: AbstractControl[];
         switch (branch) {
@@ -1522,6 +1648,53 @@ export class CanvasComponent implements OnInit {
                 control.splice(clIndex, 1);
                 break;
         }
+    }
+
+    addClToRepetition(
+        funcName: string,
+        isEvt: boolean,
+        index: number,
+        evtIndex: number,
+        cascade: boolean
+    ) {
+        let decisionFormGroup = this.getRepetitionFormGroup(
+            index,
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade
+        );
+        let control: AbstractControl[];
+        control = (decisionFormGroup.get("whileAst") as FormArray).controls;
+        console.log(control);
+        control.push(
+            this.initWhileAstFormArray({
+                exec: this.initRepetitionFormArray({
+                    index,
+                    evtIndex,
+                    funcName,
+                    expression: this.initComparisonFormArray({
+                        index,
+                        evtIndex,
+                        funcName,
+                        leftExpression: "",
+                        rightExpression: "",
+                        symbol: "Different",
+                    }),
+                }),
+                clTypeName: "repetition",
+                clType: "comparison",
+                parentIndex: control.length - 1,
+            })
+        );
+        console.log(control);
+    }
+
+    removeClFromRepetition(cl: any, clIndex: number) {
+        console.log(cl);
+        let control: AbstractControl[];
+        control = (cl.get("whileAst") as FormArray).controls;
+        control.splice(clIndex, 1);
     }
 
     addParameterToFunction(index: number) {
@@ -1587,7 +1760,6 @@ export class CanvasComponent implements OnInit {
             );
             curElement.commandLine[index].type.name = value;
             curElement.commandLine[index].formIndex = formIndex;
-
             if (value === "return") {
                 let returnQtt = curElement.commandLine.filter((cl) => {
                     return cl.type.name === "return";
@@ -1755,46 +1927,39 @@ export class CanvasComponent implements OnInit {
                 );
                 break;
             case "decision":
+                control = this.decisionArrayData.controls;
+                control.push(
+                    this.initDecisionFormArray({
+                        index,
+                        funcName,
+                        evtIndex,
+                        expression: this.getClType(
+                            clType,
+                            funcName,
+                            index,
+                            isEvt,
+                            evtIndex
+                        ),
+                    })
+                );
+                break;
             case "repetition":
-                switch (clType) {
-                    case "comparison":
-                        control = this.comparisonArrayData.controls;
-                        control.push(
-                            this.initComparisonFormArray({
-                                leftExpression: "",
-                                symbol: "",
-                                rightExpression: "",
-                                funcName,
-                                index,
-                                evtIndex: isEvt ? evtIndex : -1,
-                            })
-                        );
-                        break;
-                    case "booleanLogic":
-                        control = this.booleanLogicArrayData.controls;
-                        control.push(
-                            this.initBooleanLogicFormArray({
-                                leftExpression: "",
-                                symbol: "",
-                                rightExpression: "",
-                                funcName,
-                                index,
-                                evtIndex: isEvt ? evtIndex : -1,
-                            })
-                        );
-                        break;
-                    case "custom":
-                        control = this.customConditionArrayData.controls;
-                        control.push(
-                            this.initCustomConditionFormArray({
-                                customCondition: "",
-                                funcName,
-                                index,
-                                evtIndex: isEvt ? evtIndex : -1,
-                            })
-                        );
-                        break;
-                }
+                control = this.repetitionArrayData.controls;
+                control.push(
+                    this.initRepetitionFormArray({
+                        index,
+                        funcName,
+                        evtIndex,
+                        expression: this.getClType(
+                            clType,
+                            funcName,
+                            index,
+                            isEvt,
+                            evtIndex
+                        ),
+                    })
+                );
+                break;
                 break;
             case "call":
                 control = this.callFuncArrayData.controls;
@@ -1835,6 +2000,57 @@ export class CanvasComponent implements OnInit {
         return control.length - 1;
     }
 
+    private getClType(
+        clType: string,
+        funcName: string,
+        index: number,
+        isEvt: boolean,
+        evtIndex: number
+    ): FormGroup {
+        let control: AbstractControl[];
+        switch (clType) {
+            case "comparison":
+                control = this.comparisonArrayData.controls;
+                control.push(
+                    this.initComparisonFormArray({
+                        leftExpression: "",
+                        symbol: "",
+                        rightExpression: "",
+                        funcName,
+                        index,
+                        evtIndex: isEvt ? evtIndex : -1,
+                    })
+                );
+                break;
+            case "booleanLogic":
+                control = this.booleanLogicArrayData.controls;
+                control.push(
+                    this.initBooleanLogicFormArray({
+                        leftExpression: "",
+                        symbol: "",
+                        rightExpression: "",
+                        funcName,
+                        index,
+                        evtIndex: isEvt ? evtIndex : -1,
+                    })
+                );
+                break;
+            case "custom":
+                control = this.customConditionArrayData.controls;
+                control.push(
+                    this.initCustomConditionFormArray({
+                        customCondition: "",
+                        funcName,
+                        index,
+                        evtIndex: isEvt ? evtIndex : -1,
+                    })
+                );
+                break;
+        }
+
+        return control[control.length - 1] as FormGroup;
+    }
+
     private removeLastValueFromForm(
         lastValue: string,
         lastClType: string,
@@ -1847,18 +2063,11 @@ export class CanvasComponent implements OnInit {
                 control = this.declarationArrayData.controls;
                 break;
             case "decision":
+                control = this.decisionArrayData.controls;
+                this.removeLastClType(lastClType, lastFormIndex);
             case "repetition":
-                switch (lastClType) {
-                    case "comparison":
-                        control = this.comparisonArrayData.controls;
-                        break;
-                    case "booleanLogic":
-                        control = this.booleanLogicArrayData.controls;
-                        break;
-                    case "custom":
-                        control = this.customConditionArrayData.controls;
-                        break;
-                }
+                control = this.repetitionArrayData.controls;
+                this.removeLastClType(lastClType, lastFormIndex);
                 break;
             case "call":
                 control = this.callFuncArrayData.controls;
@@ -1875,6 +2084,22 @@ export class CanvasComponent implements OnInit {
         control.splice(lastFormIndex, 1);
     }
 
+    private removeLastClType(clType: string, formIndex: number) {
+        let control: AbstractControl[];
+        switch (clType) {
+            case "comparison":
+                control = this.comparisonArrayData.controls;
+                break;
+            case "booleanLogic":
+                control = this.booleanLogicArrayData.controls;
+                break;
+            case "custom":
+                control = this.customConditionArrayData.controls;
+                break;
+        }
+        control.splice(formIndex, 1);
+    }
+
     ifCondition(
         funcName: string,
         isEvt: boolean,
@@ -1885,8 +2110,7 @@ export class CanvasComponent implements OnInit {
             (element) => funcName === element.funcName
         );
         if (!isEvt) {
-            let clType = curElement.commandLine[index].type.clType;
-            return clType;
+            return curElement.commandLine[index].type.clType;
         } else {
             return curElement.events[evtIndex].commandLine[index].type.clType;
         }
