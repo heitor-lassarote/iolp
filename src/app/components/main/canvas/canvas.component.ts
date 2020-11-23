@@ -87,6 +87,7 @@ export class CanvasComponent implements OnInit {
     declarationForm: FormGroup;
     callFuncForm: FormGroup;
     attributionForm: FormGroup;
+    htmlElementForm: FormGroup;
     returnForm: FormGroup;
 
     // Attributes
@@ -187,6 +188,10 @@ export class CanvasComponent implements OnInit {
 
         this.attributionForm = this.formBuilder.group({
             attributionArray: this.formBuilder.array([]),
+        });
+
+        this.htmlElementForm = this.formBuilder.group({
+            htmlElementArray: this.formBuilder.array([]),
         });
 
         this.returnForm = this.formBuilder.group({
@@ -313,6 +318,10 @@ export class CanvasComponent implements OnInit {
 
     get attributionArrayData() {
         return <FormArray>this.attributionForm.get("attributionArray");
+    }
+
+    get htmlElementArrayData() {
+        return <FormArray>this.htmlElementForm.get("htmlElementArray");
     }
 
     getParamentersArrayData(
@@ -550,6 +559,24 @@ export class CanvasComponent implements OnInit {
         });
     }
 
+    private initHtmlElementFormArray(htmlElement: {
+        index: number;
+        funcName: string;
+        evtIndex: number;
+        elementName: string;
+        elementData: string;
+        elementValue: string;
+    }): FormGroup {
+        return this.formBuilder.group({
+            elementName: htmlElement.elementName,
+            elementData: htmlElement.elementData,
+            elementValue: [htmlElement.elementValue, Validators.required],
+            index: htmlElement.index,
+            funcName: htmlElement.funcName,
+            evtIndex: htmlElement.evtIndex,
+        });
+    }
+
     private initReturnFormArray(returnValue: { value: any }) {
         return this.formBuilder.group({
             returnValue: [returnValue.value, Validators.required],
@@ -722,6 +749,26 @@ export class CanvasComponent implements OnInit {
         }
 
         return this.attributionArrayData.controls[formIndex] as FormGroup;
+    }
+
+    getHtmlElementFormGroup(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): FormGroup {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        return this.htmlElementArrayData.controls[formIndex] as FormGroup;
     }
 
     getReturnFormGroup(
@@ -1041,10 +1088,7 @@ export class CanvasComponent implements OnInit {
             );
             //Command Lines
             func.commandLine.forEach((cl: CommandLine) => {
-                let controls = this.checkFormControlType(
-                    cl.type.name,
-                    cl.type.clType
-                );
+                let controls = this.checkFormControlType(cl.type.name);
                 let expression: Expression;
                 let curControl = controls[cl.formIndex];
                 expression = this.getExpressionType(
@@ -1063,29 +1107,20 @@ export class CanvasComponent implements OnInit {
         return functions;
     }
 
-    private checkFormControlType(
-        clName: string,
-        clType: string
-    ): AbstractControl[] {
+    private checkFormControlType(clName: string): AbstractControl[] {
         switch (clName) {
             case "decision":
+                return this.decisionArrayData.controls;
             case "repetition":
-                switch (clType) {
-                    case "comparison":
-                        return this.comparisonArrayData.controls;
-                    case "booleanLogic":
-                        return this.booleanLogicArrayData.controls;
-                    case "custom":
-                        return this.customConditionArrayData.controls;
-                    default:
-                        return null;
-                }
+                return this.repetitionArrayData.controls;
             case "declaration":
                 return this.declarationArrayData.controls;
             case "call":
                 return this.callFuncArrayData.controls;
             case "attribution":
                 return this.attributionArrayData.controls;
+            case "htmlElement":
+                return this.htmlElementArrayData.controls;
             case "return":
                 return this.returnArrayData.controls;
             default:
@@ -1118,6 +1153,11 @@ export class CanvasComponent implements OnInit {
                 break;
             case "attribution":
                 newAst = new Expression_(expression);
+                break;
+            case "htmlElement":
+                newAst = new Expression_(
+                    (expression as StringExpression).value
+                );
                 break;
             case "return":
                 if (expression instanceof StringExpression) {
@@ -1282,7 +1322,16 @@ export class CanvasComponent implements OnInit {
             case "attribution":
                 newExpression = new Assign(
                     new Variable(control.get("varName").value),
-                    new StringExpression(control.get("attributionValue").value)
+                    control.get("attributionValue").value
+                );
+                break;
+            case "htmlElement":
+                newExpression = new StringExpression(
+                    `document.getElementById(${
+                        control.get("elementName").value
+                    }).${this.getHtmlElementDataType(
+                        control.get("elementData").value
+                    )} = ${control.get("elementValue").value}`
                 );
                 break;
             case "return":
@@ -1313,6 +1362,17 @@ export class CanvasComponent implements OnInit {
         }
 
         return newExpression;
+    }
+
+    private getHtmlElementDataType(data: string): string {
+        switch (data) {
+            case "id":
+                return "id";
+            case "class":
+                return "className";
+            case "text":
+                return "innerHTML";
+        }
     }
 
     private getValueByVarType(varType: string, value: string): number | string {
@@ -1666,16 +1726,14 @@ export class CanvasComponent implements OnInit {
         let formIndex: number;
         if (!isEvt) {
             control = this.checkFormControlType(
-                curElement.commandLine[index].type.name,
-                curElement.commandLine[index].type.clType
+                curElement.commandLine[index].type.name
             );
             formIndex = curElement.commandLine[index].formIndex;
             let returnType = control[formIndex].get("returnType").value;
             return returnType;
         } else {
             control = this.checkFormControlType(
-                curElement.events[evtIndex].commandLine[index].type.name,
-                curElement.events[evtIndex].commandLine[index].type.clType
+                curElement.events[evtIndex].commandLine[index].type.name
             );
             formIndex =
                 curElement.events[evtIndex].commandLine[index].formIndex;
@@ -2000,6 +2058,19 @@ export class CanvasComponent implements OnInit {
                     })
                 );
                 break;
+            case "htmlElement":
+                control = this.htmlElementArrayData.controls;
+                control.push(
+                    this.initHtmlElementFormArray({
+                        elementName: "",
+                        elementData: "",
+                        elementValue: "",
+                        funcName,
+                        index,
+                        evtIndex: isEvt ? evtIndex : -1,
+                    })
+                );
+                break;
             case "return":
                 control = this.returnArrayData.controls;
                 control.push(
@@ -2089,6 +2160,9 @@ export class CanvasComponent implements OnInit {
             case "attribution":
                 control = this.attributionArrayData.controls;
                 break;
+            case "htmlElement":
+                control = this.htmlElementArrayData.controls;
+                break;
             case "return":
                 control = this.returnArrayData.controls;
                 break;
@@ -2158,6 +2232,7 @@ export class CanvasComponent implements OnInit {
             this.declarationForm.valid &&
             this.callFuncForm.valid &&
             this.attributionForm.valid &&
+            this.htmlElementForm.valid &&
             this.returnForm.valid
         );
     }

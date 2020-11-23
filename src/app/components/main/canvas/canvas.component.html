@@ -272,6 +272,9 @@
                                             <option value="attribution">
                                                 Atribuição
                                             </option>
+                                            <option value="htmlElement">
+                                                Elemento HTML
+                                            </option>
                                             <option
                                                 value="return"
                                                 *ngIf="funcIndex !== 0"
@@ -308,6 +311,18 @@
                                                 cl.type.name === 'attribution'
                                             "
                                             [ngTemplateOutlet]="attribution"
+                                            [ngTemplateOutletContext]="{
+                                                index: funcClIndex,
+                                                evtIndex: -1,
+                                                isEvt: false,
+                                                funcName: func.funcName
+                                            }"
+                                        ></ng-container>
+                                        <ng-container
+                                            *ngIf="
+                                                cl.type.name === 'htmlElement'
+                                            "
+                                            [ngTemplateOutlet]="htmlElement"
                                             [ngTemplateOutletContext]="{
                                                 index: funcClIndex,
                                                 evtIndex: -1,
@@ -475,6 +490,9 @@
                                                     <option value="attribution">
                                                         Atribuição
                                                     </option>
+                                                    <option value="htmlElement">
+                                                        Elemento HTML
+                                                    </option>
                                                 </select>
                                             </div>
                                             <div class="col-md-8">
@@ -512,6 +530,21 @@
                                                     "
                                                     [ngTemplateOutlet]="
                                                         attribution
+                                                    "
+                                                    [ngTemplateOutletContext]="{
+                                                        index: evtClIndex,
+                                                        evtIndex: evtIndex,
+                                                        isEvt: true,
+                                                        funcName: func.funcName
+                                                    }"
+                                                ></ng-container>
+                                                <ng-container
+                                                    *ngIf="
+                                                        cl.type.name ===
+                                                        'htmlElement'
+                                                    "
+                                                    [ngTemplateOutlet]="
+                                                        htmlElement
                                                     "
                                                     [ngTemplateOutletContext]="{
                                                         index: evtClIndex,
@@ -1579,6 +1612,53 @@
                         type="text"
                         class="form-control"
                         formControlName="attributionValue"
+                    />
+                </div>
+            </div>
+        </div>
+    </form>
+</ng-template>
+
+<ng-template
+    #htmlElement
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        role="form"
+        [formGroup]="getHtmlElementFormGroup(index, isEvt, evtIndex, funcName)"
+    >
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-2 text-center m-auto">
+                    <div>Buscar por ID:</div>
+                </div>
+                <div class="col-3">
+                    <select class="form-control" formControlName="elementName">
+                        <option
+                            *ngFor="let element of elements"
+                            [value]="element.name?.trim()"
+                        >
+                            {{ element.name?.trim() }}
+                        </option>
+                    </select>
+                </div>
+                <div class="col-3">
+                    <select class="form-control" formControlName="elementData">
+                        <option value="id">ID</option>
+                        <option value="class">Classe</option>
+                        <option value="text">Texto</option>
+                    </select>
+                </div>
+                <div class="col-4">
+                    <input
+                        type="text"
+                        required
+                        class="form-control"
+                        formControlName="elementValue"
+                        placeholder="novo valor"
                     />
                 </div>
             </div>

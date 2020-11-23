@@ -129,15 +129,15 @@ export abstract class AST {
 }
 
 export class Assign extends AST {
-    constructor(leftExpression: Expression, rightExpression: Expression) {
+    constructor(leftExpression: Expression | string, rightExpression: Expression | string) {
         super();
         this.leftExpression = leftExpression;
         this.rightExpression = rightExpression;
     }
 
     tag = "assign";
-    leftExpression: Expression;
-    rightExpression: Expression;
+    leftExpression: Expression | string;
+    rightExpression: Expression | string;
 }
 
 export class End extends AST {
@@ -145,18 +145,18 @@ export class End extends AST {
 }
 
 export class Expression_ extends AST {
-    constructor(expression: Expression) {
+    constructor(expression: Expression | string) {
         super();
         this.expression = expression;
     }
 
     tag = "expression";
-    expression: Expression;
+    expression: Expression | string;
 }
 
 export class If extends AST {
     constructor(
-        expression: Expression,
+        expression: Expression | string,
         trueBranchAst: AST[],
         falseBranchAst: AST[]
     ) {
@@ -167,20 +167,20 @@ export class If extends AST {
     }
 
     tag = "if";
-    expression: Expression;
+    expression: Expression | string;
     trueBranchAst: AST[];
     falseBranchAst: AST[];
 }
 
 export class Match extends AST {
-    constructor(expression: Expression, branches: Branch[]) {
+    constructor(expression: Expression | string, branches: Branch[]) {
         super();
         this.expression = expression;
         this.branches = branches;
     }
 
     tag = "match";
-    expression: Expression;
+    expression: Expression | string;
     branches: Branch[];
 }
 
@@ -196,7 +196,7 @@ export class Return extends AST {
 }
 
 export class Var extends AST {
-    constructor(name: string, type: Type, expression: Expression) {
+    constructor(name: string, type: Type, expression: Expression | string) {
         super();
         this.name = name;
         this.type = type;
@@ -206,18 +206,18 @@ export class Var extends AST {
     tag = "var";
     name: string;
     type: Type;
-    expression: Expression;
+    expression: Expression | string;
 }
 
 export class While extends AST {
-    constructor(expression: Expression, whileAst: AST[]) {
+    constructor(expression: Expression | string, whileAst: AST[]) {
         super();
         this.expression = expression;
         this.whileAst = whileAst;
     }
 
     tag = "while";
-    expression: Expression;
+    expression: Expression | string;
     whileAst: AST[];
 }
 
@@ -271,14 +271,14 @@ export abstract class Expression {
 }
 
 export class Access extends Expression {
-    constructor(expression: Expression, name: string) {
+    constructor(expression: Expression | string, name: string) {
         super();
         this.expression = expression;
         this.name = name;
     }
 
     tag = "access";
-    expression: Expression;
+    expression: Expression | string;
     name: string;
 }
 
@@ -297,9 +297,9 @@ export class Access extends Expression {
 //    | Or
 export class BinaryOp extends Expression {
     constructor(
-        leftExpression: Expression,
+        leftExpression: Expression | string,
         symbol: string,
-        rightExpression: Expression
+        rightExpression: Expression | string
     ) {
         super();
         this.leftExpression = leftExpression;
@@ -308,33 +308,39 @@ export class BinaryOp extends Expression {
     }
 
     tag = "binaryOp";
-    leftExpression: Expression;
+    leftExpression: Expression | string;
     symbol: string;
-    rightExpression: Expression;
+    rightExpression: Expression | string;
 }
 
 export class Call extends Expression {
-    constructor(expression: Expression, args: Expression[]) {
+    constructor(
+        expression: Expression | string,
+        args: Expression[] | string[]
+    ) {
         super();
         this.expression = expression;
         this.arguments = args;
     }
 
     tag = "call";
-    expression: Expression;
-    arguments: Expression[];
+    expression: Expression | string;
+    arguments: Expression[] | string[];
 }
 
 export class Index extends Expression {
-    constructor(leftExpression: Expression, rightExpression: Expression) {
+    constructor(
+        leftExpression: Expression | string,
+        rightExpression: Expression | string
+    ) {
         super();
         this.leftExpression = leftExpression;
         this.rightExpression = rightExpression;
     }
 
     tag = "index";
-    leftExpression: Expression;
-    rightExpression: Expression;
+    leftExpression: Expression | string;
+    rightExpression: Expression | string;
 }
 
 export class Literal_ extends Expression {
@@ -348,13 +354,13 @@ export class Literal_ extends Expression {
 }
 
 export class Parenthesis extends Expression {
-    constructor(expression: Expression) {
+    constructor(expression: Expression | string) {
         super();
         this.expression = expression;
     }
 
     tag = "parenthesis";
-    expression: Expression;
+    expression: Expression | string;
 }
 
 export class Structure_ extends Expression {
@@ -371,7 +377,7 @@ export class Structure_ extends Expression {
 //    = Negate
 //    | Not
 export class UnaryOp extends Expression {
-    constructor(symbol: string, expression: Expression) {
+    constructor(symbol: string, expression: Expression | string) {
         super();
         this.symbol = symbol;
         this.expression = expression;
@@ -379,7 +385,7 @@ export class UnaryOp extends Expression {
 
     tag = "unaryOp";
     symbol: string;
-    expression: Expression;
+    expression: Expression | string;
 }
 
 export class Variable extends Expression {
