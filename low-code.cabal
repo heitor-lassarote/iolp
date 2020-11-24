@@ -40,6 +40,7 @@ common shared-properties
     , DuplicateRecordFields
     , FlexibleContexts
     , FlexibleInstances
+    , GADTs
     , GeneralizedNewtypeDeriving
     , LambdaCase
     , NoImplicitPrelude
@@ -47,6 +48,7 @@ common shared-properties
     , QuasiQuotes
     , RecordWildCards
     , ScopedTypeVariables
+    , StandaloneDeriving
     , TypeFamilies
   default-language:     Haskell2010
 
@@ -79,9 +81,7 @@ executable low-code
   default-extensions:
       DeriveAnyClass
     , DeriveGeneric
-    , GADTs
     , MultiParamTypeClasses
-    , StandaloneDeriving
     , TemplateHaskell
     , ViewPatterns
   if flag(lib-Werror)

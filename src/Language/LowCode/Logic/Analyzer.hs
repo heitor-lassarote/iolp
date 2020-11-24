@@ -202,6 +202,11 @@ analyzeAssign left right = do
     let typeL = getMetadata exprL
     exprR <- analyzeExprWithHint typeL right
     let typeR = getMetadata exprR
+    case left of
+        Access _ _ _ -> pass
+        Index _ _ _ -> pass
+        Variable _ _ -> pass
+        _ -> addError $ InvalidAssignment exprL exprR
     checkTypes (unsafeCodegen' left <> " = " <> unsafeCodegen' right) typeL typeR
     pure (exprL, exprR)
 

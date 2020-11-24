@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds #-}
 module Language.LowCode.Logic.Error
     ( Error (..)
     , prettyError
@@ -15,27 +16,29 @@ import Language.LowCode.Logic.Type (Type)
 
 -- TODO: Add information about where the error is coming from.
 -- TODO: Should IncompatibleTypes and TypeMismatch really have these signatures?
-data Error
-    = ConstructorMismatch !Name !Name !Name
-    | CyclicImports !(NonEmpty Name)
-    | DuplicateModule !Name
-    | DuplicateRecord !Name
-    | IncompatibleSignatures !Name !Int !Int
-    | IncompatibleTypes1 !UnarySymbol !(Expression ())
-    | IncompatibleTypes2 !(Expression ()) !BinarySymbol !(Expression ())
-    | MainNotFound
-    | MissingFields !(NonEmpty Name)
-    | NoSuchConstructor !Name !Name
-    | NoSuchModule !Name
-    | NotAFunction !Name
-    | NotAMember !Type !Name
-    | NotARecord !Type !Name
-    | ShadowedVariable !Name
-    | TypeMismatch !Text !Type !Type
-    | UndefinedVariable !Name
-    | UnknownPattern !MatchPattern !Type
-    | UnknownType !(Expression ())
-    deriving (Eq, Show)
+data Error where
+    ConstructorMismatch :: !Name -> !Name -> !Name -> Error
+    CyclicImports :: !(NonEmpty Name) -> Error
+    DuplicateModule :: !Name -> Error
+    DuplicateRecord :: !Name -> Error
+    IncompatibleSignatures :: !Name -> !Int -> !Int -> Error
+    IncompatibleTypes1 :: (Show e) => !UnarySymbol -> !(Expression e) -> Error
+    IncompatibleTypes2 :: Each '[Show] [l, r] => !(Expression l) -> !BinarySymbol -> !(Expression r) -> Error
+    InvalidAssignment :: Each '[Show] [l, r] => !(Expression l) -> !(Expression r) -> Error
+    MainNotFound :: Error
+    MissingFields :: !(NonEmpty Name) -> Error
+    NoSuchConstructor :: !Name -> !Name -> Error
+    NoSuchModule :: !Name -> Error
+    NotAFunction :: !Name -> Error
+    NotAMember :: !Type -> !Name -> Error
+    NotARecord :: !Type -> !Name -> Error
+    ShadowedVariable :: !Name -> Error
+    TypeMismatch :: !Text -> !Type -> !Type -> Error
+    UndefinedVariable :: !Name -> Error
+    UnknownPattern :: !MatchPattern -> !Type -> Error
+    UnknownType :: (Show e) => !(Expression e) -> Error
+
+deriving stock instance Show Error
 
 prettyCyclic :: NonEmpty Name -> Text
 prettyCyclic (f :| []) = sformat ("'" % stext % "' imports itself.") f
@@ -75,6 +78,10 @@ prettyError = \case
         (unsafeCodegen' left)
         (unsafeCodegen' right)
         (binaryToText symbol)
+    InvalidAssignment left right -> sformat
+        ("Cannot assign expression '" % stext % "' to '" % stext % "'. Only access, index and variable are assignable.")
+        (unsafeCodegen' right)
+        (unsafeCodegen' left)
     MainNotFound -> "No function with name 'main' and type () -> Unit could be found."
     MissingFields (name :| names) -> sformat
         ("Record does not have the required fields: " % shown % ".")
@@ -114,11 +121,12 @@ prettyError = \case
         ("Could not deduce type for '" % stext % "'.")
         (unsafeCodegen' expr)
 
-data Warning
-    = FloatingPointEquality !Double
-    | UnreachableStatement !(AST ())
-    | UnusedVariable !Name
-    deriving (Eq, Show)
+data Warning where
+    FloatingPointEquality :: !Double -> Warning
+    UnreachableStatement :: (Show a) => !(AST a) -> Warning
+    UnusedVariable :: !Name -> Warning
+
+deriving instance Show Warning
 
 prettyWarning :: Warning -> Text
 prettyWarning = \case
