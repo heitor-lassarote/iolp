@@ -7,15 +7,15 @@ class LCElement {
     getText() {
         return value.text();
     }
-    
+
     setText(text) {
         value.text(text);
     }
-    
+
     onClick(func) {
         value.click(() => func($(this)));
     }
-    
+
     hide() {
         value.hide();
     }
@@ -36,19 +36,22 @@ function GET(url, before, success, error, complete) {
         async: false,
         url: url,
         type: "GET",
-        beforeSend: xhr => {
+        beforeSend: (xhr) => {
             xhr.setRequestHeader("Content-type", "application/json");
             before();
         },
         success: success,
-        error: (xhr, textStatus, errorThrown) => { failed = true; return error(xhr.status, textStatus, errorThrown) },
+        error: (xhr, textStatus, errorThrown) => {
+            failed = true;
+            return error(xhr.status, textStatus, errorThrown);
+        },
         complete: complete,
     });
 
     if (failed) {
-        return {isSuccess: false, result: ""};
+        return { isSuccess: false, result: "" };
     } else {
-        return {isSuccess: true, result: res.responseText};
+        return { isSuccess: true, result: res.responseText };
     }
 }
 
@@ -61,16 +64,19 @@ function POST(url, value, before, success, error, complete) {
         dataType: "json",
         contentType: "application/json",
         data: value,
-        beforeSend: _ => before(),
+        beforeSend: (_) => before(),
         success: success,
-        error: (xhr, textStatus, errorThrown) => { failed = true; return error(xhr.status, textStatus, errorThrown) },
+        error: (xhr, textStatus, errorThrown) => {
+            failed = true;
+            return error(xhr.status, textStatus, errorThrown);
+        },
         complete: complete,
     });
 
     if (failed) {
-        return {isSuccess: false, result: ""};
+        return { isSuccess: false, result: "" };
     } else {
-        return {isSuccess: true, result: res.responseText};
+        return { isSuccess: true, result: res.responseText };
     }
 }
 // ---------------------------------- Utility ----------------------------------
@@ -110,4 +116,8 @@ function textToIntegerRadix(x, radix) {
 // -------------------------------------- UI -----------------------------------
 function event(compName, eventType, callback) {
     $(`#${compName}`).on(eventType, callback);
+}
+
+function handleHtmlElement(compName, execution) {
+    eval(`$("#${compName}").${execution}`);
 }
