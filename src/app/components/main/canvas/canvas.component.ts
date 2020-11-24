@@ -383,8 +383,10 @@ export class CanvasComponent implements OnInit {
         funcName: string;
         evtIndex: number;
         expression: FormGroup;
+        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
+            parent: decision.parent,
             expression: decision.expression,
             trueBranchAst: this.formBuilder.array([]),
             falseBranchAst: this.formBuilder.array([]),
@@ -427,8 +429,10 @@ export class CanvasComponent implements OnInit {
         funcName: string;
         evtIndex: number;
         expression: AbstractControl;
+        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
+            parent: repetition.parent,
             expression: repetition.expression,
             whileAst: this.formBuilder.array([]),
             index: repetition.index,
@@ -511,8 +515,10 @@ export class CanvasComponent implements OnInit {
         varType: string;
         varName: string;
         varValue: string;
+        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
+            parent: declaration.parent,
             varType: [declaration.varType, Validators.required],
             varName: [declaration.varName, Validators.required],
             varValue: declaration.varValue,
@@ -529,8 +535,10 @@ export class CanvasComponent implements OnInit {
         returnType: string;
         varName: string;
         function: string;
+        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
+            parent: callFunc.parent,
             returnType: callFunc.returnType,
             varName: callFunc.varName,
             function: callFunc.function,
@@ -555,8 +563,10 @@ export class CanvasComponent implements OnInit {
         evtIndex: number;
         varName: string;
         attributionValue: string;
+        parent: FormGroup;
     }) {
         return this.formBuilder.group({
+            parent: attribution.parent,
             varName: attribution.varName,
             attributionValue: [
                 attribution.attributionValue,
@@ -575,8 +585,10 @@ export class CanvasComponent implements OnInit {
         elementName: string;
         elementData: string;
         elementValue: string;
+        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
+            parent: htmlElement.parent,
             elementName: htmlElement.elementName,
             elementData: htmlElement.elementData,
             elementValue: [htmlElement.elementValue, Validators.required],
@@ -586,8 +598,12 @@ export class CanvasComponent implements OnInit {
         });
     }
 
-    private initReturnFormArray(returnValue: { value: any }): FormGroup {
+    private initReturnFormArray(returnValue: {
+        value: any;
+        parent: FormGroup;
+    }): FormGroup {
         return this.formBuilder.group({
+            parent: returnValue.parent,
             returnValue: [returnValue.value, Validators.required],
         });
     }
@@ -598,8 +614,10 @@ export class CanvasComponent implements OnInit {
         evtIndex: number;
         consoleType: string;
         consoleText: string;
+        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
+            parent: consoleValue.parent,
             consoleType: consoleValue.consoleType,
             consoleText: [consoleValue.consoleText, Validators.required],
             index: consoleValue.index,
@@ -617,19 +635,20 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         cascade: boolean
     ): FormGroup {
-        if (!cascade) {
-            let curElement: LogicFunction = this.logicElements.find(
-                (element) => funcName === element.funcName
-            );
-            let formIndex: number;
-            if (!isEvt) {
-                formIndex = curElement.commandLine[index].formIndex;
-            } else {
-                formIndex =
-                    curElement.events[evtIndex].commandLine[index].formIndex;
-            }
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
 
+        if (!cascade) {
             return this.decisionArrayData.controls[formIndex] as FormGroup;
+        } else {
         }
     }
 
@@ -640,19 +659,20 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         cascade: boolean
     ): FormGroup {
-        if (!cascade) {
-            let curElement: LogicFunction = this.logicElements.find(
-                (element) => funcName === element.funcName
-            );
-            let formIndex: number;
-            if (!isEvt) {
-                formIndex = curElement.commandLine[index].formIndex;
-            } else {
-                formIndex =
-                    curElement.events[evtIndex].commandLine[index].formIndex;
-            }
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
 
+        if (!cascade) {
             return this.repetitionArrayData.controls[formIndex] as FormGroup;
+        } else {
         }
     }
 
@@ -1529,6 +1549,7 @@ export class CanvasComponent implements OnInit {
                         funcName: func,
                         index: curElement.commandLine.length - 1,
                         evtIndex: -1,
+                        parent: null,
                     })
                 );
                 curElement.commandLine.push({
@@ -1649,6 +1670,7 @@ export class CanvasComponent implements OnInit {
                                 rightExpression: "",
                                 symbol: "Different",
                             }),
+                            parent: null,
                         }),
                         clTypeName: "decision",
                         clType: "comparison",
@@ -1674,6 +1696,7 @@ export class CanvasComponent implements OnInit {
                                 rightExpression: "",
                                 symbol: "Different",
                             }),
+                            parent: null,
                         }),
                         clTypeName: "decision",
                         clType: "comparison",
@@ -1730,6 +1753,7 @@ export class CanvasComponent implements OnInit {
                         rightExpression: "",
                         symbol: "Different",
                     }),
+                    parent: null,
                 }),
                 clTypeName: "repetition",
                 clType: "comparison",
@@ -2057,6 +2081,7 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
+                        parent: null,
                     })
                 );
                 break;
@@ -2074,6 +2099,7 @@ export class CanvasComponent implements OnInit {
                             isEvt,
                             evtIndex
                         ),
+                        parent: null,
                     })
                 );
                 break;
@@ -2091,6 +2117,7 @@ export class CanvasComponent implements OnInit {
                             isEvt,
                             evtIndex
                         ),
+                        parent: null,
                     })
                 );
                 break;
@@ -2104,6 +2131,7 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
+                        parent: null,
                     })
                 );
                 break;
@@ -2116,6 +2144,7 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
+                        parent: null,
                     })
                 );
                 break;
@@ -2129,6 +2158,7 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
+                        parent: null,
                     })
                 );
                 break;
@@ -2137,6 +2167,7 @@ export class CanvasComponent implements OnInit {
                 control.push(
                     this.initReturnFormArray({
                         value: "",
+                        parent: null,
                     })
                 );
                 break;
@@ -2149,6 +2180,7 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
+                        parent: null,
                     })
                 );
                 break;
