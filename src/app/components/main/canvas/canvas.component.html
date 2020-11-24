@@ -281,6 +281,9 @@
                                             >
                                                 Retorno
                                             </option>
+                                            <option value="console">
+                                                Console
+                                            </option>
                                         </select>
                                     </div>
                                     <div class="col-md-8">
@@ -333,6 +336,16 @@
                                         <ng-container
                                             *ngIf="cl.type.name === 'return'"
                                             [ngTemplateOutlet]="return"
+                                            [ngTemplateOutletContext]="{
+                                                index: funcClIndex,
+                                                evtIndex: -1,
+                                                isEvt: false,
+                                                funcName: func.funcName
+                                            }"
+                                        ></ng-container>
+                                        <ng-container
+                                            *ngIf="cl.type.name === 'console'"
+                                            [ngTemplateOutlet]="console"
                                             [ngTemplateOutletContext]="{
                                                 index: funcClIndex,
                                                 evtIndex: -1,
@@ -493,6 +506,9 @@
                                                     <option value="htmlElement">
                                                         Elemento HTML
                                                     </option>
+                                                    <option value="console">
+                                                        Console
+                                                    </option>
                                                 </select>
                                             </div>
                                             <div class="col-md-8">
@@ -546,6 +562,19 @@
                                                     [ngTemplateOutlet]="
                                                         htmlElement
                                                     "
+                                                    [ngTemplateOutletContext]="{
+                                                        index: evtClIndex,
+                                                        evtIndex: evtIndex,
+                                                        isEvt: true,
+                                                        funcName: func.funcName
+                                                    }"
+                                                ></ng-container>
+                                                <ng-container
+                                                    *ngIf="
+                                                        cl.type.name ===
+                                                        'console'
+                                                    "
+                                                    [ngTemplateOutlet]="console"
                                                     [ngTemplateOutletContext]="{
                                                         index: evtClIndex,
                                                         evtIndex: evtIndex,
@@ -1597,7 +1626,11 @@
                             "
                         >
                             <option
-                                [value]="variable.get('varName').value"
+                                [value]="
+                                    variable.get('varName').value +
+                                    '-' +
+                                    variable.get('varType').value
+                                "
                                 *ngIf="
                                     variable.get('funcName').value === funcName
                                 "
@@ -1648,8 +1681,10 @@
                 <div class="col-3">
                     <select class="form-control" formControlName="elementData">
                         <option value="id">ID</option>
-                        <option value="class">Classe</option>
+                        <option value="addClass">Adicionar Classe</option>
+                        <option value="removeClass">Remover Classe</option>
                         <option value="text">Texto</option>
+                        <option value="value">Valor</option>
                     </select>
                 </div>
                 <div class="col-4">
@@ -1683,6 +1718,38 @@
                 class="form-control"
                 formControlName="returnValue"
             />
+        </div>
+    </form>
+</ng-template>
+
+<ng-template
+    #console
+    let-index="index"
+    let-evtIndex="evtIndex"
+    let-isEvt="isEvt"
+    let-funcName="funcName"
+>
+    <form
+        role="form"
+        [formGroup]="getConsoleFormGroup(index, isEvt, evtIndex, funcName)"
+    >
+        <div class="col-md-12">
+            <div class="row">
+                <div class="col-3">
+                    <select class="form-control" formControlName="consoleType">
+                        <option value="log">Log</option>
+                        <option value="error">Error</option>
+                        <option value="warning">Warning</option>
+                    </select>
+                </div>
+                <div class="col-9">
+                    <input
+                        type="text"
+                        class="form-control"
+                        formControlName="consoleText"
+                    />
+                </div>
+            </div>
         </div>
     </form>
 </ng-template>

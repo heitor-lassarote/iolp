@@ -39,11 +39,21 @@ export class SendService {
     }
 
     postCode(ast: Output): Promise<any> {
-        return this.http
-            .post<any>(this.postUrl, ast, {
-                headers: this.header,
-                withCredentials: true,
-            })
-            .toPromise();
+        // if (sessionStorage.getItem("projectID")) {
+        //     let url = `${this.postUrl}/${sessionStorage.getItem("projectID")}`;
+        //     return this.http
+        //         .put<any>(url, ast, {
+        //             headers: this.header,
+        //             withCredentials: true,
+        //         })
+        //         .toPromise();
+        // } else {
+            return this.http
+                .post<any>(this.postUrl, ast, {
+                    headers: this.header,
+                    withCredentials: true,
+                })
+                .toPromise();
+        // }
     }
 }

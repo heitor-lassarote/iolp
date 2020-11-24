@@ -89,6 +89,7 @@ export class CanvasComponent implements OnInit {
     attributionForm: FormGroup;
     htmlElementForm: FormGroup;
     returnForm: FormGroup;
+    consoleForm: FormGroup;
 
     // Attributes
     isLogicContainer: boolean = true; //TODO: Change to false
@@ -196,6 +197,10 @@ export class CanvasComponent implements OnInit {
 
         this.returnForm = this.formBuilder.group({
             returnArray: this.formBuilder.array([]),
+        });
+
+        this.consoleForm = this.formBuilder.group({
+            consoleArray: this.formBuilder.array([]),
         });
     }
 
@@ -342,6 +347,10 @@ export class CanvasComponent implements OnInit {
 
     get returnArrayData() {
         return <FormArray>this.returnForm.get("returnArray");
+    }
+
+    get consoleArrayData() {
+        return <FormArray>this.consoleForm.get("consoleArray");
     }
 
     getFunctionParams(funcIndex: number) {
@@ -577,9 +586,25 @@ export class CanvasComponent implements OnInit {
         });
     }
 
-    private initReturnFormArray(returnValue: { value: any }) {
+    private initReturnFormArray(returnValue: { value: any }): FormGroup {
         return this.formBuilder.group({
             returnValue: [returnValue.value, Validators.required],
+        });
+    }
+
+    private initConsoleFormArray(consoleValue: {
+        index: number;
+        funcName: string;
+        evtIndex: number;
+        consoleType: string;
+        consoleText: string;
+    }): FormGroup {
+        return this.formBuilder.group({
+            consoleType: consoleValue.consoleType,
+            consoleText: [consoleValue.consoleText, Validators.required],
+            index: consoleValue.index,
+            funcName: consoleValue.funcName,
+            evtIndex: consoleValue.evtIndex,
         });
     }
     // End Create Array Data
@@ -789,6 +814,26 @@ export class CanvasComponent implements OnInit {
         }
 
         return this.returnArrayData.controls[formIndex] as FormGroup;
+    }
+
+    getConsoleFormGroup(
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string
+    ): FormGroup {
+        let curElement: LogicFunction = this.logicElements.find(
+            (element) => funcName === element.funcName
+        );
+        let formIndex: number;
+        if (!isEvt) {
+            formIndex = curElement.commandLine[index].formIndex;
+        } else {
+            formIndex =
+                curElement.events[evtIndex].commandLine[index].formIndex;
+        }
+
+        return this.consoleArrayData.controls[formIndex] as FormGroup;
     }
 
     // Change Container listeners
@@ -1149,15 +1194,26 @@ export class CanvasComponent implements OnInit {
                 );
                 break;
             case "call":
-                newAst = new Expression_(expression);
+                switch (control.get("returnType").value) {
+                    case "with-return":
+                        newAst = new Assign(
+                            new Variable(control.get("varName").value),
+                            expression
+                        );
+                        break;
+                    case "without-return":
+                        newAst = new Expression_(expression);
+                        break;
+                }
                 break;
             case "attribution":
-                newAst = new Expression_(expression);
+                newAst = new Assign(
+                    new Variable(control.get("varName").value.split("-")[0]),
+                    expression
+                );
                 break;
             case "htmlElement":
-                newAst = new Expression_(
-                    (expression as StringExpression).value
-                );
+                newAst = new Expression_(expression);
                 break;
             case "return":
                 if (expression instanceof StringExpression) {
@@ -1167,6 +1223,9 @@ export class CanvasComponent implements OnInit {
                         expression === null ? UNIT : expression
                     );
                 }
+                break;
+            case "console":
+                newAst = new Expression_(expression);
                 break;
             default:
                 newAst = null;
@@ -1301,38 +1360,31 @@ export class CanvasComponent implements OnInit {
 
                     args.push(exp);
                 });
-                switch (control.get("returnType").value) {
-                    case "with-return":
-                        newExpression = new Assign(
-                            new Variable(control.get("varName").value),
-                            new Call(
-                                new Variable(control.get("function").value),
-                                args
-                            )
-                        );
-                        break;
-                    case "without-return":
-                        newExpression = new Call(
-                            new Variable(control.get("function").value),
-                            args
-                        );
-                        break;
-                }
+                newExpression = new Call(
+                    new Variable(control.get("function").value),
+                    args
+                );
                 break;
             case "attribution":
-                newExpression = new Assign(
-                    new Variable(control.get("varName").value),
-                    control.get("attributionValue").value
+                newExpression = new Literal_(
+                    this.getLiteralByVarType(
+                        control.get("varName").value.split("-")[1],
+                        control.get("attributionValue").value
+                    )
                 );
                 break;
             case "htmlElement":
-                newExpression = new StringExpression(
-                    `document.getElementById(${
-                        control.get("elementName").value
-                    }).${this.getHtmlElementDataType(
-                        control.get("elementData").value
-                    )} = ${control.get("elementValue").value}`
-                );
+                newExpression = new Call(new Variable("handleHtmlElement"), [
+                    new Literal_(new Text(control.get("elementName").value)),
+                    new Literal_(
+                        new Text(
+                            this.getHtmlElementDataType(
+                                control.get("elementData").value,
+                                control.get("elementValue").value
+                            )
+                        )
+                    ),
+                ]);
                 break;
             case "return":
                 const returnValue: string = control
@@ -1356,6 +1408,12 @@ export class CanvasComponent implements OnInit {
                     newExpression = null;
                 }
                 break;
+            case "console":
+                newExpression = new Call(new Variable("consoleLog"), [
+                    new Literal_(new Text(control.get("consoleType").value)),
+                    new Literal_(new Text(control.get("consoleText").value)),
+                ]);
+                break;
             default:
                 newExpression = null;
                 break;
@@ -1364,14 +1422,18 @@ export class CanvasComponent implements OnInit {
         return newExpression;
     }
 
-    private getHtmlElementDataType(data: string): string {
+    private getHtmlElementDataType(data: string, value: string): string {
         switch (data) {
             case "id":
-                return "id";
-            case "class":
-                return "className";
+                return `attr("id", "${value}")`;
+            case "addClass":
+                return `addClass("${value}")`;
+            case "removeClass":
+                return `removeClass("${value}")`;
             case "text":
-                return "innerHTML";
+                return `text("${value}")`;
+            case "value":
+                return `val("${value}")`;
         }
     }
 
@@ -1379,12 +1441,14 @@ export class CanvasComponent implements OnInit {
         let newValue: number | string;
         switch (varType) {
             case "integer":
-                newValue = parseInt(value, 10);
+                newValue = parseInt(value === "" ? "0" : value, 10);
                 break;
             case "double":
-                newValue = parseFloat(value);
+                newValue = parseFloat(value === "" ? "0.0" : value);
+                break;
             default:
                 newValue = value;
+                break;
         }
         return newValue;
     }
@@ -1396,10 +1460,10 @@ export class CanvasComponent implements OnInit {
                 newLiteral = new Char(value);
                 break;
             case "double":
-                newLiteral = new Double(value);
+                newLiteral = new Double(parseFloat(value));
                 break;
             case "integer":
-                newLiteral = new Integer(value);
+                newLiteral = new Integer(parseInt(value, 10));
                 break;
             case "text":
                 newLiteral = new Text(value);
@@ -1775,9 +1839,6 @@ export class CanvasComponent implements OnInit {
                 this.initParams(formControl as FormControl)
             );
         }
-        control
-            .get("parametersQuantity")
-            .patchValue(funcControl.get("parametersQuantity").value);
     }
 
     onChangeVarType(
@@ -2079,6 +2140,18 @@ export class CanvasComponent implements OnInit {
                     })
                 );
                 break;
+            case "console":
+                control = this.consoleArrayData.controls;
+                control.push(
+                    this.initConsoleFormArray({
+                        consoleType: "log",
+                        consoleText: "",
+                        funcName,
+                        index,
+                        evtIndex: isEvt ? evtIndex : -1,
+                    })
+                );
+                break;
             default:
                 return 0;
         }
@@ -2165,6 +2238,9 @@ export class CanvasComponent implements OnInit {
                 break;
             case "return":
                 control = this.returnArrayData.controls;
+                break;
+            case "console":
+                control = this.consoleArrayData.controls;
                 break;
             default:
                 return;
