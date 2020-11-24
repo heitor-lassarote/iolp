@@ -121,3 +121,7 @@ function event(compName, eventType, callback) {
 function handleHtmlElement(compName, execution) {
     eval(`$("#${compName}").${execution}`);
 }
+
+function consoleLog(consoleType, text) {
+    eval(`console.${consoleType}(${text})`);
+}

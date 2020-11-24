@@ -35,6 +35,7 @@ modulePrelude = Module
         , ("trunc", FunctionType [DoubleType] IntegerType)
         , ("event", FunctionType [TextType, TextType, FunctionType [] unitType] unitType)
         , ("handleHtmlElement", FunctionType [TextType, TextType] unitType)
+        , ("consoleLog", FunctionType [TextType, TextType] unitType)
         ]
     , functions = []
     , importedModules = []
