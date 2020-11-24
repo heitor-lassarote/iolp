@@ -33,12 +33,15 @@ instance ToJSON AST where
         ]
     toJSON (Text t) = object [ "text" .= String t ]
 
-link :: [Name] -> [Name] -> [AST] -> AST
-link cssFiles jsFiles html =
-    Tag "html" []
-        [ Tag "head" [] (includeStylesheets cssFiles <> includeScripts jsFiles)
-        , Tag "body" [] html
+link :: Name -> [Name] -> [Name] -> [AST] -> AST
+link title cssFiles jsFiles html =
+    Tag "html" [("lang", "en")]
+        [ Tag "head" [] (charset <> titleTag <> viewport <> includeStylesheets cssFiles)
+        , Tag "body" [] (html <> includeScripts jsFiles)
         ]
   where
+    charset = [Tag "meta" [("charset", "utf-8")] []]
+    titleTag = [Tag "title" [] [Text title]]
+    viewport = [Tag "meta" [("name", "viewport"), ("content", "width=device-width, initial-scale=1")] []]
     includeStylesheets fs = [Tag "link" [("rel", "stylesheet"), ("type", "text/css"), ("href", f)] [] | f <- fs]
     includeScripts fs = [Tag "script" [("src", f), ("type", "text/javascript")] [] | f <- fs]

@@ -78,7 +78,13 @@ htmlCodegen
     :: (Emit gen, Monoid gen)
     => AST
     -> HTMLCodegen gen
-htmlCodegen = \case
+htmlCodegen ast = liftA2 (<>) (emitM "<!DOCTYPE html>\n") (htmlCodegenImpl ast)
+
+htmlCodegenImpl
+    :: (Emit gen, Monoid gen)
+    => AST
+    -> HTMLCodegen gen
+htmlCodegenImpl = \case
     Tag name attributes asts -> do
         indent' <- indent
         attributes' <- genAttributes attributes

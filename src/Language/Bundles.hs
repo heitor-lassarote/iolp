@@ -145,7 +145,11 @@ instance Bundle BundleCssHtmlLogic where
         linkHtml allMods warnings page = do
             js' <- Map.elems <$> traverse logicResult modulesAndErrors
             css' <- uiResult cssName $ evalCodegenT (CSS.withOptions cssOptions) $ codegen $ css page
-            html' <- uiResult htmlName $ evalCodegenT (HTML.withOptions htmlOptions) $ codegen $ HTML.link cssNames (map fst extraJsFiles' <> jsNames) $ html page
+            html' <- uiResult htmlName
+                $ evalCodegenT (HTML.withOptions htmlOptions)
+                $ codegen
+                $ HTML.link pName cssNames (map fst extraJsFiles' <> jsNames)
+                $ html page
             pure (css' : html' : jsFiles <> js')
           where
             pName = name page
