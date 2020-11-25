@@ -378,7 +378,8 @@
                                             evtIndex: -1,
                                             isEvt: false,
                                             funcName: func.funcName,
-                                            cascade: false
+                                            cascade: false,
+                                            branch: ''
                                         }"
                                     ></ng-container>
                                     <ng-container
@@ -608,7 +609,8 @@
                                                     evtIndex: evtIndex,
                                                     isEvt: true,
                                                     funcName: func.funcName,
-                                                    cascade: false
+                                                    cascade: false,
+                                                    branch: ''
                                                 }"
                                             ></ng-container>
                                             <ng-container
@@ -655,11 +657,19 @@
     let-isEvt="isEvt"
     let-funcName="funcName"
     let-cascade="cascade"
+    let-branch="branch"
 >
     <form
         role="form"
         [formGroup]="
-            getDecisionFormGroup(index, isEvt, evtIndex, funcName, cascade)
+            getDecisionFormGroup(
+                index,
+                isEvt,
+                evtIndex,
+                funcName,
+                cascade,
+                branch
+            )
         "
     >
         <div class="ibox">
@@ -871,7 +881,8 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: true
+                                    cascade: true,
+                                    branch: 'trueBranch'
                                 }"
                             ></ng-container>
                             <ng-container
@@ -1025,7 +1036,8 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: true
+                                    cascade: true,
+                                    branch: 'falseBranch'
                                 }"
                             ></ng-container>
                             <ng-container
