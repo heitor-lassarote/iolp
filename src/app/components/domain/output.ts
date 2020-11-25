@@ -31,13 +31,18 @@ export class HtmlTextOut extends HtmlOut {
 
 export class Module {
     adtTemplates: Map<string, Constructor<Type>[]>;
-    externs: Map<string, Type>;
+    externs: Object;
     functions: Function[];
     importedModules: string[];
     moduleName: string;
 }
 
 export class Field<T> {
+    constructor(fieldName: string, fieldValue: T) {
+        this.fieldName = fieldName;
+        this.fieldValue = fieldValue;
+    }
+
     fieldName: string;
     fieldValue: T;
 }
@@ -129,7 +134,10 @@ export abstract class AST {
 }
 
 export class Assign extends AST {
-    constructor(leftExpression: Expression | string, rightExpression: Expression | string) {
+    constructor(
+        leftExpression: Expression | string,
+        rightExpression: Expression | string
+    ) {
         super();
         this.leftExpression = leftExpression;
         this.rightExpression = rightExpression;

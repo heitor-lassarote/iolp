@@ -34,6 +34,7 @@ import {
     Assign,
     Return,
     StringExpression,
+    Field,
 } from "./../../domain/output";
 import { Info } from "./../../domain/info";
 import { Element } from "src/app/components/domain/element";
@@ -69,7 +70,15 @@ declare let $: any;
 declare let css: any;
 
 // Constants
-const UNIT = new AlgebraicType("Unit");
+const UNIT: Type = new AlgebraicType("Unit");
+const consoleType: Type = new RecordType([
+    new Field<FunctionType>("log", new FunctionType([new TextType()], UNIT)),
+    new Field<FunctionType>("error", new FunctionType([new TextType()], UNIT)),
+    new Field<FunctionType>(
+        "warning",
+        new FunctionType([new TextType()], UNIT)
+    ),
+]);
 
 @Component({
     selector: "app-canvas",
@@ -959,9 +968,16 @@ export class CanvasComponent implements OnInit {
                 htmlObject = this.createComponent(element, htmlObject, false);
                 pageTest.html.push(htmlObject);
             });
+        let externs: Map<string, Type> = new Map<string, Type>([
+            ["console", consoleType],
+        ]);
+        let externsValue: Object = {};
+        for (let [key, value] of externs) {
+            externsValue = { [key]: value, ...externsValue };
+        }
         let logicObject: Module = {
             adtTemplates: new Map(),
-            externs: new Map(),
+            externs: externsValue,
             functions: [],
             importedModules: ["Prelude", "JSON", "REST"],
             moduleName: "main",
@@ -1188,6 +1204,8 @@ export class CanvasComponent implements OnInit {
                 return this.htmlElementArrayData.controls;
             case "return":
                 return this.returnArrayData.controls;
+            case "console":
+                return this.consoleArrayData.controls;
             default:
                 return null;
         }
@@ -1245,7 +1263,9 @@ export class CanvasComponent implements OnInit {
                 }
                 break;
             case "console":
-                newAst = new Expression_(expression);
+                newAst = new Expression_(
+                    (expression as StringExpression).value
+                );
                 break;
             default:
                 newAst = null;
@@ -1429,10 +1449,11 @@ export class CanvasComponent implements OnInit {
                 }
                 break;
             case "console":
-                newExpression = new Call(new Variable("consoleLog"), [
-                    new Literal_(new Text(control.get("consoleType").value)),
-                    new Literal_(new Text(control.get("consoleText").value)),
-                ]);
+                newExpression = new StringExpression(
+                    `console.${control.get("consoleType").value}("${
+                        control.get("consoleText").value
+                    }")`
+                );
                 break;
             default:
                 newExpression = null;
