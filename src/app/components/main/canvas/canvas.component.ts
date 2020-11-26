@@ -90,9 +90,6 @@ export class CanvasComponent implements OnInit {
     logicForm: FormGroup;
     decisionForm: FormGroup;
     repetitionForm: FormGroup;
-    comparisonForm: FormGroup;
-    booleanLogicForm: FormGroup;
-    customConditionForm: FormGroup;
     declarationForm: FormGroup;
     callFuncForm: FormGroup;
     attributionForm: FormGroup;
@@ -174,18 +171,6 @@ export class CanvasComponent implements OnInit {
 
         this.repetitionForm = this.formBuilder.group({
             repetitionArray: this.formBuilder.array([]),
-        });
-
-        this.comparisonForm = this.formBuilder.group({
-            comparisonArray: this.formBuilder.array([]),
-        });
-
-        this.booleanLogicForm = this.formBuilder.group({
-            booleanLogicArray: this.formBuilder.array([]),
-        });
-
-        this.customConditionForm = this.formBuilder.group({
-            customConditionArray: this.formBuilder.array([]),
         });
 
         this.declarationForm = this.formBuilder.group({
@@ -310,18 +295,6 @@ export class CanvasComponent implements OnInit {
         );
 
         return <FormArray>repetitionFormGroup.get("whileAst");
-    }
-
-    get comparisonArrayData() {
-        return <FormArray>this.comparisonForm.get("comparisonArray");
-    }
-
-    get booleanLogicArrayData() {
-        return <FormArray>this.booleanLogicForm.get("booleanLogicArray");
-    }
-
-    get customConditionArrayData() {
-        return <FormArray>this.customConditionForm.get("customConditionArray");
     }
 
     get declarationArrayData() {
@@ -467,6 +440,7 @@ export class CanvasComponent implements OnInit {
     }
 
     private initComparisonFormArray(comparison: {
+        conditionType: string;
         index: number;
         funcName: string;
         evtIndex: number;
@@ -478,6 +452,7 @@ export class CanvasComponent implements OnInit {
             leftExpression: [comparison.leftExpression, Validators.required],
             symbol: [comparison.symbol, Validators.required],
             rightExpression: [comparison.rightExpression, Validators.required],
+            conditionType: comparison.conditionType,
             index: comparison.index,
             funcName: comparison.funcName,
             evtIndex: comparison.evtIndex,
@@ -485,6 +460,7 @@ export class CanvasComponent implements OnInit {
     }
 
     private initBooleanLogicFormArray(booleanLogic: {
+        conditionType: string;
         index: number;
         funcName: string;
         evtIndex: number;
@@ -499,6 +475,7 @@ export class CanvasComponent implements OnInit {
                 booleanLogic.rightExpression,
                 Validators.required,
             ],
+            conditionType: booleanLogic.conditionType,
             index: booleanLogic.index,
             funcName: booleanLogic.funcName,
             evtIndex: booleanLogic.evtIndex,
@@ -506,6 +483,7 @@ export class CanvasComponent implements OnInit {
     }
 
     private initCustomConditionFormArray(custom: {
+        conditionType: string;
         index: number;
         funcName: string;
         evtIndex: number;
@@ -513,6 +491,7 @@ export class CanvasComponent implements OnInit {
     }) {
         return this.formBuilder.group({
             customCondition: [custom.customCondition, Validators.required],
+            conditionType: custom.conditionType,
             index: custom.index,
             funcName: custom.funcName,
             evtIndex: custom.evtIndex,
@@ -729,9 +708,6 @@ export class CanvasComponent implements OnInit {
                     ? this.decisionArrayData
                     : this.repetitionArrayData;
         }
-        console.log(
-            arrayData.controls[formIndex].get("expression") as FormGroup
-        );
         return arrayData.controls[formIndex].get("expression") as FormGroup;
     }
 
@@ -761,10 +737,6 @@ export class CanvasComponent implements OnInit {
                     ? this.decisionArrayData
                     : this.repetitionArrayData;
         }
-
-        console.log(
-            arrayData.controls[formIndex].get("expression") as FormGroup
-        );
         return arrayData.controls[formIndex].get("expression") as FormGroup;
     }
 
@@ -794,10 +766,6 @@ export class CanvasComponent implements OnInit {
                     ? this.decisionArrayData
                     : this.repetitionArrayData;
         }
-
-        console.log(
-            arrayData.controls[formIndex].get("expression") as FormGroup
-        );
         return arrayData.controls[formIndex].get("expression") as FormGroup;
     }
 
@@ -1230,7 +1198,6 @@ export class CanvasComponent implements OnInit {
                 let curControl = controls[cl.formIndex];
                 expression = this.getExpressionType(
                     cl.type.name,
-                    cl.type.clType,
                     curControl as FormGroup
                 );
                 ast = this.getAstType(cl.type.name, expression, curControl);
@@ -1375,29 +1342,47 @@ export class CanvasComponent implements OnInit {
         return newType;
     }
 
-    private getExpressionType(
-        clName: string,
-        clType: string,
-        control: FormGroup
-    ): Expression {
+    private getExpressionType(clName: string, control: FormGroup): Expression {
         let newExpression: Expression;
 
         switch (clName) {
             case "decision":
-            case "repetition":
-                switch (clType) {
+                let decisionExp: FormGroup = control.get("expression").value;
+                switch (decisionExp["conditionType"]) {
                     case "comparison":
                     case "booleanLogic":
                         newExpression = new BinaryOp(
-                            control.get("leftExpression").value,
-                            control.get("symbol").value,
-                            control.get("rightExpression").value
+                            decisionExp["leftExpression"],
+                            decisionExp["symbol"],
+                            decisionExp["rightExpression"]
                         );
                         break;
                     case "custom":
                         newExpression = new StringExpression(
-                            control.get("customCondition").value
+                            decisionExp["customCondition"]
                         );
+                        break;
+                    default:
+                        newExpression = null;
+                        break;
+                }
+                break;
+            case "repetition":
+                let repetitionExp: FormGroup = control.get("expression").value;
+                switch (repetitionExp["conditionType"]) {
+                    case "comparison":
+                    case "booleanLogic":
+                        newExpression = new BinaryOp(
+                            repetitionExp["leftExpression"],
+                            repetitionExp["symbol"],
+                            repetitionExp["rightExpression"]
+                        );
+                        break;
+                    case "custom":
+                        newExpression = new StringExpression(
+                            repetitionExp["customCondition"]
+                        );
+                        break;
                     default:
                         newExpression = null;
                         break;
@@ -1614,6 +1599,7 @@ export class CanvasComponent implements OnInit {
                             leftExpression: "",
                             symbol: "Different",
                             rightExpression: "",
+                            conditionType: "comparison",
                             funcName: func,
                             index: curElement.commandLine.length - 1,
                             evtIndex: -1,
@@ -1688,6 +1674,7 @@ export class CanvasComponent implements OnInit {
                     leftExpression: "",
                     symbol: "Different",
                     rightExpression: "",
+                    conditionType: "comparison",
                     funcName: func,
                     index: curEvt.commandLine.length - 1,
                     evtIndex: -1,
@@ -1745,6 +1732,7 @@ export class CanvasComponent implements OnInit {
                                 index,
                                 evtIndex,
                                 funcName,
+                                conditionType: "comparison",
                                 leftExpression: "",
                                 rightExpression: "",
                                 symbol: "Different",
@@ -1771,6 +1759,7 @@ export class CanvasComponent implements OnInit {
                                 index,
                                 evtIndex,
                                 funcName,
+                                conditionType: "comparison",
                                 leftExpression: "",
                                 rightExpression: "",
                                 symbol: "Different",
@@ -1828,6 +1817,7 @@ export class CanvasComponent implements OnInit {
                         index,
                         evtIndex,
                         funcName,
+                        conditionType: "comparison",
                         leftExpression: "",
                         rightExpression: "",
                         symbol: "Different",
@@ -1979,17 +1969,14 @@ export class CanvasComponent implements OnInit {
         evtIndex: number
     ) {
         let lastValue: string;
-        let lastClType: string;
         let curElement: LogicFunction = this.logicElements.find(
             (element) => funcName === element.funcName
         );
         let formIndex: number;
         if (!isEvt) {
             lastValue = curElement.commandLine[index].type.name;
-            lastClType = curElement.commandLine[index].type.clType;
             this.removeLastValueFromForm(
                 lastValue,
-                // lastClType,
                 curElement.commandLine[index].formIndex
             );
             formIndex = this.getFormIndexOnFunctionCommandLineChange(
@@ -2011,11 +1998,7 @@ export class CanvasComponent implements OnInit {
                         "Erro!",
                         "Mais de um retorno na mesma função!",
                         () => {
-                            this.removeLastValueFromForm(
-                                "return",
-                                // "",
-                                formIndex
-                            );
+                            this.removeLastValueFromForm("return", formIndex);
                             curElement.commandLine.splice(index, 1);
                         }
                     );
@@ -2024,11 +2007,8 @@ export class CanvasComponent implements OnInit {
         } else {
             lastValue =
                 curElement.events[evtIndex].commandLine[index].type.name;
-            lastClType =
-                curElement.events[evtIndex].commandLine[index].type.clType;
             this.removeLastValueFromForm(
                 lastValue,
-                // lastClType,
                 curElement.events[evtIndex].commandLine[index].formIndex
             );
             formIndex = this.getFormIndexOnFunctionCommandLineChange(
@@ -2051,33 +2031,26 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         isEvt: boolean,
         index: number,
-        evtIndex: number
+        evtIndex: number,
+        cascade: boolean,
+        branch: string
     ) {
-        // let lastValue: string;
-        // let lastClType: string;
         let curElement: LogicFunction = this.logicElements.find(
             (element) => funcName === element.funcName
         );
-        this.changeIfExpression(value, funcName, index, isEvt, evtIndex);
+        this.changeIfExpression(
+            value,
+            funcName,
+            index,
+            isEvt,
+            evtIndex,
+            cascade,
+            branch,
+            curElement.commandLine[index].formIndex
+        );
         if (!isEvt) {
-            // lastValue = curElement.commandLine[index].type.name;
-            // lastClType = curElement.commandLine[index].type.clType;
-            // this.removeLastValueFromForm(
-            //     lastValue,
-            //     lastClType,
-            //     curElement.commandLine[index].formIndex
-            // );
             curElement.commandLine[index].type.clType = value;
         } else {
-            // lastValue =
-            //     curElement.events[evtIndex].commandLine[index].type.name;
-            // lastClType =
-            //     curElement.events[evtIndex].commandLine[index].type.clType;
-            // this.removeLastValueFromForm(
-            //     lastValue,
-            //     lastClType,
-            //     curElement.events[evtIndex].commandLine[index].formIndex
-            // );
             curElement.events[evtIndex].commandLine[index].type.clType = value;
         }
     }
@@ -2134,8 +2107,26 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         index: number,
         isEvt: boolean,
-        evtIndex: number
-    ) {}
+        evtIndex: number,
+        cascade: boolean,
+        branch: string,
+        formIndex: number
+    ) {
+        const formGroup: FormGroup = this.getDecisionFormGroup(
+            index,
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade,
+            branch
+        );
+
+        formGroup.removeControl("expression");
+        formGroup.addControl(
+            "expression",
+            this.getClType(value, funcName, index, isEvt, evtIndex)
+        );
+    }
 
     private getFormIndexOnFunctionCommandLineChange(
         value: string,
@@ -2280,6 +2271,7 @@ export class CanvasComponent implements OnInit {
                     leftExpression: "",
                     symbol: "Different",
                     rightExpression: "",
+                    conditionType: clType,
                     funcName,
                     index,
                     evtIndex: isEvt ? evtIndex : -1,
@@ -2288,8 +2280,9 @@ export class CanvasComponent implements OnInit {
             case "booleanLogic":
                 formGroup = this.initBooleanLogicFormArray({
                     leftExpression: "",
-                    symbol: "and",
+                    symbol: "And",
                     rightExpression: "",
+                    conditionType: clType,
                     funcName,
                     index,
                     evtIndex: isEvt ? evtIndex : -1,
@@ -2298,6 +2291,7 @@ export class CanvasComponent implements OnInit {
             case "custom":
                 formGroup = this.initCustomConditionFormArray({
                     customCondition: "",
+                    conditionType: clType,
                     funcName,
                     index,
                     evtIndex: isEvt ? evtIndex : -1,
@@ -2308,11 +2302,7 @@ export class CanvasComponent implements OnInit {
         return formGroup;
     }
 
-    private removeLastValueFromForm(
-        lastValue: string,
-        // lastClType: string,
-        lastFormIndex: number
-    ) {
+    private removeLastValueFromForm(lastValue: string, lastFormIndex: number) {
         let control: AbstractControl[];
         switch (lastValue) {
             case "declaration":
@@ -2344,22 +2334,6 @@ export class CanvasComponent implements OnInit {
         }
         control.splice(lastFormIndex, 1);
     }
-
-    // private removeLastClType(clType: string, formIndex: number) {
-    //     let control: AbstractControl[];
-    //     switch (clType) {
-    //         case "comparison":
-    //             control = this.comparisonArrayData.controls;
-    //             break;
-    //         case "booleanLogic":
-    //             control = this.booleanLogicArrayData.controls;
-    //             break;
-    //         case "custom":
-    //             control = this.customConditionArrayData.controls;
-    //             break;
-    //     }
-    //     control.splice(formIndex, 1);
-    // }
 
     ifCondition(
         funcName: string,
@@ -2399,9 +2373,6 @@ export class CanvasComponent implements OnInit {
     isValid(): boolean {
         return (
             this.logicForm.valid &&
-            this.comparisonForm.valid &&
-            this.booleanLogicForm.valid &&
-            this.customConditionForm.valid &&
             this.declarationForm.valid &&
             this.callFuncForm.valid &&
             this.attributionForm.valid &&
