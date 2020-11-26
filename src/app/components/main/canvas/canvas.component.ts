@@ -2060,45 +2060,25 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         isEvt: boolean,
         index: number,
-        evtIndex: number
+        evtIndex: number,
+        cascade: boolean
     ) {
-        let lastValue: string;
-        let lastClType: string;
         let curElement: LogicFunction = this.logicElements.find(
             (element) => funcName === element.funcName
         );
-        let formIndex: number = this.getFormIndexOnFunctionCommandLineChange(
-            "repetition",
+        this.changeWhileExpression(
             value,
             funcName,
             index,
             isEvt,
-            evtIndex
+            evtIndex,
+            cascade,
+            curElement.commandLine[index].formIndex
         );
         if (!isEvt) {
-            lastValue = curElement.commandLine[index].type.name;
-            lastClType = curElement.commandLine[index].type.clType;
-            this.removeLastValueFromForm(
-                lastValue,
-                // lastClType,
-                curElement.commandLine[index].formIndex
-            );
             curElement.commandLine[index].type.clType = value;
-            curElement.commandLine[index].formIndex = formIndex;
         } else {
-            lastValue =
-                curElement.events[evtIndex].commandLine[index].type.name;
-            lastClType =
-                curElement.events[evtIndex].commandLine[index].type.clType;
-            this.removeLastValueFromForm(
-                lastValue,
-                // lastClType,
-                curElement.events[evtIndex].commandLine[index].formIndex
-            );
             curElement.events[evtIndex].commandLine[index].type.clType = value;
-            curElement.events[evtIndex].commandLine[
-                index
-            ].formIndex = formIndex;
         }
     }
 
@@ -2119,6 +2099,30 @@ export class CanvasComponent implements OnInit {
             funcName,
             cascade,
             branch
+        );
+
+        formGroup.removeControl("expression");
+        formGroup.addControl(
+            "expression",
+            this.getClType(value, funcName, index, isEvt, evtIndex)
+        );
+    }
+
+    private changeWhileExpression(
+        value: string,
+        funcName: string,
+        index: number,
+        isEvt: boolean,
+        evtIndex: number,
+        cascade: boolean,
+        formIndex: number
+    ) {
+        const formGroup: FormGroup = this.getRepetitionFormGroup(
+            index,
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade
         );
 
         formGroup.removeControl("expression");

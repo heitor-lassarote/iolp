@@ -12,6 +12,7 @@ import { NgxSpinnerModule } from "ngx-spinner";
 import { TranslateResponseService } from "./services/translate/translate.service";
 import { TranslateKeysService } from "./services/translate/translate-keys.service";
 import { LoginModule } from "./components/login/login.module";
+import { SignupModule } from "./components/signup/signup.module";
 
 @NgModule({
     declarations: [AppComponent],
@@ -24,6 +25,7 @@ import { LoginModule } from "./components/login/login.module";
         ToastrModule.forRoot(),
         NgxSpinnerModule,
         LoginModule,
+        SignupModule,
     ],
     providers: [
         { provide: LocationStrategy, useClass: HashLocationStrategy },

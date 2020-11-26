@@ -5,8 +5,8 @@
             <form
                 class="m-t"
                 role="form"
-                [formGroup]="loginForm"
-                (ngSubmit)="login()"
+                [formGroup]="signupForm"
+                (ngSubmit)="signUp()"
             >
                 <div class="form-group">
                     <input
@@ -14,7 +14,7 @@
                         email
                         formControlName="email"
                         class="form-control"
-                        placeholder="E-mail"
+                        placeholder="email"
                     />
                 </div>
                 <div class="form-group">
@@ -26,21 +26,17 @@
                     />
                 </div>
                 <button
-                    [disabled]="loginForm.invalid"
+                    [disabled]="signupForm.invalid"
                     class="btn btn-primary block full-width m-b"
                 >
-                    Entrar
+                    Criar Conta
                 </button>
 
-                <a ui-sref="forgot_password"><small>Esqueci a senha</small></a>
                 <p class="text-muted text-center">
-                    <small>Não tem uma conta?</small>
+                    <small>Já tem uma conta?</small>
                 </p>
-                <a
-                    class="btn btn-sm btn-white btn-block"
-                    [routerLink]="['/signup']"
-                >
-                    Criar uma Conta
+                <a class="btn btn-sm btn-white btn-block" [routerLink]="['/']">
+                    Entre na plataforma
                 </a>
             </form>
         </div>
