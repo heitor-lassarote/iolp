@@ -63,7 +63,6 @@ import {
 } from "@angular/forms";
 import { AlertService } from "src/app/services/alert/alert.service";
 import { BehaviorSubject, Observable } from "rxjs";
-import { Variable as Variab } from "../../domain/variable";
 import { LOWCODEFUNCTIONS } from "../../constants/low-code-functions.constant";
 
 declare let $: any;
@@ -242,16 +241,18 @@ export class CanvasComponent implements OnInit {
         isEvt: boolean,
         evtIndex: number,
         funcName: string,
-        cascade: boolean
+        cascade: string
     ) {
         let decisionFormGroup: FormGroup = this.getDecisionFormGroup(
             index,
             isEvt,
             evtIndex,
             funcName,
-            cascade,
-            "trueBranch"
+            cascade
         );
+
+        console.log(cascade);
+        console.log(decisionFormGroup);
 
         return <FormArray>decisionFormGroup.get("trueBranchAst");
     }
@@ -261,15 +262,14 @@ export class CanvasComponent implements OnInit {
         isEvt: boolean,
         evtIndex: number,
         funcName: string,
-        cascade: boolean
+        cascade: string
     ) {
         let decisionFormGroup: FormGroup = this.getDecisionFormGroup(
             index,
             isEvt,
             evtIndex,
             funcName,
-            cascade,
-            "falseBranch"
+            cascade
         );
 
         return <FormArray>decisionFormGroup.get("falseBranchAst");
@@ -347,7 +347,7 @@ export class CanvasComponent implements OnInit {
         funcName: string;
         parameters: { paramName: string; paramValue: any; paramType: Type }[];
         returnType: string | Type;
-    }) {
+    }): FormGroup {
         return this.formBuilder.group({
             funcName: [func.funcName, [Validators.required]],
             parameters: this.formBuilder.array(func.parameters),
@@ -367,13 +367,13 @@ export class CanvasComponent implements OnInit {
         funcName: string;
         evtIndex: number;
         expression: FormGroup;
-        parent: FormGroup;
+        cascade: string;
     }): FormGroup {
         return this.formBuilder.group({
-            parent: decision.parent,
             expression: decision.expression,
             trueBranchAst: this.formBuilder.array([]),
             falseBranchAst: this.formBuilder.array([]),
+            cascade: decision.cascade,
             index: decision.index,
             funcName: decision.funcName,
             evtIndex: decision.evtIndex,
@@ -384,13 +384,11 @@ export class CanvasComponent implements OnInit {
         exec: FormGroup;
         clType: string;
         clTypeName: string;
-        parentIndex: number;
     }): FormGroup {
         return this.formBuilder.group({
             exec: trueBranch.exec,
             clType: trueBranch.clType,
             clTypeName: trueBranch.clTypeName,
-            parentIndex: trueBranch.parentIndex,
         });
     }
 
@@ -398,13 +396,11 @@ export class CanvasComponent implements OnInit {
         exec: FormGroup;
         clType: string;
         clTypeName: string;
-        parentIndex: number;
     }): FormGroup {
         return this.formBuilder.group({
             exec: falseBranch.exec,
             clType: falseBranch.clType,
             clTypeName: falseBranch.clTypeName,
-            parentIndex: falseBranch.parentIndex,
         });
     }
 
@@ -413,10 +409,8 @@ export class CanvasComponent implements OnInit {
         funcName: string;
         evtIndex: number;
         expression: AbstractControl;
-        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
-            parent: repetition.parent,
             expression: repetition.expression,
             whileAst: this.formBuilder.array([]),
             index: repetition.index,
@@ -429,13 +423,11 @@ export class CanvasComponent implements OnInit {
         exec: FormGroup;
         clType: string;
         clTypeName: string;
-        parentIndex: number;
     }): FormGroup {
         return this.formBuilder.group({
             exec: whileAst.exec,
             clType: whileAst.clType,
             clTypeName: whileAst.clTypeName,
-            parentIndex: whileAst.parentIndex,
         });
     }
 
@@ -505,10 +497,8 @@ export class CanvasComponent implements OnInit {
         varType: string;
         varName: string;
         varValue: string;
-        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
-            parent: declaration.parent,
             varType: [declaration.varType, Validators.required],
             varName: [declaration.varName, Validators.required],
             varValue: declaration.varValue,
@@ -525,10 +515,8 @@ export class CanvasComponent implements OnInit {
         returnType: string;
         varName: string;
         function: string;
-        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
-            parent: callFunc.parent,
             returnType: callFunc.returnType,
             varName: callFunc.varName,
             function: callFunc.function,
@@ -553,10 +541,8 @@ export class CanvasComponent implements OnInit {
         evtIndex: number;
         varName: string;
         attributionValue: string;
-        parent: FormGroup;
     }) {
         return this.formBuilder.group({
-            parent: attribution.parent,
             varName: attribution.varName,
             attributionValue: [
                 attribution.attributionValue,
@@ -575,10 +561,8 @@ export class CanvasComponent implements OnInit {
         elementName: string;
         elementData: string;
         elementValue: string;
-        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
-            parent: htmlElement.parent,
             elementName: htmlElement.elementName,
             elementData: htmlElement.elementData,
             elementValue: [htmlElement.elementValue, Validators.required],
@@ -588,12 +572,8 @@ export class CanvasComponent implements OnInit {
         });
     }
 
-    private initReturnFormArray(returnValue: {
-        value: any;
-        parent: FormGroup;
-    }): FormGroup {
+    private initReturnFormArray(returnValue: { value: any }): FormGroup {
         return this.formBuilder.group({
-            parent: returnValue.parent,
             returnValue: [returnValue.value, Validators.required],
         });
     }
@@ -604,10 +584,8 @@ export class CanvasComponent implements OnInit {
         evtIndex: number;
         consoleType: string;
         consoleText: string;
-        parent: FormGroup;
     }): FormGroup {
         return this.formBuilder.group({
-            parent: consoleValue.parent,
             consoleType: consoleValue.consoleType,
             consoleText: [consoleValue.consoleText, Validators.required],
             index: consoleValue.index,
@@ -623,39 +601,43 @@ export class CanvasComponent implements OnInit {
         isEvt: boolean,
         evtIndex: number,
         funcName: string,
-        cascade: boolean,
-        branch: string
+        cascade: string
     ): FormGroup {
         let curElement: LogicFunction = this.logicElements.find(
             (element) => funcName === element.funcName
         );
         let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
+        let stack: string[] = cascade.split(",");
+        let branches: number[] = stack[0]
+            .split(":")
+            .map((value) => parseInt(value));
+        formIndex = !isEvt
+            ? curElement.commandLine[branches[0]].formIndex
+            : curElement.events[evtIndex].commandLine[branches[0]].formIndex;
 
-        const formGroup: FormGroup = this.decisionArrayData.controls[
+        let head: FormGroup = this.decisionArrayData.controls[
             formIndex
         ] as FormGroup;
+        let formGroups: FormGroup[] = [head];
 
-        if (!cascade) {
-            return formGroup;
-        } else {
-            if (branch === "trueBranch") {
-                let trueControl: AbstractControl[] = (formGroup.get(
-                    "trueBranchAst"
-                ) as FormArray).controls;
-                console.log(trueControl);
-            } else {
-                let falseControl: AbstractControl[] = (formGroup.get(
-                    "falseBranchAst"
-                ) as FormArray).controls;
-                console.log(falseControl);
+        if (branches[1] !== undefined) {
+            head = (head.get(
+                branches[1] === 0 ? "trueBranchAst" : "falseBranchAst"
+            ) as FormArray).controls[branches[0]] as FormGroup;
+            formGroups.push(head);
+        }
+
+        for (let i = 1; i < stack.length; ++i) {
+            let element: string = stack[i];
+            branches = element.split(":").map((value) => parseInt(value));
+            if (branches[1] !== undefined) {
+                head = (head.get(
+                    branches[1] === 0 ? "trueBranchAst" : "falseBranchAst"
+                ) as FormArray).controls[branches[0]] as FormGroup;
+                formGroups.push(head);
             }
         }
+        return head;
     }
 
     getRepetitionFormGroup(
@@ -1585,8 +1567,9 @@ export class CanvasComponent implements OnInit {
         control.splice(index, 1);
     }
 
-    createItem(func: string, type: string) {
+    createItem(func: string, type: string, funcIndex: number) {
         let curElement: LogicFunction;
+        const index: number = this.logicElements[funcIndex].commandLine.length;
         switch (type) {
             case "cl":
                 const decisionControl = this.decisionArrayData.controls;
@@ -1607,7 +1590,7 @@ export class CanvasComponent implements OnInit {
                         funcName: func,
                         index: curElement.commandLine.length - 1,
                         evtIndex: -1,
-                        parent: null,
+                        cascade: index.toString(),
                     })
                 );
                 curElement.commandLine.push({
@@ -1682,7 +1665,7 @@ export class CanvasComponent implements OnInit {
                 funcName: func,
                 index: curEvt.commandLine.length - 1,
                 evtIndex: -1,
-                parent: null,
+                cascade: "",
             })
         );
         curEvt.commandLine.push({
@@ -1706,88 +1689,52 @@ export class CanvasComponent implements OnInit {
         isEvt: boolean,
         index: number,
         evtIndex: number,
-        cascade: boolean
+        cascade: string
     ) {
         let decisionFormGroup = this.getDecisionFormGroup(
             index,
             isEvt,
             evtIndex,
             funcName,
-            cascade,
-            branch
+            cascade
         );
         let control: AbstractControl[];
+        control = (decisionFormGroup.get(branch) as FormArray).controls;
+        let data = {
+            exec: this.initDecisionFormArray({
+                index,
+                evtIndex,
+                funcName,
+                expression: this.initComparisonFormArray({
+                    index,
+                    evtIndex,
+                    funcName,
+                    conditionType: "comparison",
+                    leftExpression: "",
+                    rightExpression: "",
+                    symbol: "Different",
+                }),
+                cascade: cascade + "," + control.length.toString(),
+            }),
+            clTypeName: "decision",
+            clType: "comparison",
+        };
         switch (branch) {
-            case "trueBranch":
-                control = (decisionFormGroup.get("trueBranchAst") as FormArray)
-                    .controls;
+            case "trueBranchAst":
                 console.log(control);
-                control.push(
-                    this.initTrueBranchAstFormArray({
-                        exec: this.initDecisionFormArray({
-                            index,
-                            evtIndex,
-                            funcName,
-                            expression: this.initComparisonFormArray({
-                                index,
-                                evtIndex,
-                                funcName,
-                                conditionType: "comparison",
-                                leftExpression: "",
-                                rightExpression: "",
-                                symbol: "Different",
-                            }),
-                            parent: null,
-                        }),
-                        clTypeName: "decision",
-                        clType: "comparison",
-                        parentIndex: control.length - 1,
-                    })
-                );
+                control.push(this.initTrueBranchAstFormArray(data));
                 console.log(control);
                 break;
-            case "falseBranch":
-                control = (decisionFormGroup.get("falseBranchAst") as FormArray)
-                    .controls;
-                control.push(
-                    this.initFalseBranchAstFormArray({
-                        exec: this.initDecisionFormArray({
-                            index,
-                            evtIndex,
-                            funcName,
-                            expression: this.initComparisonFormArray({
-                                index,
-                                evtIndex,
-                                funcName,
-                                conditionType: "comparison",
-                                leftExpression: "",
-                                rightExpression: "",
-                                symbol: "Different",
-                            }),
-                            parent: null,
-                        }),
-                        clTypeName: "decision",
-                        clType: "comparison",
-                        parentIndex: control.length - 1,
-                    })
-                );
+            case "falseBranchAst":
+                control.push(this.initFalseBranchAstFormArray(data));
                 break;
         }
     }
 
     removeClFromDecisionBranch(branch: string, cl: any, clIndex: number) {
         console.log(cl);
-        let control: AbstractControl[];
-        switch (branch) {
-            case "trueBranch":
-                control = (cl.get("trueBranchAst") as FormArray).controls;
-                control.splice(clIndex, 1);
-                break;
-            case "falseBranch":
-                control = (cl.get("falseBranchAst") as FormArray).controls;
-                control.splice(clIndex, 1);
-                break;
-        }
+        let control: AbstractControl[] = (cl.get(branch) as FormArray).controls;
+        control.splice(clIndex, 1);
     }
 
     addClToRepetition(
@@ -1822,11 +1769,9 @@ export class CanvasComponent implements OnInit {
                         rightExpression: "",
                         symbol: "Different",
                     }),
-                    parent: null,
                 }),
                 clTypeName: "repetition",
                 clType: "comparison",
-                parentIndex: control.length - 1,
             })
         );
         console.log(control);
@@ -2032,7 +1977,7 @@ export class CanvasComponent implements OnInit {
         isEvt: boolean,
         index: number,
         evtIndex: number,
-        cascade: boolean,
+        cascade: string,
         branch: string
     ) {
         let curElement: LogicFunction = this.logicElements.find(
@@ -2044,9 +1989,7 @@ export class CanvasComponent implements OnInit {
             index,
             isEvt,
             evtIndex,
-            cascade,
-            branch,
-            curElement.commandLine[index].formIndex
+            cascade
         );
         if (!isEvt) {
             curElement.commandLine[index].type.clType = value;
@@ -2088,17 +2031,14 @@ export class CanvasComponent implements OnInit {
         index: number,
         isEvt: boolean,
         evtIndex: number,
-        cascade: boolean,
-        branch: string,
-        formIndex: number
+        cascade: string
     ) {
         const formGroup: FormGroup = this.getDecisionFormGroup(
             index,
             isEvt,
             evtIndex,
             funcName,
-            cascade,
-            branch
+            cascade
         );
 
         formGroup.removeControl("expression");
@@ -2152,7 +2092,6 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
-                        parent: null,
                     })
                 );
                 break;
@@ -2170,7 +2109,7 @@ export class CanvasComponent implements OnInit {
                             isEvt,
                             evtIndex
                         ),
-                        parent: null,
+                        cascade: "",
                     })
                 );
                 break;
@@ -2188,7 +2127,6 @@ export class CanvasComponent implements OnInit {
                             isEvt,
                             evtIndex
                         ),
-                        parent: null,
                     })
                 );
                 break;
@@ -2202,7 +2140,6 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
-                        parent: null,
                     })
                 );
                 break;
@@ -2215,7 +2152,6 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
-                        parent: null,
                     })
                 );
                 break;
@@ -2229,7 +2165,6 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
-                        parent: null,
                     })
                 );
                 break;
@@ -2238,7 +2173,6 @@ export class CanvasComponent implements OnInit {
                 control.push(
                     this.initReturnFormArray({
                         value: "",
-                        parent: null,
                     })
                 );
                 break;
@@ -2251,13 +2185,13 @@ export class CanvasComponent implements OnInit {
                         funcName,
                         index,
                         evtIndex: isEvt ? evtIndex : -1,
-                        parent: null,
                     })
                 );
                 break;
             default:
                 return 0;
         }
+
         return control.length - 1;
     }
 

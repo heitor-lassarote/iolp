@@ -199,7 +199,11 @@
                                 >
                                     <li
                                         (click)="
-                                            createItem(func.funcName, 'cl')
+                                            createItem(
+                                                func.funcName,
+                                                'cl',
+                                                funcIndex
+                                            )
                                         "
                                     >
                                         <a> Linha de comando </a>
@@ -207,7 +211,11 @@
                                     <li *ngIf="funcIndex === 0">
                                         <a
                                             (click)="
-                                                createItem(func.funcName, 'evt')
+                                                createItem(
+                                                    func.funcName,
+                                                    'evt',
+                                                    funcIndex
+                                                )
                                             "
                                         >
                                             Evento
@@ -219,7 +227,13 @@
                                     *ngIf="funcIndex !== 0"
                                     type="button"
                                     class="btn btn-primary add-btn m-l-sm"
-                                    (click)="createItem(func.funcName, 'cl')"
+                                    (click)="
+                                        createItem(
+                                            func.funcName,
+                                            'cl',
+                                            funcIndex
+                                        )
+                                    "
                                 >
                                     <i class="fa fa-plus"></i>
                                 </button>
@@ -378,7 +392,7 @@
                                             evtIndex: -1,
                                             isEvt: false,
                                             funcName: func.funcName,
-                                            cascade: false,
+                                            cascade: funcClIndex.toString(),
                                             branch: ''
                                         }"
                                     ></ng-container>
@@ -609,7 +623,7 @@
                                                     evtIndex: evtIndex,
                                                     isEvt: true,
                                                     funcName: func.funcName,
-                                                    cascade: false,
+                                                    cascade: evtClIndex.toString(),
                                                     branch: ''
                                                 }"
                                             ></ng-container>
@@ -662,14 +676,7 @@
     <form
         role="form"
         [formGroup]="
-            getDecisionFormGroup(
-                index,
-                isEvt,
-                evtIndex,
-                funcName,
-                cascade,
-                branch
-            )
+            getDecisionFormGroup(index, isEvt, evtIndex, funcName, cascade)
         "
     >
         <div class="ibox">
@@ -758,7 +765,7 @@
                         class="btn btn-primary add-btn m-l-sm"
                         (click)="
                             addClToDecisionBranch(
-                                'trueBranch',
+                                'trueBranchAst',
                                 funcName,
                                 isEvt,
                                 index,
@@ -862,7 +869,7 @@
                                     class="m-l-md btn btn-remove"
                                     (click)="
                                         removeClFromDecisionBranch(
-                                            'trueBranch',
+                                            'trueBranchAst',
                                             cl,
                                             ifClIndex
                                         )
@@ -883,8 +890,8 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: true,
-                                    branch: 'trueBranch'
+                                    cascade: cascade + ':0,',
+                                    branch: 'trueBranchAst'
                                 }"
                             ></ng-container>
                             <ng-container
@@ -913,7 +920,7 @@
                         class="btn btn-primary add-btn m-l-sm"
                         (click)="
                             addClToDecisionBranch(
-                                'falseBranch',
+                                'falseBranchAst',
                                 funcName,
                                 isEvt,
                                 index,
@@ -1017,7 +1024,7 @@
                                     class="m-l-md btn btn-remove"
                                     (click)="
                                         removeClFromDecisionBranch(
-                                            'falseBranch',
+                                            'falseBranchAst',
                                             cl,
                                             ifClIndex
                                         )
@@ -1038,8 +1045,8 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: true,
-                                    branch: 'falseBranch'
+                                    cascade: cascade + ':1,',
+                                    branch: 'falseBranchAst'
                                 }"
                             ></ng-container>
                             <ng-container
