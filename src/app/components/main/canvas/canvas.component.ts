@@ -368,12 +368,14 @@ export class CanvasComponent implements OnInit {
         evtIndex: number;
         expression: FormGroup;
         cascade: string;
+        conditionType: string;
     }): FormGroup {
         return this.formBuilder.group({
             expression: decision.expression,
             trueBranchAst: this.formBuilder.array([]),
             falseBranchAst: this.formBuilder.array([]),
             cascade: decision.cascade,
+            conditionType: decision.conditionType,
             index: decision.index,
             funcName: decision.funcName,
             evtIndex: decision.evtIndex,
@@ -1591,6 +1593,7 @@ export class CanvasComponent implements OnInit {
                         index: curElement.commandLine.length - 1,
                         evtIndex: -1,
                         cascade: index.toString(),
+                        conditionType: "comparison",
                     })
                 );
                 curElement.commandLine.push({
@@ -1666,6 +1669,7 @@ export class CanvasComponent implements OnInit {
                 index: curEvt.commandLine.length - 1,
                 evtIndex: -1,
                 cascade: "",
+                conditionType: "comparison",
             })
         );
         curEvt.commandLine.push({
@@ -1715,6 +1719,7 @@ export class CanvasComponent implements OnInit {
                     symbol: "Different",
                 }),
                 cascade: cascade + "," + control.length.toString(),
+                conditionType: "comparison",
             }),
             clTypeName: "decision",
             clType: "comparison",
@@ -1977,60 +1982,6 @@ export class CanvasComponent implements OnInit {
         isEvt: boolean,
         index: number,
         evtIndex: number,
-        cascade: string,
-        branch: string
-    ) {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        this.changeIfExpression(
-            value,
-            funcName,
-            index,
-            isEvt,
-            evtIndex,
-            cascade
-        );
-        if (!isEvt) {
-            curElement.commandLine[index].type.clType = value;
-        } else {
-            curElement.events[evtIndex].commandLine[index].type.clType = value;
-        }
-    }
-
-    changeWhileLoop(
-        value: string,
-        funcName: string,
-        isEvt: boolean,
-        index: number,
-        evtIndex: number,
-        cascade: boolean
-    ) {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        this.changeWhileExpression(
-            value,
-            funcName,
-            index,
-            isEvt,
-            evtIndex,
-            cascade,
-            curElement.commandLine[index].formIndex
-        );
-        if (!isEvt) {
-            curElement.commandLine[index].type.clType = value;
-        } else {
-            curElement.events[evtIndex].commandLine[index].type.clType = value;
-        }
-    }
-
-    private changeIfExpression(
-        value: string,
-        funcName: string,
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
         cascade: string
     ) {
         const formGroup: FormGroup = this.getDecisionFormGroup(
@@ -2048,14 +1999,13 @@ export class CanvasComponent implements OnInit {
         );
     }
 
-    private changeWhileExpression(
+    changeWhileLoop(
         value: string,
         funcName: string,
-        index: number,
         isEvt: boolean,
+        index: number,
         evtIndex: number,
-        cascade: boolean,
-        formIndex: number
+        cascade: boolean
     ) {
         const formGroup: FormGroup = this.getRepetitionFormGroup(
             index,
@@ -2110,6 +2060,7 @@ export class CanvasComponent implements OnInit {
                             evtIndex
                         ),
                         cascade: "",
+                        conditionType: clType,
                     })
                 );
                 break;
@@ -2271,22 +2222,6 @@ export class CanvasComponent implements OnInit {
                 return;
         }
         control.splice(lastFormIndex, 1);
-    }
-
-    ifCondition(
-        funcName: string,
-        isEvt: boolean,
-        index: number,
-        evtIndex: number
-    ): string {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        if (!isEvt) {
-            return curElement.commandLine[index].type.clType;
-        } else {
-            return curElement.events[evtIndex].commandLine[index].type.clType;
-        }
     }
 
     whileLoopCondition(

@@ -686,6 +686,7 @@
                     <div class="col-3">
                         <select
                             class="form-control"
+                            formControlName="conditionType"
                             (change)="
                                 changeIfCondition(
                                     $event.target.value,
@@ -693,8 +694,7 @@
                                     isEvt,
                                     index,
                                     evtIndex,
-                                    cascade,
-                                    branch
+                                    cascade
                                 )
                             "
                         >
@@ -708,12 +708,13 @@
                     <div class="col-8">
                         <ng-container
                             *ngIf="
-                                ifCondition(
-                                    funcName,
-                                    isEvt,
+                                getDecisionFormGroup(
                                     index,
-                                    evtIndex
-                                ) === 'comparison'
+                                    isEvt,
+                                    evtIndex,
+                                    funcName,
+                                    cascade
+                                ).get('conditionType').value === 'comparison'
                             "
                             [ngTemplateOutlet]="comparison"
                             [ngTemplateOutletContext]="{
@@ -725,12 +726,13 @@
                         ></ng-container>
                         <ng-container
                             *ngIf="
-                                ifCondition(
-                                    funcName,
-                                    isEvt,
+                                getDecisionFormGroup(
                                     index,
-                                    evtIndex
-                                ) === 'booleanLogic'
+                                    isEvt,
+                                    evtIndex,
+                                    funcName,
+                                    cascade
+                                ).get('conditionType').value === 'booleanLogic'
                             "
                             [ngTemplateOutlet]="booleanLogic"
                             [ngTemplateOutletContext]="{
@@ -742,12 +744,13 @@
                         ></ng-container>
                         <ng-container
                             *ngIf="
-                                ifCondition(
-                                    funcName,
-                                    isEvt,
+                                getDecisionFormGroup(
                                     index,
-                                    evtIndex
-                                ) === 'custom'
+                                    isEvt,
+                                    evtIndex,
+                                    funcName,
+                                    cascade
+                                ).get('conditionType').value === 'custom'
                             "
                             [ngTemplateOutlet]="custom"
                             [ngTemplateOutletContext]="{
@@ -791,11 +794,15 @@
                         ).controls;
                         let ifClIndex = index
                     "
+                    [formGroup]="cl"
                 >
                     <div class="column">
                         <div class="row">
                             <div class="col-md-3">
-                                <select class="form-control">
+                                <select
+                                    class="form-control"
+                                    formControlName="clTypeName"
+                                >
                                     <option value="decision">Decisão</option>
                                     <option value="repetition">
                                         Repetição
@@ -946,11 +953,15 @@
                         ).controls;
                         let ifClIndex = index
                     "
+                    [formGroup]="cl"
                 >
                     <div class="column">
                         <div class="row">
                             <div class="col-md-3">
-                                <select class="form-control">
+                                <select
+                                    class="form-control"
+                                    formControlName="clTypeName"
+                                >
                                     <option value="decision">Decisão</option>
                                     <option value="repetition">
                                         Repetição
@@ -1193,11 +1204,15 @@
                         ).controls;
                         let ifClIndex = index
                     "
+                    [formGroup]="cl"
                 >
                     <div class="column">
                         <div class="row">
                             <div class="col-md-3">
-                                <select class="form-control">
+                                <select
+                                    class="form-control"
+                                    formControlName="clTypeName"
+                                >
                                     <option value="decision">Decisão</option>
                                     <option value="repetition">
                                         Repetição
@@ -1288,7 +1303,7 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: true
+                                    cascade: ''
                                 }"
                             ></ng-container>
                             <ng-container
@@ -1301,7 +1316,7 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: true
+                                    cascade: ''
                                 }"
                             ></ng-container>
                         </div>
