@@ -7,4 +7,5 @@ export class Element {
         x: number;
         y: number;
     };
+    selectOptions: string[];
 }

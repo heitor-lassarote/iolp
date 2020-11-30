@@ -55,6 +55,7 @@ export class SideNavigationComponent implements OnInit {
                 x: 50,
                 y: 50,
             },
+            selectOptions: [],
         };
         this.spawnService.createComponent(element);
     }

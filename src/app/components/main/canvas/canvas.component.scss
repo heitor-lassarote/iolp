@@ -70,6 +70,20 @@ mwlResizable {
     line-height: 1.5;
     background-clip: padding-box;
 }
+.select-field {
+    width: 200px;
+    height: calc(1.5em + 0.75rem + 2px);
+    background-color: #ffffff;
+    background-image: none;
+    border: 1px solid #e5e6e7;
+    border-radius: 1px;
+    color: inherit;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    font-weight: 400;
+    line-height: 1.5;
+    background-clip: padding-box;
+}
 .inside-ibox {
     border-top: 1px !important;
     display: flex;

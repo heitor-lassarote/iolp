@@ -77,6 +77,18 @@
                 cdkDrag
                 cdkDragBoundary=".screen"
             />
+            <select
+                *ngIf="e.type === 'select'"
+                class="draggable select-field"
+                [id]="e.name"
+                (click)="click($event, $event.target)"
+                cdkDrag
+                cdkDragBoundary=".screen"
+            >
+                <option *ngFor="let item of e.selectOptions" [value]="item">
+                    {{ item }}
+                </option>
+            </select>
         </div>
     </div>
 </div>
