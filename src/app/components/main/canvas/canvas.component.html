@@ -262,12 +262,13 @@
                                         <select
                                             class="form-control"
                                             (change)="
-                                                funcClTypeChange(
+                                                clTypeChange(
                                                     $event.target.value,
                                                     false,
                                                     func.funcName,
                                                     funcClIndex,
-                                                    -1
+                                                    -1,
+                                                    funcClIndex.toString()
                                                 )
                                             "
                                         >
@@ -310,7 +311,8 @@
                                                 index: funcClIndex,
                                                 evtIndex: -1,
                                                 isEvt: false,
-                                                funcName: func.funcName
+                                                funcName: func.funcName,
+                                                cascade: funcClIndex.toString()
                                             }"
                                         ></ng-container>
                                         <ng-container
@@ -404,7 +406,7 @@
                                             evtIndex: -1,
                                             isEvt: false,
                                             funcName: func.funcName,
-                                            cascade: false
+                                            cascade: funcClIndex.toString()
                                         }"
                                     ></ng-container>
                                 </div>
@@ -494,12 +496,13 @@
                                                 <select
                                                     class="form-control"
                                                     (change)="
-                                                        funcClTypeChange(
+                                                        clTypeChange(
                                                             $event.target.value,
                                                             true,
                                                             func.funcName,
                                                             evtClIndex,
-                                                            evtIndex
+                                                            evtIndex,
+                                                            evtClIndex.toString()
                                                         )
                                                     "
                                                 >
@@ -539,7 +542,8 @@
                                                         index: evtClIndex,
                                                         evtIndex: evtIndex,
                                                         isEvt: true,
-                                                        funcName: func.funcName
+                                                        funcName: func.funcName,
+                                                        cascade: evtClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
@@ -638,7 +642,7 @@
                                                     evtIndex: evtIndex,
                                                     isEvt: true,
                                                     funcName: func.funcName,
-                                                    cascade: false
+                                                    cascade: evtClIndex.toString()
                                                 }"
                                             ></ng-container>
                                         </div>
@@ -675,9 +679,7 @@
 >
     <form
         role="form"
-        [formGroup]="
-            getDecisionFormGroup(index, isEvt, evtIndex, funcName, cascade)
-        "
+        [formGroup]="getInnermostFormGroup(isEvt, evtIndex, funcName, cascade)"
     >
         <div class="ibox">
             <div class="ibox-title inside-ibox">
@@ -708,8 +710,7 @@
                     <div class="col-8">
                         <ng-container
                             *ngIf="
-                                getDecisionFormGroup(
-                                    index,
+                                getInnermostFormGroup(
                                     isEvt,
                                     evtIndex,
                                     funcName,
@@ -718,16 +719,15 @@
                             "
                             [ngTemplateOutlet]="comparison"
                             [ngTemplateOutletContext]="{
-                                index: index,
                                 evtIndex: evtIndex,
                                 isEvt: isEvt,
-                                funcName: funcName
+                                funcName: funcName,
+                                cascade: cascade
                             }"
                         ></ng-container>
                         <ng-container
                             *ngIf="
-                                getDecisionFormGroup(
-                                    index,
+                                getInnermostFormGroup(
                                     isEvt,
                                     evtIndex,
                                     funcName,
@@ -736,16 +736,15 @@
                             "
                             [ngTemplateOutlet]="booleanLogic"
                             [ngTemplateOutletContext]="{
-                                index: index,
                                 evtIndex: evtIndex,
                                 isEvt: isEvt,
-                                funcName: funcName
+                                funcName: funcName,
+                                cascade: cascade
                             }"
                         ></ng-container>
                         <ng-container
                             *ngIf="
-                                getDecisionFormGroup(
-                                    index,
+                                getInnermostFormGroup(
                                     isEvt,
                                     evtIndex,
                                     funcName,
@@ -754,10 +753,10 @@
                             "
                             [ngTemplateOutlet]="custom"
                             [ngTemplateOutletContext]="{
-                                index: index,
                                 evtIndex: evtIndex,
                                 isEvt: isEvt,
-                                funcName: funcName
+                                funcName: funcName,
+                                cascade: cascade
                             }"
                         ></ng-container>
                     </div>
@@ -785,12 +784,12 @@
                 <div
                     class="col-md-12 m-b-md m-t-sm"
                     *ngFor="
-                        let cl of getTrueBranch(
-                            index,
+                        let cl of getDecisionBranch(
                             isEvt,
                             evtIndex,
                             funcName,
-                            cascade
+                            cascade,
+                            'trueBranchAst'
                         ).controls;
                         let ifClIndex = index
                     "
@@ -830,7 +829,11 @@
                                         index: ifClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
-                                        funcName: funcName
+                                        funcName: funcName,
+                                        cascade:
+                                            cascade +
+                                            ':0,' +
+                                            ifClIndex.toString()
                                     }"
                                 ></ng-container>
                                 <ng-container
@@ -876,9 +879,13 @@
                                     class="m-l-md btn btn-remove"
                                     (click)="
                                         removeClFromDecisionBranch(
+                                            ifClIndex,
                                             'trueBranchAst',
-                                            cl,
-                                            ifClIndex
+                                            funcName,
+                                            isEvt,
+                                            index,
+                                            evtIndex,
+                                            cascade
                                         )
                                     "
                                 >
@@ -897,7 +904,8 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: cascade + ':0,',
+                                    cascade:
+                                        cascade + ':0,' + ifClIndex.toString(),
                                     branch: 'trueBranchAst'
                                 }"
                             ></ng-container>
@@ -910,7 +918,9 @@
                                     index: ifClIndex,
                                     evtIndex: -1,
                                     isEvt: false,
-                                    funcName: funcName
+                                    funcName: funcName,
+                                    cascade:
+                                        cascade + ':0,' + ifClIndex.toString()
                                 }"
                             ></ng-container>
                         </div>
@@ -944,12 +954,12 @@
                 <div
                     class="col-md-12 m-b-md m-t-sm"
                     *ngFor="
-                        let cl of getFalseBranch(
-                            index,
+                        let cl of getDecisionBranch(
                             isEvt,
                             evtIndex,
                             funcName,
-                            cascade
+                            cascade,
+                            'falseBranchAst'
                         ).controls;
                         let ifClIndex = index
                     "
@@ -989,7 +999,11 @@
                                         index: ifClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
-                                        funcName: funcName
+                                        funcName: funcName,
+                                        cascade:
+                                            cascade +
+                                            ':1,' +
+                                            ifClIndex.toString()
                                     }"
                                 ></ng-container>
                                 <ng-container
@@ -1035,9 +1049,13 @@
                                     class="m-l-md btn btn-remove"
                                     (click)="
                                         removeClFromDecisionBranch(
+                                            ifClIndex,
                                             'falseBranchAst',
-                                            cl,
-                                            ifClIndex
+                                            funcName,
+                                            isEvt,
+                                            index,
+                                            evtIndex,
+                                            cascade
                                         )
                                     "
                                 >
@@ -1056,7 +1074,8 @@
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: cascade + ':1,',
+                                    cascade:
+                                        cascade + ':1,' + ifClIndex.toString(),
                                     branch: 'falseBranchAst'
                                 }"
                             ></ng-container>
@@ -1069,7 +1088,9 @@
                                     index: ifClIndex,
                                     evtIndex: -1,
                                     isEvt: false,
-                                    funcName: funcName
+                                    funcName: funcName,
+                                    cascade:
+                                        cascade + ':1,' + ifClIndex.toString()
                                 }"
                             ></ng-container>
                         </div>
@@ -1090,9 +1111,7 @@
 >
     <form
         role="form"
-        [formGroup]="
-            getRepetitionFormGroup(index, isEvt, evtIndex, funcName, cascade)
-        "
+        [formGroup]="getInnermostFormGroup(isEvt, evtIndex, funcName, cascade)"
     >
         <div class="ibox">
             <div class="ibox-title inside-ibox">
@@ -1101,6 +1120,7 @@
                     <div class="col-3">
                         <select
                             class="form-control"
+                            formControlName="conditionType"
                             (change)="
                                 changeWhileLoop(
                                     $event.target.value,
@@ -1122,53 +1142,56 @@
                     <div class="col-8">
                         <ng-container
                             *ngIf="
-                                whileLoopCondition(
-                                    funcName,
+                                getInnermostFormGroup(
                                     isEvt,
-                                    index,
-                                    evtIndex
-                                ) === 'comparison'
+                                    evtIndex,
+                                    funcName,
+                                    cascade
+                                ).get('conditionType').value === 'comparison'
                             "
                             [ngTemplateOutlet]="comparison"
                             [ngTemplateOutletContext]="{
                                 index: index,
                                 evtIndex: evtIndex,
                                 isEvt: isEvt,
-                                funcName: funcName
+                                funcName: funcName,
+                                cascade: cascade
                             }"
                         ></ng-container>
                         <ng-container
                             *ngIf="
-                                whileLoopCondition(
-                                    funcName,
+                                getInnermostFormGroup(
                                     isEvt,
-                                    index,
-                                    evtIndex
-                                ) === 'booleanLogic'
+                                    evtIndex,
+                                    funcName,
+                                    cascade
+                                ).get('conditionType').value === 'booleanLogic'
                             "
                             [ngTemplateOutlet]="booleanLogic"
                             [ngTemplateOutletContext]="{
                                 index: index,
                                 evtIndex: evtIndex,
                                 isEvt: isEvt,
-                                funcName: funcName
+                                funcName: funcName,
+                                cascade: cascade
                             }"
                         ></ng-container>
                         <ng-container
                             *ngIf="
-                                whileLoopCondition(
-                                    funcName,
+                                getInnermostFormGroup(
                                     isEvt,
-                                    index,
-                                    evtIndex
-                                ) === 'custom'
+                                    evtIndex,
+                                    funcName,
+                                    cascade
+                                ).get('conditionType').value === 'custom'
                             "
                             [ngTemplateOutlet]="custom"
                             [ngTemplateOutletContext]="{
                                 index: index,
                                 evtIndex: evtIndex,
                                 isEvt: isEvt,
-                                funcName: funcName
+                                funcName: funcName,
+                                cascade: cascade
                             }"
                         ></ng-container>
                     </div>
@@ -1196,13 +1219,12 @@
                     class="col-md-12 m-b-md m-t-sm"
                     *ngFor="
                         let cl of getWhileAst(
-                            index,
                             isEvt,
                             evtIndex,
                             funcName,
                             cascade
                         ).controls;
-                        let ifClIndex = index
+                        let whileClIndex = index
                     "
                     [formGroup]="cl"
                 >
@@ -1237,10 +1259,14 @@
                                     "
                                     [ngTemplateOutlet]="declaration"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
+                                        index: whileClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
-                                        funcName: funcName
+                                        funcName: funcName,
+                                        cascade:
+                                            cascade +
+                                            ':2,' +
+                                            whileClIndex.toString()
                                     }"
                                 ></ng-container>
                                 <ng-container
@@ -1249,7 +1275,7 @@
                                     "
                                     [ngTemplateOutlet]="call"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
+                                        index: whileClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName
@@ -1262,7 +1288,7 @@
                                     "
                                     [ngTemplateOutlet]="attribution"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
+                                        index: whileClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName
@@ -1274,7 +1300,7 @@
                                     "
                                     [ngTemplateOutlet]="return"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
+                                        index: whileClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName
@@ -1285,7 +1311,14 @@
                                 <button
                                     class="m-l-md btn btn-remove"
                                     (click)="
-                                        removeClFromRepetition(cl, ifClIndex)
+                                        removeClFromRepetition(
+                                            whileClIndex,
+                                            funcName,
+                                            isEvt,
+                                            index,
+                                            evtIndex,
+                                            cascade
+                                        )
                                     "
                                 >
                                     <i class="fa fa-trash"></i>
@@ -1299,11 +1332,14 @@
                                 "
                                 [ngTemplateOutlet]="ifDecision"
                                 [ngTemplateOutletContext]="{
-                                    index: ifClIndex,
+                                    index: whileClIndex,
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: ''
+                                    cascade:
+                                        cascade +
+                                        ':2,' +
+                                        whileClIndex.toString()
                                 }"
                             ></ng-container>
                             <ng-container
@@ -1312,11 +1348,14 @@
                                 "
                                 [ngTemplateOutlet]="whileLoop"
                                 [ngTemplateOutletContext]="{
-                                    index: ifClIndex,
+                                    index: whileClIndex,
                                     evtIndex: -1,
                                     isEvt: false,
                                     funcName: funcName,
-                                    cascade: ''
+                                    cascade:
+                                        cascade +
+                                        ':2,' +
+                                        whileClIndex.toString()
                                 }"
                             ></ng-container>
                         </div>
@@ -1333,9 +1372,10 @@
     let-evtIndex="evtIndex"
     let-isEvt="isEvt"
     let-funcName="funcName"
+    let-cascade="cascade"
 >
     <form
-        [formGroup]="getDeclarationFormGroup(index, isEvt, evtIndex, funcName)"
+        [formGroup]="getInnermostFormGroup(isEvt, evtIndex, funcName, cascade)"
         role="form"
     >
         <div class="col-md-12">
@@ -1377,11 +1417,11 @@
                         class="form-control"
                         formControlName="varValue"
                         *ngIf="
-                            getDeclarationFormGroup(
-                                index,
+                            getInnermostFormGroup(
                                 isEvt,
                                 evtIndex,
-                                funcName
+                                funcName,
+                                cascade
                             ).get('varType').value === 'bool'
                         "
                     >
@@ -1394,11 +1434,11 @@
                         formControlName="varValue"
                         placeholder="Valor"
                         *ngIf="
-                            getDeclarationFormGroup(
-                                index,
+                            getInnermostFormGroup(
                                 isEvt,
                                 evtIndex,
-                                funcName
+                                funcName,
+                                cascade
                             ).get('varType').value !== 'bool'
                         "
                     />
@@ -1414,9 +1454,10 @@
     let-evtIndex="evtIndex"
     let-isEvt="isEvt"
     let-funcName="funcName"
+    let-cascade="cascade"
 >
     <form
-        [formGroup]="getComparisonFormGroup(index, isEvt, evtIndex, funcName)"
+        [formGroup]="getConditionFormGroup(isEvt, evtIndex, funcName, cascade)"
         role="form"
     >
         <div class="col-md-12">
@@ -1460,9 +1501,10 @@
     let-evtIndex="evtIndex"
     let-isEvt="isEvt"
     let-funcName="funcName"
+    let-cascade="cascade"
 >
     <form
-        [formGroup]="getBooleanLogicFormGroup(index, isEvt, evtIndex, funcName)"
+        [formGroup]="getConditionFormGroup(isEvt, evtIndex, funcName, cascade)"
         role="form"
     >
         <div class="col-md-12">
@@ -1503,11 +1545,10 @@
     let-evtIndex="evtIndex"
     let-isEvt="isEvt"
     let-funcName="funcName"
+    let-cascade="cascade"
 >
     <form
-        [formGroup]="
-            getCustomConditionFormGroup(index, isEvt, evtIndex, funcName)
-        "
+        [formGroup]="getConditionFormGroup(isEvt, evtIndex, funcName, cascade)"
         role="form"
     >
         <div class="col-md-12">
