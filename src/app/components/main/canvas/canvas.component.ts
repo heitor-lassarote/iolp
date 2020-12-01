@@ -290,16 +290,16 @@ export class CanvasComponent implements OnInit {
     }
 
     getParamentersArrayData(
-        index: number,
         isEvt: boolean,
         evtIndex: number,
-        funcName: string
+        funcName: string,
+        cascade: string
     ) {
-        let parameterFormGroup: FormGroup = this.getCallFuncFormGroup(
-            index,
+        let parameterFormGroup: FormGroup = this.getInnermostFormGroup(
             isEvt,
             evtIndex,
-            funcName
+            funcName,
+            cascade
         );
 
         return <FormArray>parameterFormGroup.get("parameters");
@@ -593,7 +593,7 @@ export class CanvasComponent implements OnInit {
                     break;
             }
             head = (head.get(branchName) as FormArray).controls[
-                branches[0]
+                parseInt(stack[1].split(":")[0])
             ].get("exec") as FormGroup;
         }
 
@@ -613,7 +613,7 @@ export class CanvasComponent implements OnInit {
                         break;
                 }
                 head = (head.get(branchName) as FormArray).controls[
-                    branches[0]
+                    parseInt(stack[i + 1].split(":")[0])
                 ].get("exec") as FormGroup;
             } else {
                 const oldHead = head;
@@ -644,126 +644,6 @@ export class CanvasComponent implements OnInit {
         );
 
         return formGroup.get("expression") as FormGroup;
-    }
-
-    // getDeclarationFormGroup(
-    //     index: number,
-    //     isEvt: boolean,
-    //     evtIndex: number,
-    //     funcName: string
-    // ): FormGroup {
-    //     let curElement: LogicFunction = this.logicElements.find(
-    //         (element) => funcName === element.funcName
-    //     );
-    //     let formIndex: number;
-    //     if (!isEvt) {
-    //         formIndex = curElement.commandLine[index].formIndex;
-    //     } else {
-    //         formIndex =
-    //             curElement.events[evtIndex].commandLine[index].formIndex;
-    //     }
-
-    //     return this.declarationArrayData.controls[formIndex] as FormGroup;
-    // }
-
-    getCallFuncFormGroup(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return this.callFuncArrayData.controls[formIndex] as FormGroup;
-    }
-
-    getAttributionFormGroup(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return this.attributionArrayData.controls[formIndex] as FormGroup;
-    }
-
-    getHtmlElementFormGroup(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return this.htmlElementArrayData.controls[formIndex] as FormGroup;
-    }
-
-    getReturnFormGroup(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return this.returnArrayData.controls[formIndex] as FormGroup;
-    }
-
-    getConsoleFormGroup(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): FormGroup {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        return this.consoleArrayData.controls[formIndex] as FormGroup;
     }
 
     // Change Container listeners
@@ -1530,6 +1410,11 @@ export class CanvasComponent implements OnInit {
                     (element) => func === element.funcName
                 );
                 curElement.commandLine.splice(index, 1);
+                const clTypeName: string =
+                    curElement.commandLine[index].type.name;
+                const formIndex: number =
+                    curElement.commandLine[index].formIndex;
+                this.checkFormControlType(clTypeName).splice(formIndex, 1);
                 break;
             case "evt":
                 curElement = this.logicElements.find(
@@ -1576,6 +1461,9 @@ export class CanvasComponent implements OnInit {
             return eventName === ev.eventName;
         });
         curEvt.commandLine.splice(index, 1);
+        const clTypeName: string = curEvt.commandLine[index].type.name;
+        const formIndex: number = curEvt.commandLine[index].formIndex;
+        this.checkFormControlType(clTypeName).splice(formIndex, 1);
     }
 
     addClToDecisionBranch(
@@ -1586,36 +1474,28 @@ export class CanvasComponent implements OnInit {
         evtIndex: number,
         cascade: string
     ) {
-        let decisionFormGroup = this.getInnermostFormGroup(
+        const control: AbstractControl[] = this.getDecisionBranch(
             isEvt,
             evtIndex,
             funcName,
-            cascade
-        );
-
-        const control: AbstractControl[] = (decisionFormGroup.get(
+            cascade,
             branch
-        ) as FormArray).controls;
+        ).controls;
         const clIndex: number = control.length;
         const formIndex: number = this.checkFormControlType("decision").length;
 
+        const execFormGroup: FormGroup = this.setNewValueToCl(
+            "decision",
+            "comparison",
+            funcName,
+            index,
+            isEvt,
+            evtIndex
+        );
+
         control.push(
             this.initBranchAstFormArray({
-                exec: this.initDecisionFormArray({
-                    index,
-                    evtIndex,
-                    funcName,
-                    expression: this.initComparisonFormArray({
-                        index,
-                        evtIndex,
-                        funcName,
-                        conditionType: "comparison",
-                        leftExpression: "",
-                        rightExpression: "",
-                        symbol: "Different",
-                    }),
-                    conditionType: "comparison",
-                }),
+                exec: execFormGroup,
                 clTypeName: "decision",
                 clType: "comparison",
                 index: clIndex,
@@ -1629,16 +1509,20 @@ export class CanvasComponent implements OnInit {
         branch: string,
         funcName: string,
         isEvt: boolean,
-        index: number,
         evtIndex: number,
-        cascade: string
+        cascade: string,
+        clTypeName: string,
+        formIndex: number
     ) {
-        let control = (this.getInnermostFormGroup(
+        let control = this.getDecisionBranch(
             isEvt,
             evtIndex,
             funcName,
-            cascade
-        ).get(branch) as FormArray).controls;
+            cascade,
+            branch
+        ).controls;
+
+        this.checkFormControlType(clTypeName).splice(formIndex, 1);
 
         control.splice(clIndex, 1);
     }
@@ -1650,36 +1534,27 @@ export class CanvasComponent implements OnInit {
         evtIndex: number,
         cascade: string
     ) {
-        let repetitionFormGroup = this.getInnermostFormGroup(
+        const control: AbstractControl[] = this.getWhileAst(
             isEvt,
             evtIndex,
             funcName,
             cascade
-        );
-
-        const control: AbstractControl[] = (repetitionFormGroup.get(
-            "whileAst"
-        ) as FormArray).controls;
+        ).controls;
         const clIndex: number = control.length;
         const formIndex: number = this.checkFormControlType("decision").length;
 
+        const execFormGroup: FormGroup = this.setNewValueToCl(
+            "decision",
+            "comparison",
+            funcName,
+            index,
+            isEvt,
+            evtIndex
+        );
+
         control.push(
             this.initBranchAstFormArray({
-                exec: this.initDecisionFormArray({
-                    index,
-                    evtIndex,
-                    funcName,
-                    expression: this.initComparisonFormArray({
-                        index,
-                        evtIndex,
-                        funcName,
-                        conditionType: "comparison",
-                        leftExpression: "",
-                        rightExpression: "",
-                        symbol: "Different",
-                    }),
-                    conditionType: "comparison",
-                }),
+                exec: execFormGroup,
                 clTypeName: "decision",
                 clType: "comparison",
                 index: clIndex,
@@ -1692,16 +1567,15 @@ export class CanvasComponent implements OnInit {
         clIndex: number,
         funcName: string,
         isEvt: boolean,
-        index: number,
         evtIndex: number,
-        cascade: string
+        cascade: string,
+        clTypeName: string,
+        formIndex: number
     ) {
-        let control = (this.getInnermostFormGroup(
-            isEvt,
-            evtIndex,
-            funcName,
-            cascade
-        ).get("whileAst") as FormArray).controls;
+        let control = this.getWhileAst(isEvt, evtIndex, funcName, cascade)
+            .controls;
+
+        this.checkFormControlType(clTypeName).splice(formIndex, 1);
 
         control.splice(clIndex, 1);
     }
@@ -1737,60 +1611,26 @@ export class CanvasComponent implements OnInit {
         this.logicElements[0].events[index].eventType = value;
     }
 
-    callFuncChangeReturnType(
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ): string {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let control: AbstractControl[];
-        let formIndex: number;
-        if (!isEvt) {
-            control = this.checkFormControlType(
-                curElement.commandLine[index].type.name
-            );
-            formIndex = curElement.commandLine[index].formIndex;
-            let returnType = control[formIndex].get("returnType").value;
-            return returnType;
-        } else {
-            control = this.checkFormControlType(
-                curElement.events[evtIndex].commandLine[index].type.name
-            );
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-            let returnType = control[formIndex].get("returnType").value;
-            return returnType;
-        }
-    }
-
     onChangeCallFunction(
         func: string,
-        index: number,
         isEvt: boolean,
         evtIndex: number,
-        funcName: string
+        funcName: string,
+        cascade: string
     ) {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
+        const formGroup: FormGroup = this.getInnermostFormGroup(
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade
         );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
 
-        let funcControl = this.formData.controls.find(
+        const funcControl = this.formData.controls.find(
             (ctr) => ctr.get("funcName").value === func
         );
 
-        let control = this.callFuncArrayData.controls[formIndex];
-        let funcParams = funcControl.get("parameters") as FormArray;
-        let callParams = control.get("parameters") as FormArray;
+        const funcParams = funcControl.get("parameters") as FormArray;
+        const callParams = formGroup.get("parameters") as FormArray;
 
         callParams.clear();
 
@@ -1801,78 +1641,41 @@ export class CanvasComponent implements OnInit {
         }
     }
 
-    onChangeVarType(
-        value: string,
-        index: number,
-        isEvt: boolean,
-        evtIndex: number,
-        funcName: string
-    ) {
-        let curElement: LogicFunction = this.logicElements.find(
-            (element) => funcName === element.funcName
-        );
-        let formIndex: number;
-        if (!isEvt) {
-            formIndex = curElement.commandLine[index].formIndex;
-        } else {
-            formIndex =
-                curElement.events[evtIndex].commandLine[index].formIndex;
-        }
-
-        let control = this.declarationArrayData.controls[formIndex];
-
-        if (value === "bool") {
-            control.get("varValue").setValue("true");
-        } else {
-            control.get("varValue").setValue("");
-        }
-    }
-
     clTypeChange(
         value: string,
         isEvt: boolean,
         funcName: string,
         index: number,
         evtIndex: number,
-        cascade: string
+        cl: FormGroup
     ) {
-        const formGroup: FormGroup = this.getInnermostFormGroup(
-            isEvt,
-            evtIndex,
-            funcName,
-            cascade
-        );
-        const parent: FormGroup | FormArray = formGroup.parent;
-
         let lastValue: string;
         let formIndex: number;
 
-        console.log("clTypeChange - parent(before):", parent);
-
-        if (parent !== null) {
+        if (cl !== null) {
             //Corpo if/else/while
-            lastValue = parent.get("clTypeName").value;
+            lastValue = cl.get("clTypeName").value;
             this.removeLastValueFromForm(
                 lastValue,
-                parent.get("originFormIndex").value
+                cl.get("originFormIndex").value
             );
 
-            (parent as FormGroup).removeControl("exec");
-            (parent as FormGroup).addControl(
+            cl.removeControl("exec");
+            cl.addControl(
                 "exec",
                 this.setNewValueToCl(
                     value,
-                    parent.get("clType").value,
+                    cl.get("clType").value,
                     funcName,
                     index,
                     isEvt,
                     evtIndex
                 )
             );
-            parent.get("clTypeName").setValue(value);
-            parent
-                .get("originFormIndex")
-                .setValue(this.checkFormControlType(value).length - 1);
+            cl.get("clTypeName").setValue(value);
+            cl.get("originFormIndex").setValue(
+                this.checkFormControlType(value).length - 1
+            );
         } else {
             //Raíz
             let curElement: LogicFunction = this.logicElements.find(
@@ -1958,7 +1761,7 @@ export class CanvasComponent implements OnInit {
             "expression",
             this.getClType(value, funcName, index, isEvt, evtIndex)
         );
-        formGroup.get("clType").setValue(value);
+        formGroup.get("conditionType").setValue(value);
     }
 
     changeWhileLoop(
@@ -1981,7 +1784,7 @@ export class CanvasComponent implements OnInit {
             "expression",
             this.getClType(value, funcName, index, isEvt, evtIndex)
         );
-        formGroup.get("clType").setValue(value);
+        formGroup.get("conditionType").setValue(value);
     }
 
     private setNewValueToCl(
@@ -2095,119 +1898,8 @@ export class CanvasComponent implements OnInit {
         isEvt: boolean,
         evtIndex: number
     ): number {
-        let control: AbstractControl[];
-        switch (value) {
-            case "declaration":
-                control = this.declarationArrayData.controls;
-                control.push(
-                    this.initDeclarationFormArray({
-                        varType: "adt",
-                        varName: "",
-                        varValue: "",
-                        funcName,
-                        index,
-                        evtIndex: isEvt ? evtIndex : -1,
-                    })
-                );
-                break;
-            case "decision":
-                control = this.decisionArrayData.controls;
-                control.push(
-                    this.initDecisionFormArray({
-                        index,
-                        funcName,
-                        evtIndex,
-                        expression: this.getClType(
-                            clType,
-                            funcName,
-                            index,
-                            isEvt,
-                            evtIndex
-                        ),
-                        conditionType: clType,
-                    })
-                );
-                break;
-            case "repetition":
-                control = this.repetitionArrayData.controls;
-                control.push(
-                    this.initRepetitionFormArray({
-                        index,
-                        funcName,
-                        evtIndex,
-                        expression: this.getClType(
-                            clType,
-                            funcName,
-                            index,
-                            isEvt,
-                            evtIndex
-                        ),
-                        conditionType: clType,
-                    })
-                );
-                break;
-            case "call":
-                control = this.callFuncArrayData.controls;
-                control.push(
-                    this.initCallFuncFormArray({
-                        returnType: "with-return",
-                        varName: "",
-                        function: "",
-                        funcName,
-                        index,
-                        evtIndex: isEvt ? evtIndex : -1,
-                    })
-                );
-                break;
-            case "attribution":
-                control = this.attributionArrayData.controls;
-                control.push(
-                    this.initAttributionFormArray({
-                        varName: "",
-                        attributionValue: "",
-                        funcName,
-                        index,
-                        evtIndex: isEvt ? evtIndex : -1,
-                    })
-                );
-                break;
-            case "htmlElement":
-                control = this.htmlElementArrayData.controls;
-                control.push(
-                    this.initHtmlElementFormArray({
-                        elementName: "",
-                        elementData: "",
-                        elementValue: "",
-                        funcName,
-                        index,
-                        evtIndex: isEvt ? evtIndex : -1,
-                    })
-                );
-                break;
-            case "return":
-                control = this.returnArrayData.controls;
-                control.push(
-                    this.initReturnFormArray({
-                        value: "",
-                    })
-                );
-                break;
-            case "console":
-                control = this.consoleArrayData.controls;
-                control.push(
-                    this.initConsoleFormArray({
-                        consoleType: "log",
-                        consoleText: "",
-                        funcName,
-                        index,
-                        evtIndex: isEvt ? evtIndex : -1,
-                    })
-                );
-                break;
-            default:
-                return 0;
-        }
-
+        let control: AbstractControl[] = this.checkFormControlType(value);
+        this.setNewValueToCl(value, clType, funcName, index, isEvt, evtIndex);
         return control.length - 1;
     }
 
