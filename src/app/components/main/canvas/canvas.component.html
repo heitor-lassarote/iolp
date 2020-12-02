@@ -368,11 +368,13 @@
                                             *ngIf="cl.type.name === 'return'"
                                             [ngTemplateOutlet]="return"
                                             [ngTemplateOutletContext]="{
-                                                index: funcClIndex,
                                                 evtIndex: -1,
                                                 isEvt: false,
                                                 funcName: func.funcName,
-                                                cascade: funcClIndex.toString()
+                                                cascade: funcClIndex.toString(),
+                                                type: getCurFunction(
+                                                    funcIndex
+                                                ).get('returnType').value
                                             }"
                                         ></ng-container>
                                         <ng-container
@@ -412,7 +414,8 @@
                                             isEvt: false,
                                             funcName: func.funcName,
                                             cascade: funcClIndex.toString(),
-                                            branch: ''
+                                            branch: '',
+                                            funcIndex: funcIndex
                                         }"
                                     ></ng-container>
                                     <ng-container
@@ -423,7 +426,8 @@
                                             evtIndex: -1,
                                             isEvt: false,
                                             funcName: func.funcName,
-                                            cascade: funcClIndex.toString()
+                                            cascade: funcClIndex.toString(),
+                                            funcIndex: funcIndex
                                         }"
                                     ></ng-container>
                                 </div>
@@ -645,7 +649,8 @@
                                                     isEvt: true,
                                                     funcName: func.funcName,
                                                     cascade: evtClIndex.toString(),
-                                                    branch: ''
+                                                    branch: '',
+                                                    funcIndex: funcIndex
                                                 }"
                                             ></ng-container>
                                             <ng-container
@@ -659,7 +664,8 @@
                                                     evtIndex: evtIndex,
                                                     isEvt: true,
                                                     funcName: func.funcName,
-                                                    cascade: evtClIndex.toString()
+                                                    cascade: evtClIndex.toString(),
+                                                    funcIndex: funcIndex
                                                 }"
                                             ></ng-container>
                                         </div>
@@ -693,6 +699,7 @@
     let-funcName="funcName"
     let-cascade="cascade"
     let-branch="branch"
+    let-funcIndex="funcIndex"
 >
     <form
         role="form"
@@ -927,14 +934,16 @@
                                     "
                                     [ngTemplateOutlet]="return"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
                                             ':0,' +
-                                            ifClIndex.toString()
+                                            ifClIndex.toString(),
+                                        type: getCurFunction(funcIndex).get(
+                                            'returnType'
+                                        ).value
                                     }"
                                 ></ng-container>
                                 <ng-container
@@ -943,7 +952,6 @@
                                     "
                                     [ngTemplateOutlet]="console"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName,
@@ -987,7 +995,8 @@
                                     funcName: funcName,
                                     cascade:
                                         cascade + ':0,' + ifClIndex.toString(),
-                                    branch: 'trueBranchAst'
+                                    branch: 'trueBranchAst',
+                                    funcIndex: funcIndex
                                 }"
                             ></ng-container>
                             <ng-container
@@ -1001,7 +1010,8 @@
                                     isEvt: false,
                                     funcName: funcName,
                                     cascade:
-                                        cascade + ':0,' + ifClIndex.toString()
+                                        cascade + ':0,' + ifClIndex.toString(),
+                                    funcIndex: funcIndex
                                 }"
                             ></ng-container>
                         </div>
@@ -1161,14 +1171,16 @@
                                     "
                                     [ngTemplateOutlet]="return"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
                                             ':1,' +
-                                            ifClIndex.toString()
+                                            ifClIndex.toString(),
+                                        type: getCurFunction(funcIndex).get(
+                                            'returnType'
+                                        ).value
                                     }"
                                 ></ng-container>
                                 <ng-container
@@ -1177,7 +1189,6 @@
                                     "
                                     [ngTemplateOutlet]="console"
                                     [ngTemplateOutletContext]="{
-                                        index: ifClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName,
@@ -1221,7 +1232,8 @@
                                     funcName: funcName,
                                     cascade:
                                         cascade + ':1,' + ifClIndex.toString(),
-                                    branch: 'falseBranchAst'
+                                    branch: 'falseBranchAst',
+                                    funcIndex: funcIndex
                                 }"
                             ></ng-container>
                             <ng-container
@@ -1235,7 +1247,8 @@
                                     isEvt: false,
                                     funcName: funcName,
                                     cascade:
-                                        cascade + ':1,' + ifClIndex.toString()
+                                        cascade + ':1,' + ifClIndex.toString(),
+                                    funcIndex: funcIndex
                                 }"
                             ></ng-container>
                         </div>
@@ -1253,6 +1266,7 @@
     let-isEvt="isEvt"
     let-funcName="funcName"
     let-cascade="cascade"
+    let-funcIndex="funcIndex"
 >
     <form
         role="form"
@@ -1488,14 +1502,16 @@
                                     "
                                     [ngTemplateOutlet]="return"
                                     [ngTemplateOutletContext]="{
-                                        index: whileClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
                                             ':2,' +
-                                            whileClIndex.toString()
+                                            whileClIndex.toString(),
+                                        type: getCurFunction(funcIndex).get(
+                                            'returnType'
+                                        ).value
                                     }"
                                 ></ng-container>
                                 <ng-container
@@ -1504,7 +1520,6 @@
                                     "
                                     [ngTemplateOutlet]="console"
                                     [ngTemplateOutletContext]="{
-                                        index: whileClIndex,
                                         evtIndex: -1,
                                         isEvt: false,
                                         funcName: funcName,
@@ -1548,7 +1563,8 @@
                                     cascade:
                                         cascade +
                                         ':2,' +
-                                        whileClIndex.toString()
+                                        whileClIndex.toString(),
+                                    funcIndex: funcIndex
                                 }"
                             ></ng-container>
                             <ng-container
@@ -1564,7 +1580,8 @@
                                     cascade:
                                         cascade +
                                         ':2,' +
-                                        whileClIndex.toString()
+                                        whileClIndex.toString(),
+                                    funcIndex: funcIndex
                                 }"
                             ></ng-container>
                         </div>
@@ -1979,10 +1996,13 @@
     let-isEvt="isEvt"
     let-funcName="funcName"
     let-cascade="cascade"
+    let-type="type"
 >
     <form
         role="form"
-        [formGroup]="getInnermostFormGroup(isEvt, evtIndex, funcName, cascade)"
+        [formGroup]="
+            getReturnFormGroup(isEvt, evtIndex, funcName, cascade, type)
+        "
     >
         <div class="col-md-12">
             <input

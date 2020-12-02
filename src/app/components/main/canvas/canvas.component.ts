@@ -86,6 +86,7 @@ const consoleType: Type = new RecordType([
 })
 export class CanvasComponent implements OnInit {
     // Forms
+    uiForm: FormGroup;
     logicForm: FormGroup;
     decisionForm: FormGroup;
     repetitionForm: FormGroup;
@@ -142,6 +143,10 @@ export class CanvasComponent implements OnInit {
     }
 
     private createForms() {
+        this.uiForm = this.formBuilder.group({
+            components: this.formBuilder.array([]),
+        });
+
         this.logicForm = this.formBuilder.group({
             functions: this.formBuilder.array([]),
         });
@@ -224,12 +229,22 @@ export class CanvasComponent implements OnInit {
     }
 
     // Begin Get Form Array Datas
+    get uiComponentsArrayData() {
+        return <FormArray>this.uiForm.get("components");
+    }
+
     get formData() {
         return <FormArray>this.logicForm.get("functions");
     }
 
     getCurFunction(index: number): FormGroup {
         return this.formData.controls[index] as FormGroup;
+    }
+
+    getEventsArrayData(index: number): FormArray {
+        const curFunction: FormGroup = this.getCurFunction(index);
+
+        return <FormArray>curFunction.get("parameters");
     }
 
     get decisionArrayData() {
@@ -243,7 +258,7 @@ export class CanvasComponent implements OnInit {
         cascade: string,
         branch: string
     ) {
-        let decisionFormGroup: FormGroup = this.getInnermostFormGroup(
+        const decisionFormGroup: FormGroup = this.getInnermostFormGroup(
             isEvt,
             evtIndex,
             funcName,
@@ -263,7 +278,7 @@ export class CanvasComponent implements OnInit {
         funcName: string,
         cascade: string
     ) {
-        let repetitionFormGroup: FormGroup = this.getInnermostFormGroup(
+        const repetitionFormGroup: FormGroup = this.getInnermostFormGroup(
             isEvt,
             evtIndex,
             funcName,
@@ -327,6 +342,7 @@ export class CanvasComponent implements OnInit {
         return this.formBuilder.group({
             funcName: [func.funcName, [Validators.required]],
             parameters: this.formBuilder.array(func.parameters),
+            events: this.formBuilder.array([]),
             returnType: func.returnType,
         });
     }
@@ -530,9 +546,13 @@ export class CanvasComponent implements OnInit {
         });
     }
 
-    private initReturnFormArray(returnValue: { value: any }): FormGroup {
+    private initReturnFormArray(returnValue: {
+        value: any;
+        type: string;
+    }): FormGroup {
         return this.formBuilder.group({
             returnValue: [returnValue.value, Validators.required],
+            returnType: returnValue.type,
         });
     }
 
@@ -566,40 +586,26 @@ export class CanvasComponent implements OnInit {
 
         let branchName: string;
         let stack: string[] = cascade.split(",");
-        let branches: number[] = stack[0]
-            .split(":")
-            .map((value) => parseInt(value));
+        let branches: number[];
+        let head: FormGroup;
 
-        let formIndex: number = !isEvt
-            ? curElement.commandLine[branches[0]].formIndex
-            : curElement.events[evtIndex].commandLine[branches[0]].formIndex;
-
-        const formArray: AbstractControl[] = this.checkFormControlType(
-            curElement.commandLine[branches[0]].type.name
-        );
-
-        let head: FormGroup = formArray[formIndex] as FormGroup;
-
-        if (branches[1] !== undefined) {
-            switch (branches[1]) {
-                case 0:
-                    branchName = "trueBranchAst";
-                    break;
-                case 1:
-                    branchName = "falseBranchAst";
-                    break;
-                case 2:
-                    branchName = "whileAst";
-                    break;
-            }
-            head = (head.get(branchName) as FormArray).controls[
-                parseInt(stack[1].split(":")[0])
-            ].get("exec") as FormGroup;
-        }
-
-        for (let i = 1; i < stack.length; i++) {
+        for (let i = 0; i < stack.length; i++) {
             let element: string = stack[i];
             branches = element.split(":").map((value) => parseInt(value));
+
+            if (i === 0) {
+                let formIndex: number = !isEvt
+                    ? curElement.commandLine[branches[0]].formIndex
+                    : curElement.events[evtIndex].commandLine[branches[0]]
+                          .formIndex;
+
+                const formArray: AbstractControl[] = this.checkFormControlType(
+                    curElement.commandLine[branches[0]].type.name
+                );
+
+                head = formArray[formIndex] as FormGroup;
+            }
+
             if (branches[1] !== undefined) {
                 switch (branches[1]) {
                     case 0:
@@ -615,7 +621,7 @@ export class CanvasComponent implements OnInit {
                 head = (head.get(branchName) as FormArray).controls[
                     parseInt(stack[i + 1].split(":")[0])
                 ].get("exec") as FormGroup;
-            } else {
+            } else if (i !== 0) {
                 const oldHead = head;
                 let parent: FormGroup = head.parent as FormGroup;
                 head = this.checkFormControlType(
@@ -628,6 +634,25 @@ export class CanvasComponent implements OnInit {
         }
 
         return head;
+    }
+
+    getReturnFormGroup(
+        isEvt: boolean,
+        evtIndex: number,
+        funcName: string,
+        cascade: string,
+        type: string
+    ): FormGroup {
+        const formGroup = this.getInnermostFormGroup(
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade
+        );
+
+        formGroup.get("returnType").setValue(type);
+
+        return formGroup;
     }
 
     getConditionFormGroup(
@@ -948,6 +973,8 @@ export class CanvasComponent implements OnInit {
                     ? this.getType(returnValue, [], null)
                     : UNIT
             );
+            //Events
+            func.events.forEach((event: LogicEvent) => {});
             //Command Lines
             func.commandLine.forEach((cl: CommandLine) => {
                 let controls = this.checkFormControlType(cl.type.name);
@@ -999,10 +1026,21 @@ export class CanvasComponent implements OnInit {
         let newAst: any;
         switch (clTypeName) {
             case "decision":
-                newAst = new If(expression, [], []);
+                newAst = new If(
+                    expression,
+                    this.createBranchToAst(
+                        control.get("trueBranchAst") as FormArray
+                    ),
+                    this.createBranchToAst(
+                        control.get("falseBranchAst") as FormArray
+                    )
+                );
                 break;
             case "repetition":
-                newAst = new While(expression, []);
+                newAst = new While(
+                    expression,
+                    this.createBranchToAst(control.get("whileAst") as FormArray)
+                );
                 break;
             case "declaration":
                 newAst = new Var(
@@ -1052,6 +1090,30 @@ export class CanvasComponent implements OnInit {
                 break;
         }
         return newAst;
+    }
+
+    private createBranchToAst(branchArray: FormArray): AST[] {
+        const controls: AbstractControl[] = branchArray.controls;
+        let branchAst: AST[] = [];
+        let formGroup: FormGroup;
+        let expression: Expression;
+        let ast: AST;
+
+        controls.forEach((cl: FormGroup) => {
+            formGroup = cl.get("exec") as FormGroup;
+            expression = this.getExpressionType(
+                cl.get("clTypeName").value,
+                formGroup
+            );
+            ast = this.getAstType(
+                cl.get("clTypeName").value,
+                expression,
+                formGroup
+            );
+            branchAst.push(ast);
+        });
+
+        return branchAst;
     }
 
     private getType(
@@ -1228,27 +1290,27 @@ export class CanvasComponent implements OnInit {
                 const returnValue: string = control
                     .get("returnValue")
                     .value.trim();
-                if (returnValue !== "") {
-                    let variab = this.declarationArrayData.controls.find(
-                        (vari) => {
-                            return vari.get("varName").value === returnValue;
-                        }
-                    );
+                const returnType: Type = this.getType(
+                    control.get("returnType").value,
+                    [],
+                    null
+                );
 
-                    if (variab) {
-                        newExpression = new Variable(
-                            variab.get("varName").value
-                        );
-                    } else {
-                        newExpression = new StringExpression(returnValue);
-                    }
+                if (returnValue !== "") {
+                    let returnString: string =
+                        returnType instanceof TextType ||
+                        returnType instanceof CharType
+                            ? `#"${returnValue}"`
+                            : returnValue;
+                    newExpression = new StringExpression(returnString);
                 } else {
                     newExpression = null;
                 }
+
                 break;
             case "console":
                 newExpression = new StringExpression(
-                    `console.${control.get("consoleType").value}("${
+                    `console.${control.get("consoleType").value}(#"${
                         control.get("consoleText").value
                     }")`
                 );
@@ -1409,12 +1471,12 @@ export class CanvasComponent implements OnInit {
                 curElement = this.logicElements.find(
                     (element) => func === element.funcName
                 );
-                curElement.commandLine.splice(index, 1);
                 const clTypeName: string =
                     curElement.commandLine[index].type.name;
                 const formIndex: number =
                     curElement.commandLine[index].formIndex;
                 this.checkFormControlType(clTypeName).splice(formIndex, 1);
+                curElement.commandLine.splice(index, 1);
                 break;
             case "evt":
                 curElement = this.logicElements.find(
@@ -1460,10 +1522,10 @@ export class CanvasComponent implements OnInit {
         curEvt = this.logicElements[0].events.find((ev) => {
             return eventName === ev.eventName;
         });
-        curEvt.commandLine.splice(index, 1);
         const clTypeName: string = curEvt.commandLine[index].type.name;
         const formIndex: number = curEvt.commandLine[index].formIndex;
         this.checkFormControlType(clTypeName).splice(formIndex, 1);
+        curEvt.commandLine.splice(index, 1);
     }
 
     addClToDecisionBranch(
@@ -1870,6 +1932,7 @@ export class CanvasComponent implements OnInit {
             case "return":
                 formGroup = this.initReturnFormArray({
                     value: "",
+                    type: "",
                 });
                 break;
             case "console":
