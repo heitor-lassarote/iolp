@@ -1,4 +1,5 @@
-import { AST, Type } from "./output";
+import { FormGroup } from "@angular/forms";
+import { Type } from "./output";
 
 export interface LogicFunction {
     funcName: string;
@@ -17,7 +18,7 @@ export interface LogicEvent {
 
 export interface CommandLine {
     type: CommandLineType;
-    exec: AST;
+    exec: FormGroup;
     formIndex: number;
 }
 

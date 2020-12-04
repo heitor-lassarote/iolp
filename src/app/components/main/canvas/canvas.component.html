@@ -211,11 +211,7 @@
                                 >
                                     <li
                                         (click)="
-                                            createItem(
-                                                func.funcName,
-                                                'cl',
-                                                funcIndex
-                                            )
+                                            createItem(func.funcName, 'cl')
                                         "
                                     >
                                         <a> Linha de comando </a>
@@ -223,11 +219,7 @@
                                     <li *ngIf="funcIndex === 0">
                                         <a
                                             (click)="
-                                                createItem(
-                                                    func.funcName,
-                                                    'evt',
-                                                    funcIndex
-                                                )
+                                                createItem(func.funcName, 'evt')
                                             "
                                         >
                                             Evento
@@ -239,13 +231,7 @@
                                     *ngIf="funcIndex !== 0"
                                     type="button"
                                     class="btn btn-primary add-btn m-l-sm"
-                                    (click)="
-                                        createItem(
-                                            func.funcName,
-                                            'cl',
-                                            funcIndex
-                                        )
-                                    "
+                                    (click)="createItem(func.funcName, 'cl')"
                                 >
                                     <i class="fa fa-plus"></i>
                                 </button>
@@ -436,9 +422,10 @@
                         <div
                             class="col-md-12 m-b-md m-t-sm"
                             *ngFor="
-                                let evt of func.events;
+                                let evt of eventsArrayData.controls;
                                 let evtIndex = index
                             "
+                            [formGroup]="evt"
                         >
                             <div class="ibox">
                                 <div class="ibox-title inside-ibox">
@@ -446,6 +433,7 @@
                                     <select
                                         class="m-l-sm form-control"
                                         style="width: 150px"
+                                        formControlName="eventName"
                                     >
                                         <option
                                             *ngFor="let element of elements"
@@ -457,6 +445,7 @@
                                     <select
                                         class="m-l-sm form-control"
                                         style="width: 150px"
+                                        formControlName="eventType"
                                         (change)="
                                             changeEventType(
                                                 $event.target.value,
@@ -464,11 +453,11 @@
                                             )
                                         "
                                     >
-                                        <option value="onClick">Click</option>
-                                        <option value="onDoubleClick">
+                                        <option value="click">Click</option>
+                                        <option value="dblclick">
                                             Double Click
                                         </option>
-                                        <option value="onChange">Change</option>
+                                        <option value="change">Change</option>
                                     </select>
                                     <div class="ibox-tools">
                                         <div class="row-flex">
@@ -480,8 +469,8 @@
                                                 class="btn btn-primary add-btn m-l-sm"
                                                 (click)="
                                                     createEvtCl(
-                                                        evt.eventName,
-                                                        func.funcName
+                                                        func.funcName,
+                                                        evtIndex
                                                     )
                                                 "
                                             >
@@ -507,9 +496,11 @@
                                 <div
                                     class="col-md-12 m-b-md m-t-sm"
                                     *ngFor="
-                                        let cl of evt.commandLine;
+                                        let cl of getEventCommandLines(evtIndex)
+                                            .controls;
                                         let evtClIndex = index
                                     "
+                                    [formGroup]="cl"
                                 >
                                     <div class="column">
                                         <div class="row">
@@ -523,7 +514,7 @@
                                                             func.funcName,
                                                             evtClIndex,
                                                             evtIndex,
-                                                            null
+                                                            cl
                                                         )
                                                     "
                                                 >
@@ -553,7 +544,8 @@
                                             <div class="col-md-8">
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.type.name ===
+                                                        cl.get('clTypeName')
+                                                            .value ===
                                                         'declaration'
                                                     "
                                                     [ngTemplateOutlet]="
@@ -569,7 +561,8 @@
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.type.name === 'call'
+                                                        cl.get('clTypeName')
+                                                            .value === 'call'
                                                     "
                                                     [ngTemplateOutlet]="call"
                                                     [ngTemplateOutletContext]="{
@@ -581,7 +574,8 @@
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.type.name ===
+                                                        cl.get('clTypeName')
+                                                            .value ===
                                                         'attribution'
                                                     "
                                                     [ngTemplateOutlet]="
@@ -596,7 +590,8 @@
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.type.name ===
+                                                        cl.get('clTypeName')
+                                                            .value ===
                                                         'htmlElement'
                                                     "
                                                     [ngTemplateOutlet]="
@@ -611,8 +606,8 @@
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.type.name ===
-                                                        'console'
+                                                        cl.get('clTypeName')
+                                                            .value === 'console'
                                                     "
                                                     [ngTemplateOutlet]="console"
                                                     [ngTemplateOutletContext]="{
@@ -628,8 +623,10 @@
                                                     class="m-l-md btn btn-remove"
                                                     (click)="
                                                         removeEvtCl(
-                                                            evt.eventName,
-                                                            evtClIndex
+                                                            evt.get('eventName')
+                                                                .value,
+                                                            evtClIndex,
+                                                            evtIndex
                                                         )
                                                     "
                                                 >
@@ -640,7 +637,8 @@
                                         <div class="col-md-12 no-h-padding">
                                             <ng-container
                                                 *ngIf="
-                                                    cl.type.name === 'decision'
+                                                    cl.get('clTypeName')
+                                                        .value === 'decision'
                                                 "
                                                 [ngTemplateOutlet]="ifDecision"
                                                 [ngTemplateOutletContext]="{
@@ -655,8 +653,8 @@
                                             ></ng-container>
                                             <ng-container
                                                 *ngIf="
-                                                    cl.type.name ===
-                                                    'repetition'
+                                                    cl.get('clTypeName')
+                                                        .value === 'repetition'
                                                 "
                                                 [ngTemplateOutlet]="whileLoop"
                                                 [ngTemplateOutletContext]="{
@@ -869,8 +867,8 @@
                                     [ngTemplateOutlet]="declaration"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -885,8 +883,8 @@
                                     [ngTemplateOutlet]="call"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -902,8 +900,8 @@
                                     [ngTemplateOutlet]="attribution"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -919,8 +917,8 @@
                                     [ngTemplateOutlet]="htmlElement"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -934,8 +932,8 @@
                                     "
                                     [ngTemplateOutlet]="return"
                                     [ngTemplateOutletContext]="{
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -952,8 +950,8 @@
                                     "
                                     [ngTemplateOutlet]="console"
                                     [ngTemplateOutletContext]="{
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -990,8 +988,8 @@
                                 [ngTemplateOutlet]="ifDecision"
                                 [ngTemplateOutletContext]="{
                                     index: ifClIndex,
-                                    evtIndex: -1,
-                                    isEvt: false,
+                                    evtIndex: evtIndex,
+                                    isEvt: isEvt,
                                     funcName: funcName,
                                     cascade:
                                         cascade + ':0,' + ifClIndex.toString(),
@@ -1006,8 +1004,8 @@
                                 [ngTemplateOutlet]="whileLoop"
                                 [ngTemplateOutletContext]="{
                                     index: ifClIndex,
-                                    evtIndex: -1,
-                                    isEvt: false,
+                                    evtIndex: evtIndex,
+                                    isEvt: isEvt,
                                     funcName: funcName,
                                     cascade:
                                         cascade + ':0,' + ifClIndex.toString(),
@@ -1106,8 +1104,8 @@
                                     [ngTemplateOutlet]="declaration"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1122,8 +1120,8 @@
                                     [ngTemplateOutlet]="call"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1139,8 +1137,8 @@
                                     [ngTemplateOutlet]="attribution"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1156,8 +1154,8 @@
                                     [ngTemplateOutlet]="htmlElement"
                                     [ngTemplateOutletContext]="{
                                         index: ifClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1171,8 +1169,8 @@
                                     "
                                     [ngTemplateOutlet]="return"
                                     [ngTemplateOutletContext]="{
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1189,8 +1187,8 @@
                                     "
                                     [ngTemplateOutlet]="console"
                                     [ngTemplateOutletContext]="{
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1227,8 +1225,8 @@
                                 [ngTemplateOutlet]="ifDecision"
                                 [ngTemplateOutletContext]="{
                                     index: ifClIndex,
-                                    evtIndex: -1,
-                                    isEvt: false,
+                                    evtIndex: evtIndex,
+                                    isEvt: isEvt,
                                     funcName: funcName,
                                     cascade:
                                         cascade + ':1,' + ifClIndex.toString(),
@@ -1243,8 +1241,8 @@
                                 [ngTemplateOutlet]="whileLoop"
                                 [ngTemplateOutletContext]="{
                                     index: ifClIndex,
-                                    evtIndex: -1,
-                                    isEvt: false,
+                                    evtIndex: evtIndex,
+                                    isEvt: isEvt,
                                     funcName: funcName,
                                     cascade:
                                         cascade + ':1,' + ifClIndex.toString(),
@@ -1437,8 +1435,8 @@
                                     [ngTemplateOutlet]="declaration"
                                     [ngTemplateOutletContext]="{
                                         index: whileClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1453,8 +1451,8 @@
                                     [ngTemplateOutlet]="call"
                                     [ngTemplateOutletContext]="{
                                         index: whileClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1470,8 +1468,8 @@
                                     [ngTemplateOutlet]="attribution"
                                     [ngTemplateOutletContext]="{
                                         index: whileClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1487,8 +1485,8 @@
                                     [ngTemplateOutlet]="htmlElement"
                                     [ngTemplateOutletContext]="{
                                         index: whileClIndex,
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1502,8 +1500,8 @@
                                     "
                                     [ngTemplateOutlet]="return"
                                     [ngTemplateOutletContext]="{
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1520,8 +1518,8 @@
                                     "
                                     [ngTemplateOutlet]="console"
                                     [ngTemplateOutletContext]="{
-                                        evtIndex: -1,
-                                        isEvt: false,
+                                        evtIndex: evtIndex,
+                                        isEvt: isEvt,
                                         funcName: funcName,
                                         cascade:
                                             cascade +
@@ -1557,8 +1555,8 @@
                                 [ngTemplateOutlet]="ifDecision"
                                 [ngTemplateOutletContext]="{
                                     index: whileClIndex,
-                                    evtIndex: -1,
-                                    isEvt: false,
+                                    evtIndex: evtIndex,
+                                    isEvt: isEvt,
                                     funcName: funcName,
                                     cascade:
                                         cascade +
@@ -1574,8 +1572,8 @@
                                 [ngTemplateOutlet]="whileLoop"
                                 [ngTemplateOutletContext]="{
                                     index: whileClIndex,
-                                    evtIndex: -1,
-                                    isEvt: false,
+                                    evtIndex: evtIndex,
+                                    isEvt: isEvt,
                                     funcName: funcName,
                                     cascade:
                                         cascade +

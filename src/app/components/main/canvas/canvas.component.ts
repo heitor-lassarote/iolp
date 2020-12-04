@@ -233,6 +233,16 @@ export class CanvasComponent implements OnInit {
         return <FormArray>this.uiForm.get("components");
     }
 
+    get eventsArrayData() {
+        let func: AbstractControl = this.formData.controls[0];
+        return <FormArray>func.get("events");
+    }
+
+    getEventCommandLines(evtIndex: number): FormArray {
+        let evt: AbstractControl = this.eventsArrayData.controls[evtIndex];
+        return <FormArray>evt.get("eventCommandLines");
+    }
+
     get formData() {
         return <FormArray>this.logicForm.get("functions");
     }
@@ -344,6 +354,17 @@ export class CanvasComponent implements OnInit {
             parameters: this.formBuilder.array(func.parameters),
             events: this.formBuilder.array([]),
             returnType: func.returnType,
+        });
+    }
+
+    private initEvent(evt: {
+        eventName: string;
+        eventType: string;
+    }): FormGroup {
+        return this.formBuilder.group({
+            eventName: evt.eventName,
+            eventType: evt.eventType,
+            eventCommandLines: this.formBuilder.array([]),
         });
     }
 
@@ -596,11 +617,16 @@ export class CanvasComponent implements OnInit {
             if (i === 0) {
                 let formIndex: number = !isEvt
                     ? curElement.commandLine[branches[0]].formIndex
-                    : curElement.events[evtIndex].commandLine[branches[0]]
-                          .formIndex;
+                    : this.getEventCommandLines(evtIndex).controls[
+                          branches[0]
+                      ].get("originFormIndex").value;
 
                 const formArray: AbstractControl[] = this.checkFormControlType(
-                    curElement.commandLine[branches[0]].type.name
+                    !isEvt
+                        ? curElement.commandLine[branches[0]].type.name
+                        : this.getEventCommandLines(evtIndex).controls[
+                              branches[0]
+                          ].get("clTypeName").value
                 );
 
                 head = formArray[formIndex] as FormGroup;
@@ -730,10 +756,17 @@ export class CanvasComponent implements OnInit {
     onDoubleClick(ev: MouseEvent, targ: HTMLElement) {
         const id = targ.id;
 
+        this.eventsArrayData.controls.push(
+            this.initEvent({
+                eventName: id,
+                eventType: "click",
+            })
+        );
+
         this.logicElements[0].events.push({
             commandLine: [],
             eventName: id,
-            eventType: "onClick",
+            eventType: "click",
         });
 
         this.isLogicContainer = true;
@@ -973,8 +1006,6 @@ export class CanvasComponent implements OnInit {
                     ? this.getType(returnValue, [], null)
                     : UNIT
             );
-            //Events
-            func.events.forEach((event: LogicEvent) => {});
             //Command Lines
             func.commandLine.forEach((cl: CommandLine) => {
                 let controls = this.checkFormControlType(cl.type.name);
@@ -987,6 +1018,50 @@ export class CanvasComponent implements OnInit {
                 ast = this.getAstType(cl.type.name, expression, curControl);
                 funct.body.push(ast);
             });
+            //Events
+            if (funcIndex === 0) {
+                this.eventsArrayData.controls.forEach(
+                    (event: FormGroup, evtIndex: number) => {
+                        let evtClControls = this.getEventCommandLines(evtIndex)
+                            .controls;
+                        let evtFunction: Function = {
+                            name: `${event.get("eventName").value}${
+                                event.get("eventType").value
+                            }Event`,
+                            type: UNIT,
+                            arguments: [],
+                            body: [],
+                        };
+                        evtClControls.forEach((cl: FormGroup) => {
+                            let controls = this.checkFormControlType(
+                                cl.get("clTypeName").value
+                            );
+                            let expression: Expression;
+                            let curControl =
+                                controls[cl.get("originFormIndex").value];
+                            expression = this.getExpressionType(
+                                cl.get("clTypeName").value,
+                                curControl as FormGroup
+                            );
+                            ast = this.getAstType(
+                                cl.get("clTypeName").value,
+                                expression,
+                                curControl
+                            );
+                            evtFunction.body.push(ast);
+                        });
+                        functions.push(evtFunction);
+                        let eventAst: AST = new Expression_(
+                            new Call(new Variable("event"), [
+                                new Text(event.get("eventName").value),
+                                new Text(event.get("eventType").value),
+                                new Call(new Variable(evtFunction.name), []),
+                            ])
+                        );
+                        funct.body.push(eventAst);
+                    }
+                );
+            }
 
             console.log(JSON.stringify(funct));
             functions.push(funct);
@@ -1404,9 +1479,8 @@ export class CanvasComponent implements OnInit {
         control.splice(index, 1);
     }
 
-    createItem(func: string, type: string, funcIndex: number) {
+    createItem(func: string, type: string) {
         let curElement: LogicFunction;
-        const index: number = this.logicElements[funcIndex].commandLine.length;
         switch (type) {
             case "cl":
                 const decisionControl = this.decisionArrayData.controls;
@@ -1442,21 +1516,20 @@ export class CanvasComponent implements OnInit {
                         "Atenção!",
                         "É necessário haver algum componente antes de criar um evento!"
                     );
-                } else if (
-                    this.elements.length === this.logicElements[0].events.length
-                ) {
-                    this.alert.createConfirmDialog(
-                        "Atenção!",
-                        "Não há mais componentes para terem eventos adicionados!"
-                    );
                 } else {
-                    curElement = this.logicElements.find(
-                        (element) => func === element.funcName
+                    const control: AbstractControl[] = this.eventsArrayData
+                        .controls;
+                    curElement = this.logicElements[0];
+                    control.push(
+                        this.initEvent({
+                            eventName: "",
+                            eventType: "click",
+                        })
                     );
                     curElement.events.push({
                         eventName: "",
                         commandLine: [],
-                        eventType: "onClick",
+                        eventType: "click",
                     });
                 }
 
@@ -1479,52 +1552,59 @@ export class CanvasComponent implements OnInit {
                 curElement.commandLine.splice(index, 1);
                 break;
             case "evt":
+                const control: AbstractControl[] = this.eventsArrayData
+                    .controls;
                 curElement = this.logicElements.find(
                     (element) => func === element.funcName
                 );
                 curElement.events.splice(index, 1);
+                control.splice(index, 1);
                 break;
         }
     }
 
-    createEvtCl(evt: string, func: string) {
+    createEvtCl(func: string, evtIndex: number) {
         let curEvt: LogicEvent;
-        const decisionControl = this.decisionArrayData.controls;
-        curEvt = this.logicElements[0].events.find((ev) => {
-            return evt === ev.eventName;
-        });
-        decisionControl.push(
-            this.initDecisionFormArray({
-                expression: this.initComparisonFormArray({
-                    leftExpression: "",
-                    symbol: "Different",
-                    rightExpression: "",
-                    conditionType: "comparison",
-                    funcName: func,
-                    index: curEvt.commandLine.length - 1,
-                    evtIndex: -1,
-                }),
-                funcName: func,
-                index: curEvt.commandLine.length - 1,
-                evtIndex: -1,
-                conditionType: "comparison",
+        const eventControl = this.getEventCommandLines(evtIndex).controls;
+        curEvt = this.logicElements[0].events[evtIndex];
+
+        const clIndex: number = eventControl.length;
+        const formIndex: number = this.checkFormControlType("decision").length;
+
+        const execFormGroup: FormGroup = this.setNewValueToCl(
+            "decision",
+            "comparison",
+            func,
+            0,
+            true,
+            evtIndex
+        );
+
+        eventControl.push(
+            this.initBranchAstFormArray({
+                exec: execFormGroup,
+                clTypeName: "decision",
+                clType: "comparison",
+                index: clIndex,
+                originFormIndex: formIndex,
             })
         );
+
         curEvt.commandLine.push({
-            exec: null,
+            exec: execFormGroup,
             type: { name: "decision", clType: "comparison" },
-            formIndex: decisionControl.length - 1,
+            formIndex: formIndex,
         });
     }
 
-    removeEvtCl(eventName: string, index: number) {
-        let curEvt: LogicEvent;
-        curEvt = this.logicElements[0].events.find((ev) => {
-            return eventName === ev.eventName;
-        });
-        const clTypeName: string = curEvt.commandLine[index].type.name;
-        const formIndex: number = curEvt.commandLine[index].formIndex;
+    removeEvtCl(evtName: string, index: number, evtIndex: number) {
+        let evtCls: AbstractControl[] = this.getEventCommandLines(evtIndex)
+            .controls;
+        let curEvt: LogicEvent = this.logicElements[0].events[evtIndex];
+        const clTypeName: string = evtCls[index].get("clTypeName").value;
+        const formIndex: number = evtCls[index].get("originFormIndex").value;
         this.checkFormControlType(clTypeName).splice(formIndex, 1);
+        evtCls.splice(index, 1);
         curEvt.commandLine.splice(index, 1);
     }
 
