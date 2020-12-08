@@ -12,6 +12,7 @@ import { NgxSpinnerModule } from "ngx-spinner";
 import { ReactiveFormsModule } from "@angular/forms";
 import { SpawnComponentService } from "src/app/services/spawn/spawn-component.service";
 import { ShowComponentInfoService } from "src/app/services/show-component-info/show-component-info.service";
+import { MatTabsModule } from "@angular/material/tabs";
 
 @NgModule({
     declarations: [
@@ -28,6 +29,7 @@ import { ShowComponentInfoService } from "src/app/services/show-component-info/s
         ResizableModule,
         NgxSpinnerModule,
         ReactiveFormsModule,
+        MatTabsModule,
     ],
     providers: [SpawnComponentService, ShowComponentInfoService],
 })

@@ -1,4 +1,4 @@
-<div class="row col-md-12 text-left m-b-md" style="padding-right: 0 !important">
+<!-- <div class="row col-md-12 text-left m-b-md" style="padding-right: 0 !important">
     <div class="col-md-6 text-left">
         <button
             type="button"
@@ -29,360 +29,207 @@
             Aplicar
         </button>
     </div>
-</div>
+</div> -->
 
-<div id="gui" class="col-md-12" *ngIf="!isLogicContainer">
-    <div class="screen" id="canvas">
-        <div *ngFor="let e of elements; let i = index">
-            <div
-                *ngIf="e.type === 'container'"
-                [ngStyle]="{
-                    width: e.width,
-                    height: e.height,
-                    position: 'absolut',
-                    border: 'solid'
-                }"
-                mwlResizable
-                (click)="click($event, $event.target)"
-                cdkDrag
-                cdkDragBoundary=".screen"
-                [id]="e.name"
-            ></div>
-            <button
-                *ngIf="e.type === 'button'"
-                class="btn btn-default draggable"
-                [id]="e.name"
-                (click)="click($event, $event.target)"
-                (dblclick)="onDoubleClick($event, $event.target)"
-                cdkDrag
-                cdkDragBoundary=".screen"
-            >
-                Botão
-            </button>
-            <p
-                *ngIf="e.type === 'label'"
-                class="draggable"
-                [id]="e.name"
-                (click)="click($event, $event.target)"
-                cdkDrag
-                cdkDragBoundary=".screen"
-            >
-                Novo Label
-            </p>
-            <input
-                *ngIf="e.type === 'input'"
-                class="draggable input-field"
-                [id]="e.name"
-                (click)="click($event, $event.target)"
-                cdkDrag
-                cdkDragBoundary=".screen"
-            />
-            <select
-                *ngIf="e.type === 'select'"
-                class="draggable select-field"
-                [id]="e.name"
-                (click)="click($event, $event.target)"
-                cdkDrag
-                cdkDragBoundary=".screen"
-            >
-                <option *ngFor="let item of e.selectOptions" [value]="item">
-                    {{ item }}
-                </option>
-            </select>
-        </div>
-    </div>
-</div>
-
-<div id="logic" class="col-md-12" *ngIf="isLogicContainer">
-    <div class="ibox">
-        <div class="ibox-title">
-            <div class="ibox-tools">
-                <div class="row-flex">
-                    <h4 class="add-title">Nova função</h4>
+<mat-tab-group dynamicHeight animationDuration="0ms" mat-align-tabs="start" (selectedIndexChange)="checkLogicContainerState($event)">
+    <mat-tab label="Interface">
+        <div id="gui" class="col-md-12">
+            <div class="screen" id="canvas">
+                <div *ngFor="let e of elements; let i = index">
+                    <div
+                        *ngIf="e.type === 'container'"
+                        [ngStyle]="{
+                            width: e.width,
+                            height: e.height,
+                            position: 'absolut',
+                            border: 'solid'
+                        }"
+                        mwlResizable
+                        (click)="click($event, $event.target)"
+                        cdkDrag
+                        cdkDragBoundary=".screen"
+                        [id]="e.name"
+                    ></div>
                     <button
-                        type="button"
-                        class="btn btn-primary add-btn m-l-sm"
-                        (click)="addAction()"
+                        *ngIf="e.type === 'button'"
+                        class="btn btn-default draggable"
+                        [id]="e.name"
+                        (click)="click($event, $event.target)"
+                        (dblclick)="onDoubleClick($event, $event.target)"
+                        cdkDrag
+                        cdkDragBoundary=".screen"
                     >
-                        <i class="fa fa-plus"></i>
+                        Botão
                     </button>
+                    <p
+                        *ngIf="e.type === 'label'"
+                        class="draggable"
+                        [id]="e.name"
+                        (click)="click($event, $event.target)"
+                        cdkDrag
+                        cdkDragBoundary=".screen"
+                    >
+                        Novo Label
+                    </p>
+                    <input
+                        *ngIf="e.type === 'input'"
+                        class="draggable input-field"
+                        [id]="e.name"
+                        (click)="click($event, $event.target)"
+                        cdkDrag
+                        cdkDragBoundary=".screen"
+                    />
+                    <select
+                        *ngIf="e.type === 'select'"
+                        class="draggable select-field"
+                        [id]="e.name"
+                        (click)="click($event, $event.target)"
+                        cdkDrag
+                        cdkDragBoundary=".screen"
+                    >
+                        <option
+                            *ngFor="let item of e.selectOptions"
+                            [value]="item"
+                        >
+                            {{ item }}
+                        </option>
+                    </select>
                 </div>
             </div>
         </div>
-        <div class="ibox-content">
-            <div
-                class="ibox"
-                *ngFor="let func of logicElements; let funcIndex = index"
-            >
-                <form role="form" [formGroup]="getCurFunction(funcIndex)">
-                    <div class="ibox-title inside-ibox">
-                        <div class="column col-md-12">
-                            <div class="row">
-                                <select
-                                    class="form-control col-3"
-                                    formControlName="returnType"
-                                    *ngIf="funcIndex !== 0"
-                                >
-                                    <option value="void">Void</option>
-                                    <option value="adt">Algébrico</option>
-                                    <option value="array">Array</option>
-                                    <option value="bool">Booleano</option>
-                                    <option value="char">Caracter</option>
-                                    <option value="double">Double</option>
-                                    <option value="integer">Inteiro</option>
-                                    <option value="record">Registro</option>
-                                    <option value="text">Texto</option>
-                                </select>
-                                <input
-                                    class="m-l-sm form-control col-4"
-                                    type="text"
-                                    placeholder="Noma da função"
-                                    [value]="func.funcName"
-                                    formControlName="funcName"
-                                    [attr.readOnly]="func.readonly ? '' : null"
-                                />
-                                <button
-                                    *ngIf="funcIndex !== 0"
-                                    type="button"
-                                    class="btn btn-primary add-btn m-l-sm"
-                                    (click)="addParameterToFunction(funcIndex)"
-                                >
-                                    <i class="fa fa-plus"></i>
-                                </button>
-                            </div>
+    </mat-tab>
 
-                            <div
-                                class="row m-t-sm"
-                                *ngFor="
-                                    let param of getFunctionParams(funcIndex)
-                                        .controls;
-                                    let i = index
-                                "
-                                [formGroup]="param"
+    <mat-tab label="Lógica">
+        <div id="logic" class="col-md-12">
+            <div class="ibox">
+                <div class="ibox-title">
+                    <div class="ibox-tools">
+                        <div class="row-flex">
+                            <h4 class="add-title">Nova função</h4>
+                            <button
+                                type="button"
+                                class="btn btn-primary add-btn m-l-sm"
+                                (click)="addAction()"
                             >
-                                <select
-                                    class="form-control col-3"
-                                    formControlName="paramType"
-                                >
-                                    <option value="adt">Algébrico</option>
-                                    <option value="array">Array</option>
-                                    <option value="bool">Booleano</option>
-                                    <option value="char">Caracter</option>
-                                    <option value="double">Double</option>
-                                    <option value="integer">Inteiro</option>
-                                    <option value="record">Registro</option>
-                                    <option value="text">Texto</option>
-                                </select>
-                                <input
-                                    type="text"
-                                    class="form-control col-4 m-l-sm"
-                                    formControlName="paramName"
-                                    placeholder="Nome do parâmetro"
-                                />
-                                <button
-                                    *ngIf="funcIndex !== 0"
-                                    class="m-l-sm btn btn-remove"
-                                    (click)="
-                                        removeParameterFromFunction(
-                                            funcIndex,
-                                            i
-                                        )
-                                    "
-                                >
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="ibox-tools">
-                            <div class="row-flex">
-                                <h4 class="add-title">Novo item</h4>
-                                <button
-                                    *ngIf="funcIndex === 0"
-                                    type="button"
-                                    class="btn btn-primary add-btn m-l-sm dropdown-toggle"
-                                    data-toggle="dropdown"
-                                >
-                                    <i class="fa fa-plus"></i>
-                                </button>
-                                <ul
-                                    class="dropdown-menu create-item"
-                                    *ngIf="funcIndex === 0"
-                                >
-                                    <li
-                                        (click)="
-                                            createItem(func.funcName, 'cl')
-                                        "
-                                    >
-                                        <a> Linha de comando </a>
-                                    </li>
-                                    <li *ngIf="funcIndex === 0">
-                                        <a
-                                            (click)="
-                                                createItem(func.funcName, 'evt')
-                                            "
-                                        >
-                                            Evento
-                                        </a>
-                                    </li>
-                                </ul>
-
-                                <button
-                                    *ngIf="funcIndex !== 0"
-                                    type="button"
-                                    class="btn btn-primary add-btn m-l-sm"
-                                    (click)="createItem(func.funcName, 'cl')"
-                                >
-                                    <i class="fa fa-plus"></i>
-                                </button>
-
-                                <button
-                                    *ngIf="funcIndex !== 0"
-                                    class="m-l-md btn btn-remove"
-                                    (click)="removeFunc(funcIndex)"
-                                >
-                                    <i class="fa fa-trash"></i>
-                                </button>
-                            </div>
+                                <i class="fa fa-plus"></i>
+                            </button>
                         </div>
                     </div>
-                    <div class="ibox-content">
-                        <div
-                            class="col-md-12 m-b-md m-t-sm"
-                            *ngFor="
-                                let cl of func.commandLine;
-                                let funcClIndex = index
-                            "
+                </div>
+                <div class="ibox-content">
+                    <div
+                        class="ibox"
+                        *ngFor="
+                            let func of logicElements;
+                            let funcIndex = index
+                        "
+                    >
+                        <form
+                            role="form"
+                            [formGroup]="getCurFunction(funcIndex)"
                         >
-                            <div class="column">
-                                <div class="row">
-                                    <div class="col-md-3">
+                            <div class="ibox-title inside-ibox">
+                                <div class="column col-md-12">
+                                    <div class="row">
                                         <select
-                                            class="form-control"
-                                            (change)="
-                                                clTypeChange(
-                                                    $event.target.value,
-                                                    false,
-                                                    func.funcName,
-                                                    funcClIndex,
-                                                    -1,
-                                                    null
+                                            class="form-control col-3"
+                                            formControlName="returnType"
+                                            *ngIf="funcIndex !== 0"
+                                        >
+                                            <option value="void">Void</option>
+                                            <option value="adt">
+                                                Algébrico
+                                            </option>
+                                            <option value="array">Array</option>
+                                            <option value="bool">
+                                                Booleano
+                                            </option>
+                                            <option value="char">
+                                                Caracter
+                                            </option>
+                                            <option value="double">
+                                                Double
+                                            </option>
+                                            <option value="integer">
+                                                Inteiro
+                                            </option>
+                                            <option value="record">
+                                                Registro
+                                            </option>
+                                            <option value="text">Texto</option>
+                                        </select>
+                                        <input
+                                            class="m-l-sm form-control col-4"
+                                            type="text"
+                                            placeholder="Noma da função"
+                                            [value]="func.funcName"
+                                            formControlName="funcName"
+                                            [attr.readOnly]="
+                                                func.readonly ? '' : null
+                                            "
+                                        />
+                                        <button
+                                            *ngIf="funcIndex !== 0"
+                                            type="button"
+                                            class="btn btn-primary add-btn m-l-sm"
+                                            (click)="
+                                                addParameterToFunction(
+                                                    funcIndex
                                                 )
                                             "
                                         >
-                                            <option value="decision">
-                                                Decisão
+                                            <i class="fa fa-plus"></i>
+                                        </button>
+                                    </div>
+
+                                    <div
+                                        class="row m-t-sm"
+                                        *ngFor="
+                                            let param of getFunctionParams(
+                                                funcIndex
+                                            ).controls;
+                                            let i = index
+                                        "
+                                        [formGroup]="param"
+                                    >
+                                        <select
+                                            class="form-control col-3"
+                                            formControlName="paramType"
+                                        >
+                                            <option value="adt">
+                                                Algébrico
                                             </option>
-                                            <option value="repetition">
-                                                Repetição
+                                            <option value="array">Array</option>
+                                            <option value="bool">
+                                                Booleano
                                             </option>
-                                            <option value="declaration">
-                                                Declaração
+                                            <option value="char">
+                                                Caracter
                                             </option>
-                                            <option value="call">
-                                                Chamada de Função
+                                            <option value="double">
+                                                Double
                                             </option>
-                                            <option value="attribution">
-                                                Atribuição
+                                            <option value="integer">
+                                                Inteiro
                                             </option>
-                                            <option value="htmlElement">
-                                                Elemento HTML
+                                            <option value="record">
+                                                Registro
                                             </option>
-                                            <option
-                                                value="return"
-                                                *ngIf="funcIndex !== 0"
-                                            >
-                                                Retorno
-                                            </option>
-                                            <option value="console">
-                                                Console
-                                            </option>
+                                            <option value="text">Texto</option>
                                         </select>
-                                    </div>
-                                    <div class="col-md-8">
-                                        <ng-container
-                                            *ngIf="
-                                                cl.type.name === 'declaration'
-                                            "
-                                            [ngTemplateOutlet]="declaration"
-                                            [ngTemplateOutletContext]="{
-                                                index: funcClIndex,
-                                                evtIndex: -1,
-                                                isEvt: false,
-                                                funcName: func.funcName,
-                                                cascade: funcClIndex.toString()
-                                            }"
-                                        ></ng-container>
-                                        <ng-container
-                                            *ngIf="cl.type.name === 'call'"
-                                            [ngTemplateOutlet]="call"
-                                            [ngTemplateOutletContext]="{
-                                                index: funcClIndex,
-                                                evtIndex: -1,
-                                                isEvt: false,
-                                                funcName: func.funcName,
-                                                cascade: funcClIndex.toString()
-                                            }"
-                                        ></ng-container>
-                                        <ng-container
-                                            *ngIf="
-                                                cl.type.name === 'attribution'
-                                            "
-                                            [ngTemplateOutlet]="attribution"
-                                            [ngTemplateOutletContext]="{
-                                                index: funcClIndex,
-                                                evtIndex: -1,
-                                                isEvt: false,
-                                                funcName: func.funcName,
-                                                cascade: funcClIndex.toString()
-                                            }"
-                                        ></ng-container>
-                                        <ng-container
-                                            *ngIf="
-                                                cl.type.name === 'htmlElement'
-                                            "
-                                            [ngTemplateOutlet]="htmlElement"
-                                            [ngTemplateOutletContext]="{
-                                                index: funcClIndex,
-                                                evtIndex: -1,
-                                                isEvt: false,
-                                                funcName: func.funcName,
-                                                cascade: funcClIndex.toString()
-                                            }"
-                                        ></ng-container>
-                                        <ng-container
-                                            *ngIf="cl.type.name === 'return'"
-                                            [ngTemplateOutlet]="return"
-                                            [ngTemplateOutletContext]="{
-                                                evtIndex: -1,
-                                                isEvt: false,
-                                                funcName: func.funcName,
-                                                cascade: funcClIndex.toString(),
-                                                type: getCurFunction(
-                                                    funcIndex
-                                                ).get('returnType').value
-                                            }"
-                                        ></ng-container>
-                                        <ng-container
-                                            *ngIf="cl.type.name === 'console'"
-                                            [ngTemplateOutlet]="console"
-                                            [ngTemplateOutletContext]="{
-                                                index: funcClIndex,
-                                                evtIndex: -1,
-                                                isEvt: false,
-                                                funcName: func.funcName,
-                                                cascade: funcClIndex.toString()
-                                            }"
-                                        ></ng-container>
-                                    </div>
-                                    <div class="col-md-1">
+                                        <input
+                                            type="text"
+                                            class="form-control col-4 m-l-sm"
+                                            formControlName="paramName"
+                                            placeholder="Nome do parâmetro"
+                                        />
                                         <button
-                                            class="m-l-md btn btn-remove"
+                                            *ngIf="funcIndex !== 0"
+                                            class="m-l-sm btn btn-remove"
                                             (click)="
-                                                removeItem(
-                                                    func.funcName,
-                                                    'cl',
-                                                    funcClIndex
+                                                removeParameterFromFunction(
+                                                    funcIndex,
+                                                    i
                                                 )
                                             "
                                         >
@@ -390,105 +237,64 @@
                                         </button>
                                     </div>
                                 </div>
-                                <div class="col-md-12 no-h-padding">
-                                    <ng-container
-                                        *ngIf="cl.type.name === 'decision'"
-                                        [ngTemplateOutlet]="ifDecision"
-                                        [ngTemplateOutletContext]="{
-                                            index: funcClIndex,
-                                            evtIndex: -1,
-                                            isEvt: false,
-                                            funcName: func.funcName,
-                                            cascade: funcClIndex.toString(),
-                                            branch: '',
-                                            funcIndex: funcIndex
-                                        }"
-                                    ></ng-container>
-                                    <ng-container
-                                        *ngIf="cl.type.name === 'repetition'"
-                                        [ngTemplateOutlet]="whileLoop"
-                                        [ngTemplateOutletContext]="{
-                                            index: funcClIndex,
-                                            evtIndex: -1,
-                                            isEvt: false,
-                                            funcName: func.funcName,
-                                            cascade: funcClIndex.toString(),
-                                            funcIndex: funcIndex
-                                        }"
-                                    ></ng-container>
-                                </div>
-                            </div>
-                        </div>
-                        <div
-                            class="col-md-12 m-b-md m-t-sm"
-                            *ngFor="
-                                let evt of eventsArrayData.controls;
-                                let evtIndex = index
-                            "
-                            [formGroup]="evt"
-                        >
-                            <div class="ibox">
-                                <div class="ibox-title inside-ibox">
-                                    <h5 class="func-name">Componente:</h5>
-                                    <select
-                                        class="m-l-sm form-control"
-                                        style="width: 150px"
-                                        formControlName="eventName"
-                                    >
-                                        <option
-                                            *ngFor="let element of elements"
-                                            [value]="element.name"
+
+                                <div class="ibox-tools">
+                                    <div class="row-flex">
+                                        <h4 class="add-title">Novo item</h4>
+                                        <button
+                                            *ngIf="funcIndex === 0"
+                                            type="button"
+                                            class="btn btn-primary add-btn m-l-sm dropdown-toggle"
+                                            data-toggle="dropdown"
                                         >
-                                            {{ element.name }}
-                                        </option>
-                                    </select>
-                                    <select
-                                        class="m-l-sm form-control"
-                                        style="width: 150px"
-                                        formControlName="eventType"
-                                        (change)="
-                                            changeEventType(
-                                                $event.target.value,
-                                                evtIndex
-                                            )
-                                        "
-                                    >
-                                        <option value="click">Click</option>
-                                        <option value="dblclick">
-                                            Double Click
-                                        </option>
-                                        <option value="change">Change</option>
-                                    </select>
-                                    <div class="ibox-tools">
-                                        <div class="row-flex">
-                                            <h4 class="add-title">
-                                                Nova linha de comando
-                                            </h4>
-                                            <button
-                                                type="button"
-                                                class="btn btn-primary add-btn m-l-sm"
+                                            <i class="fa fa-plus"></i>
+                                        </button>
+                                        <ul
+                                            class="dropdown-menu create-item"
+                                            *ngIf="funcIndex === 0"
+                                        >
+                                            <li
                                                 (click)="
-                                                    createEvtCl(
+                                                    createItem(
                                                         func.funcName,
-                                                        evtIndex
+                                                        'cl'
                                                     )
                                                 "
                                             >
-                                                <i class="fa fa-plus"></i>
-                                            </button>
-                                            <button
-                                                class="m-l-md btn btn-remove"
-                                                (click)="
-                                                    removeItem(
-                                                        func.funcName,
-                                                        'evt',
-                                                        evtIndex
-                                                    )
-                                                "
-                                            >
-                                                <i class="fa fa-trash"></i>
-                                            </button>
-                                        </div>
+                                                <a> Linha de comando </a>
+                                            </li>
+                                            <li *ngIf="funcIndex === 0">
+                                                <a
+                                                    (click)="
+                                                        createItem(
+                                                            func.funcName,
+                                                            'evt'
+                                                        )
+                                                    "
+                                                >
+                                                    Evento
+                                                </a>
+                                            </li>
+                                        </ul>
+
+                                        <button
+                                            *ngIf="funcIndex !== 0"
+                                            type="button"
+                                            class="btn btn-primary add-btn m-l-sm"
+                                            (click)="
+                                                createItem(func.funcName, 'cl')
+                                            "
+                                        >
+                                            <i class="fa fa-plus"></i>
+                                        </button>
+
+                                        <button
+                                            *ngIf="funcIndex !== 0"
+                                            class="m-l-md btn btn-remove"
+                                            (click)="removeFunc(funcIndex)"
+                                        >
+                                            <i class="fa fa-trash"></i>
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -496,11 +302,9 @@
                                 <div
                                     class="col-md-12 m-b-md m-t-sm"
                                     *ngFor="
-                                        let cl of getEventCommandLines(evtIndex)
-                                            .controls;
-                                        let evtClIndex = index
+                                        let cl of func.commandLine;
+                                        let funcClIndex = index
                                     "
-                                    [formGroup]="cl"
                                 >
                                     <div class="column">
                                         <div class="row">
@@ -510,11 +314,11 @@
                                                     (change)="
                                                         clTypeChange(
                                                             $event.target.value,
-                                                            true,
+                                                            false,
                                                             func.funcName,
-                                                            evtClIndex,
-                                                            evtIndex,
-                                                            cl
+                                                            funcClIndex,
+                                                            -1,
+                                                            null
                                                         )
                                                     "
                                                 >
@@ -536,6 +340,12 @@
                                                     <option value="htmlElement">
                                                         Elemento HTML
                                                     </option>
+                                                    <option
+                                                        value="return"
+                                                        *ngIf="funcIndex !== 0"
+                                                    >
+                                                        Retorno
+                                                    </option>
                                                     <option value="console">
                                                         Console
                                                     </option>
@@ -544,77 +354,94 @@
                                             <div class="col-md-8">
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.get('clTypeName')
-                                                            .value ===
+                                                        cl.type.name ===
                                                         'declaration'
                                                     "
                                                     [ngTemplateOutlet]="
                                                         declaration
                                                     "
                                                     [ngTemplateOutletContext]="{
-                                                        index: evtClIndex,
-                                                        evtIndex: evtIndex,
-                                                        isEvt: true,
+                                                        index: funcClIndex,
+                                                        evtIndex: -1,
+                                                        isEvt: false,
                                                         funcName: func.funcName,
-                                                        cascade: evtClIndex.toString()
+                                                        cascade: funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.get('clTypeName')
-                                                            .value === 'call'
+                                                        cl.type.name === 'call'
                                                     "
                                                     [ngTemplateOutlet]="call"
                                                     [ngTemplateOutletContext]="{
-                                                        index: evtClIndex,
-                                                        evtIndex: evtIndex,
-                                                        isEvt: true,
-                                                        funcName: func.funcName
+                                                        index: funcClIndex,
+                                                        evtIndex: -1,
+                                                        isEvt: false,
+                                                        funcName: func.funcName,
+                                                        cascade: funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.get('clTypeName')
-                                                            .value ===
+                                                        cl.type.name ===
                                                         'attribution'
                                                     "
                                                     [ngTemplateOutlet]="
                                                         attribution
                                                     "
                                                     [ngTemplateOutletContext]="{
-                                                        index: evtClIndex,
-                                                        evtIndex: evtIndex,
-                                                        isEvt: true,
-                                                        funcName: func.funcName
+                                                        index: funcClIndex,
+                                                        evtIndex: -1,
+                                                        isEvt: false,
+                                                        funcName: func.funcName,
+                                                        cascade: funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.get('clTypeName')
-                                                            .value ===
+                                                        cl.type.name ===
                                                         'htmlElement'
                                                     "
                                                     [ngTemplateOutlet]="
                                                         htmlElement
                                                     "
                                                     [ngTemplateOutletContext]="{
-                                                        index: evtClIndex,
-                                                        evtIndex: evtIndex,
-                                                        isEvt: true,
-                                                        funcName: func.funcName
+                                                        index: funcClIndex,
+                                                        evtIndex: -1,
+                                                        isEvt: false,
+                                                        funcName: func.funcName,
+                                                        cascade: funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
                                                     *ngIf="
-                                                        cl.get('clTypeName')
-                                                            .value === 'console'
+                                                        cl.type.name ===
+                                                        'return'
+                                                    "
+                                                    [ngTemplateOutlet]="return"
+                                                    [ngTemplateOutletContext]="{
+                                                        evtIndex: -1,
+                                                        isEvt: false,
+                                                        funcName: func.funcName,
+                                                        cascade: funcClIndex.toString(),
+                                                        type: getCurFunction(
+                                                            funcIndex
+                                                        ).get('returnType')
+                                                            .value
+                                                    }"
+                                                ></ng-container>
+                                                <ng-container
+                                                    *ngIf="
+                                                        cl.type.name ===
+                                                        'console'
                                                     "
                                                     [ngTemplateOutlet]="console"
                                                     [ngTemplateOutletContext]="{
-                                                        index: evtClIndex,
-                                                        evtIndex: evtIndex,
-                                                        isEvt: true,
-                                                        funcName: func.funcName
+                                                        index: funcClIndex,
+                                                        evtIndex: -1,
+                                                        isEvt: false,
+                                                        funcName: func.funcName,
+                                                        cascade: funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                             </div>
@@ -622,11 +449,10 @@
                                                 <button
                                                     class="m-l-md btn btn-remove"
                                                     (click)="
-                                                        removeEvtCl(
-                                                            evt.get('eventName')
-                                                                .value,
-                                                            evtClIndex,
-                                                            evtIndex
+                                                        removeItem(
+                                                            func.funcName,
+                                                            'cl',
+                                                            funcClIndex
                                                         )
                                                     "
                                                 >
@@ -637,46 +463,356 @@
                                         <div class="col-md-12 no-h-padding">
                                             <ng-container
                                                 *ngIf="
-                                                    cl.get('clTypeName')
-                                                        .value === 'decision'
+                                                    cl.type.name === 'decision'
                                                 "
                                                 [ngTemplateOutlet]="ifDecision"
                                                 [ngTemplateOutletContext]="{
-                                                    index: evtClIndex,
-                                                    evtIndex: evtIndex,
-                                                    isEvt: true,
+                                                    index: funcClIndex,
+                                                    evtIndex: -1,
+                                                    isEvt: false,
                                                     funcName: func.funcName,
-                                                    cascade: evtClIndex.toString(),
+                                                    cascade: funcClIndex.toString(),
                                                     branch: '',
                                                     funcIndex: funcIndex
                                                 }"
                                             ></ng-container>
                                             <ng-container
                                                 *ngIf="
-                                                    cl.get('clTypeName')
-                                                        .value === 'repetition'
+                                                    cl.type.name ===
+                                                    'repetition'
                                                 "
                                                 [ngTemplateOutlet]="whileLoop"
                                                 [ngTemplateOutletContext]="{
-                                                    index: evtClIndex,
-                                                    evtIndex: evtIndex,
-                                                    isEvt: true,
+                                                    index: funcClIndex,
+                                                    evtIndex: -1,
+                                                    isEvt: false,
                                                     funcName: func.funcName,
-                                                    cascade: evtClIndex.toString(),
+                                                    cascade: funcClIndex.toString(),
                                                     funcIndex: funcIndex
                                                 }"
                                             ></ng-container>
                                         </div>
                                     </div>
                                 </div>
+                                <div
+                                    class="col-md-12 m-b-md m-t-sm"
+                                    *ngFor="
+                                        let evt of eventsArrayData.controls;
+                                        let evtIndex = index
+                                    "
+                                    [formGroup]="evt"
+                                >
+                                    <div class="ibox">
+                                        <div class="ibox-title inside-ibox">
+                                            <h5 class="func-name">
+                                                Componente:
+                                            </h5>
+                                            <select
+                                                class="m-l-sm form-control"
+                                                style="width: 150px"
+                                                formControlName="eventName"
+                                            >
+                                                <option
+                                                    *ngFor="
+                                                        let element of elements
+                                                    "
+                                                    [value]="element.name"
+                                                >
+                                                    {{ element.name }}
+                                                </option>
+                                            </select>
+                                            <select
+                                                class="m-l-sm form-control"
+                                                style="width: 150px"
+                                                formControlName="eventType"
+                                                (change)="
+                                                    changeEventType(
+                                                        $event.target.value,
+                                                        evtIndex
+                                                    )
+                                                "
+                                            >
+                                                <option value="click">
+                                                    Click
+                                                </option>
+                                                <option value="dblclick">
+                                                    Double Click
+                                                </option>
+                                                <option value="change">
+                                                    Change
+                                                </option>
+                                            </select>
+                                            <div class="ibox-tools">
+                                                <div class="row-flex">
+                                                    <h4 class="add-title">
+                                                        Nova linha de comando
+                                                    </h4>
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-primary add-btn m-l-sm"
+                                                        (click)="
+                                                            createEvtCl(
+                                                                func.funcName,
+                                                                evtIndex
+                                                            )
+                                                        "
+                                                    >
+                                                        <i
+                                                            class="fa fa-plus"
+                                                        ></i>
+                                                    </button>
+                                                    <button
+                                                        class="m-l-md btn btn-remove"
+                                                        (click)="
+                                                            removeItem(
+                                                                func.funcName,
+                                                                'evt',
+                                                                evtIndex
+                                                            )
+                                                        "
+                                                    >
+                                                        <i
+                                                            class="fa fa-trash"
+                                                        ></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="ibox-content">
+                                        <div
+                                            class="col-md-12 m-b-md m-t-sm"
+                                            *ngFor="
+                                                let cl of getEventCommandLines(
+                                                    evtIndex
+                                                ).controls;
+                                                let evtClIndex = index
+                                            "
+                                            [formGroup]="cl"
+                                        >
+                                            <div class="column">
+                                                <div class="row">
+                                                    <div class="col-md-3">
+                                                        <select
+                                                            class="form-control"
+                                                            (change)="
+                                                                clTypeChange(
+                                                                    $event
+                                                                        .target
+                                                                        .value,
+                                                                    true,
+                                                                    func.funcName,
+                                                                    evtClIndex,
+                                                                    evtIndex,
+                                                                    cl
+                                                                )
+                                                            "
+                                                        >
+                                                            <option
+                                                                value="decision"
+                                                            >
+                                                                Decisão
+                                                            </option>
+                                                            <option
+                                                                value="repetition"
+                                                            >
+                                                                Repetição
+                                                            </option>
+                                                            <option
+                                                                value="declaration"
+                                                            >
+                                                                Declaração
+                                                            </option>
+                                                            <option
+                                                                value="call"
+                                                            >
+                                                                Chamada de
+                                                                Função
+                                                            </option>
+                                                            <option
+                                                                value="attribution"
+                                                            >
+                                                                Atribuição
+                                                            </option>
+                                                            <option
+                                                                value="htmlElement"
+                                                            >
+                                                                Elemento HTML
+                                                            </option>
+                                                            <option
+                                                                value="console"
+                                                            >
+                                                                Console
+                                                            </option>
+                                                        </select>
+                                                    </div>
+                                                    <div class="col-md-8">
+                                                        <ng-container
+                                                            *ngIf="
+                                                                cl.get(
+                                                                    'clTypeName'
+                                                                ).value ===
+                                                                'declaration'
+                                                            "
+                                                            [ngTemplateOutlet]="
+                                                                declaration
+                                                            "
+                                                            [ngTemplateOutletContext]="{
+                                                                index: evtClIndex,
+                                                                evtIndex: evtIndex,
+                                                                isEvt: true,
+                                                                funcName:
+                                                                    func.funcName,
+                                                                cascade: evtClIndex.toString()
+                                                            }"
+                                                        ></ng-container>
+                                                        <ng-container
+                                                            *ngIf="
+                                                                cl.get(
+                                                                    'clTypeName'
+                                                                ).value ===
+                                                                'call'
+                                                            "
+                                                            [ngTemplateOutlet]="
+                                                                call
+                                                            "
+                                                            [ngTemplateOutletContext]="{
+                                                                index: evtClIndex,
+                                                                evtIndex: evtIndex,
+                                                                isEvt: true,
+                                                                funcName:
+                                                                    func.funcName
+                                                            }"
+                                                        ></ng-container>
+                                                        <ng-container
+                                                            *ngIf="
+                                                                cl.get(
+                                                                    'clTypeName'
+                                                                ).value ===
+                                                                'attribution'
+                                                            "
+                                                            [ngTemplateOutlet]="
+                                                                attribution
+                                                            "
+                                                            [ngTemplateOutletContext]="{
+                                                                index: evtClIndex,
+                                                                evtIndex: evtIndex,
+                                                                isEvt: true,
+                                                                funcName:
+                                                                    func.funcName
+                                                            }"
+                                                        ></ng-container>
+                                                        <ng-container
+                                                            *ngIf="
+                                                                cl.get(
+                                                                    'clTypeName'
+                                                                ).value ===
+                                                                'htmlElement'
+                                                            "
+                                                            [ngTemplateOutlet]="
+                                                                htmlElement
+                                                            "
+                                                            [ngTemplateOutletContext]="{
+                                                                index: evtClIndex,
+                                                                evtIndex: evtIndex,
+                                                                isEvt: true,
+                                                                funcName:
+                                                                    func.funcName
+                                                            }"
+                                                        ></ng-container>
+                                                        <ng-container
+                                                            *ngIf="
+                                                                cl.get(
+                                                                    'clTypeName'
+                                                                ).value ===
+                                                                'console'
+                                                            "
+                                                            [ngTemplateOutlet]="
+                                                                console
+                                                            "
+                                                            [ngTemplateOutletContext]="{
+                                                                index: evtClIndex,
+                                                                evtIndex: evtIndex,
+                                                                isEvt: true,
+                                                                funcName:
+                                                                    func.funcName
+                                                            }"
+                                                        ></ng-container>
+                                                    </div>
+                                                    <div class="col-md-1">
+                                                        <button
+                                                            class="m-l-md btn btn-remove"
+                                                            (click)="
+                                                                removeEvtCl(
+                                                                    evt.get(
+                                                                        'eventName'
+                                                                    ).value,
+                                                                    evtClIndex,
+                                                                    evtIndex
+                                                                )
+                                                            "
+                                                        >
+                                                            <i
+                                                                class="fa fa-trash"
+                                                            ></i>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                <div
+                                                    class="col-md-12 no-h-padding"
+                                                >
+                                                    <ng-container
+                                                        *ngIf="
+                                                            cl.get('clTypeName')
+                                                                .value ===
+                                                            'decision'
+                                                        "
+                                                        [ngTemplateOutlet]="
+                                                            ifDecision
+                                                        "
+                                                        [ngTemplateOutletContext]="{
+                                                            index: evtClIndex,
+                                                            evtIndex: evtIndex,
+                                                            isEvt: true,
+                                                            funcName:
+                                                                func.funcName,
+                                                            cascade: evtClIndex.toString(),
+                                                            branch: '',
+                                                            funcIndex: funcIndex
+                                                        }"
+                                                    ></ng-container>
+                                                    <ng-container
+                                                        *ngIf="
+                                                            cl.get('clTypeName')
+                                                                .value ===
+                                                            'repetition'
+                                                        "
+                                                        [ngTemplateOutlet]="
+                                                            whileLoop
+                                                        "
+                                                        [ngTemplateOutletContext]="{
+                                                            index: evtClIndex,
+                                                            evtIndex: evtIndex,
+                                                            isEvt: true,
+                                                            funcName:
+                                                                func.funcName,
+                                                            cascade: evtClIndex.toString(),
+                                                            funcIndex: funcIndex
+                                                        }"
+                                                    ></ng-container>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
-    </div>
-</div>
+    </mat-tab>
+</mat-tab-group>
 
 <div class="col-12 text-right">
     <button

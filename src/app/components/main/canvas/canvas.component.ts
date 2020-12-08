@@ -98,8 +98,8 @@ export class CanvasComponent implements OnInit {
     consoleForm: FormGroup;
 
     // Attributes
-    isLogicContainer: boolean = true; //TODO: Change to false
-    $logicContainer: BehaviorSubject<boolean>;
+    // isLogicContainer: boolean = true; //TODO: Change to false
+    // $logicContainer: BehaviorSubject<boolean>;
     public style: object = {};
     elements: Element[] = [];
     cssObject: CssOut[] = [];
@@ -124,7 +124,7 @@ export class CanvasComponent implements OnInit {
         private formBuilder: FormBuilder,
         private alert: AlertService
     ) {
-        this.$logicContainer = new BehaviorSubject<boolean>(true); //TODO: Change to false
+        // this.$logicContainer = new BehaviorSubject<boolean>(true); //TODO: Change to false
     }
 
     ngOnInit() {
@@ -133,11 +133,11 @@ export class CanvasComponent implements OnInit {
             this.elements.push(element);
         });
 
-        this.checkLogicContainerState(this.isLogicContainer);
+        // this.checkLogicContainerState(this.isLogicContainer);
 
-        this.$logicContainer.subscribe((value: boolean) => {
-            this.checkLogicContainerState(value);
-        });
+        // this.$logicContainer.subscribe((value: boolean) => {
+        //     this.checkLogicContainerState(value);
+        // });
 
         this.createForms();
     }
@@ -202,8 +202,8 @@ export class CanvasComponent implements OnInit {
         });
     }
 
-    private checkLogicContainerState(isLogicContainer: boolean) {
-        if (isLogicContainer) {
+    checkLogicContainerState(event: number) {
+        if (event === 1) {
             $("#infos-container").prop("hidden", true);
             $("#canvas-container")
                 .addClass("col-lg-12")
@@ -214,7 +214,7 @@ export class CanvasComponent implements OnInit {
                     child.setAttribute("hidden", "true");
                 }
             });
-        } else {
+        } else if (event === 0) {
             $("#infos-container").prop("hidden", false);
             $("#canvas-container")
                 .removeClass("col-lg-12")
@@ -698,14 +698,14 @@ export class CanvasComponent implements OnInit {
     }
 
     // Change Container listeners
-    setLogicContainer(value: boolean) {
-        this.isLogicContainer = value;
-        this.$logicContainer.next(value);
-    }
+    // setLogicContainer(value: boolean) {
+    //     this.isLogicContainer = value;
+    //     this.$logicContainer.next(value);
+    // }
 
-    getLogicContainer(): Observable<boolean> {
-        return this.$logicContainer.asObservable();
-    }
+    // getLogicContainer(): Observable<boolean> {
+    //     return this.$logicContainer.asObservable();
+    // }
 
     // Resize Components
     validate(event: ResizeEvent): boolean {
@@ -769,8 +769,8 @@ export class CanvasComponent implements OnInit {
             eventType: "click",
         });
 
-        this.isLogicContainer = true;
-        this.setLogicContainer(true);
+        // this.isLogicContainer = true;
+        // this.setLogicContainer(true);
     }
 
     // Project apply
