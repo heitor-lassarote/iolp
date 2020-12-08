@@ -13,6 +13,7 @@ import { TranslateResponseService } from "./services/translate/translate.service
 import { TranslateKeysService } from "./services/translate/translate-keys.service";
 import { LoginModule } from "./components/login/login.module";
 import { SignupModule } from "./components/signup/signup.module";
+import { DashboardModule } from "./components/dashboard/dashboard.module";
 
 @NgModule({
     declarations: [AppComponent],
@@ -26,6 +27,7 @@ import { SignupModule } from "./components/signup/signup.module";
         NgxSpinnerModule,
         LoginModule,
         SignupModule,
+        DashboardModule,
     ],
     providers: [
         { provide: LocationStrategy, useClass: HashLocationStrategy },

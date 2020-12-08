@@ -7,8 +7,7 @@ import { environment } from "src/environments/environment.prod";
     providedIn: "root",
 })
 export class SendService {
-    postUrl: string = `${environment.baseUrl}/editor`;
-    getUrl: string = `${environment.baseUrl}/editor`;
+    baseUrl: string = `${environment.baseUrl}/editor`;
     private header: HttpHeaders;
 
     constructor(private http: HttpClient) {
@@ -21,14 +20,16 @@ export class SendService {
     }
 
     getProject(id: any): Promise<any> {
-        let url = `${this.getUrl}/${id}`;
+        let url = `${this.baseUrl}/${id}`;
         return this.http
             .get<any>(url, { headers: this.header, withCredentials: true })
             .toPromise();
     }
 
     getProjectBuild(): Promise<ArrayBuffer> {
-        let url = `${this.getUrl}/${sessionStorage.getItem("projectID")}/build`;
+        let url = `${this.baseUrl}/${sessionStorage.getItem(
+            "projectID"
+        )}/build`;
         return this.http
             .get<ArrayBuffer>(url, {
                 headers: this.header,
@@ -39,21 +40,21 @@ export class SendService {
     }
 
     postCode(ast: Output): Promise<any> {
-        // if (sessionStorage.getItem("projectID")) {
-        //     let url = `${this.postUrl}/${sessionStorage.getItem("projectID")}`;
-        //     return this.http
-        //         .put<any>(url, ast, {
-        //             headers: this.header,
-        //             withCredentials: true,
-        //         })
-        //         .toPromise();
-        // } else {
+        if (sessionStorage.getItem("projectID")) {
+            let url = `${this.baseUrl}/${sessionStorage.getItem("projectID")}`;
             return this.http
-                .post<any>(this.postUrl, ast, {
+                .put<any>(url, ast, {
                     headers: this.header,
                     withCredentials: true,
                 })
                 .toPromise();
-        // }
+        } else {
+            return this.http
+                .post<any>(this.baseUrl, ast, {
+                    headers: this.header,
+                    withCredentials: true,
+                })
+                .toPromise();
+        }
     }
 }

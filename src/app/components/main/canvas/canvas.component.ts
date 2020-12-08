@@ -782,7 +782,6 @@ export class CanvasComponent implements OnInit {
                 pages: [],
             },
         };
-        let pages: Page[] = [];
         let pageTest: Page = {
             name: "Page Test",
             css: [],
@@ -828,7 +827,8 @@ export class CanvasComponent implements OnInit {
         console.log(JSON.stringify(value));
         try {
             let projectID = await this.sendService.postCode(value);
-            sessionStorage.setItem("projectID", projectID.toString());
+            if (typeof projectID === "number")
+                sessionStorage.setItem("projectID", projectID.toString());
             this.toastr.success("Aplicado com sucesso!", "Sucesso!", {
                 progressBar: true,
                 closeButton: true,
