@@ -6,6 +6,7 @@ module Language.LowCode.Logic.AST
     , MatchPattern (..)
     , Branch (..)
     , AST (..)
+    , InterpolatedElement (..)
     , Expression (..)
     , Literal (..)
     , parseFunction
@@ -171,11 +172,30 @@ instance ToJSON (AST expressionMetadata) where
             , "whileAst"        .= body
             ]
 
+data InterpolatedElement metadata
+    = InterpolatedText !Text
+    | InterpolatedExpression !(Expression metadata)
+    deriving (Eq, Functor, Show)
+
+instance FromJSON (InterpolatedElement ()) where
+    parseJSON = withObject "Language.LowCode.Logic.AST.InterpolatedElement" \o -> do
+        text' <- o .:? "text"
+        expr <- o .:? "expression"
+        case (text', expr) of
+            (Just  t, Nothing) -> InterpolatedText <$> pure t
+            (Nothing, Just  e) -> InterpolatedExpression <$> pure e
+            _ -> fail "Expected 'text' xor 'expression'."
+
+instance ToJSON (InterpolatedElement metadata) where
+    toJSON (InterpolatedText t) = object ["text" .= t]
+    toJSON (InterpolatedExpression e) = object ["expression" .= e]
+
 data Expression metadata
     = Access !metadata !(Expression metadata) !Name
     | BinaryOp !metadata !(Expression metadata) !BinarySymbol !(Expression metadata)
     | Call !metadata !(Expression metadata) ![(Expression metadata)]
     | Index !metadata !(Expression metadata) !(Expression metadata)
+    | Interpolated !metadata ![InterpolatedElement metadata]
     | Literal !metadata !Literal
     | Parenthesis !metadata !(Expression metadata)
     | Structure !metadata !(Structure (Expression metadata))
@@ -189,16 +209,19 @@ instance HasMetadata Expression where
         BinaryOp m _ _ _ -> m
         Call m _ _ -> m
         Index m _ _ -> m
+        Interpolated m _ -> m
         Literal m _ -> m
         Parenthesis m _ -> m
         Structure m _ -> m
         UnaryOp m _ _ -> m
         Variable m _ -> m
+
     setMetadata m = \case
         Access _ a b -> Access m a b
         BinaryOp _ a b c -> BinaryOp m a b c
         Call _ a b -> Call m a b
         Index _ a b -> Index m a b
+        Interpolated _ a -> Interpolated m a
         Literal _ a -> Literal m a
         Parenthesis _ a -> Parenthesis m a
         Structure _ a -> Structure m a
@@ -208,23 +231,24 @@ instance HasMetadata Expression where
 instance FromJSON (Expression ()) where
     parseJSON (String s) = either (fail . toString) pure $ parseExpression s
     parseJSON (Object o) = o .: "tag" >>= \case
-        "access"      -> Access ()      <$> o .: "expression"
-                                        <*> o .: "name"
-        "binaryOp"    -> BinaryOp ()    <$> o .: "leftExpression"
-                                        <*> o .: "symbol"
-                                        <*> o .: "rightExpression"
-        "call"        -> Call ()        <$> o .: "expression"
-                                        <*> o .: "arguments"
-        "index"       -> Index ()       <$> o .: "leftExpression"
-                                        <*> o .: "rightExpression"
-        "literal"     -> Literal ()     <$> o .: "value"
-        "parenthesis" -> Parenthesis () <$> o .: "expression"
-        "structure"   -> Structure ()   <$> o .: "structure"
-        "unaryOp"     -> UnaryOp ()     <$> o .: "symbol"
-                                        <*> o .: "expression"
-        "variable"    -> Variable ()    <$> o .: "name"
-        other         -> fail $
-            "Expected 'access', 'binaryOp', 'call', 'index', 'literal',\
+        "access"       -> Access ()       <$> o .: "expression"
+                                          <*> o .: "name"
+        "binaryOp"     -> BinaryOp ()     <$> o .: "leftExpression"
+                                          <*> o .: "symbol"
+                                          <*> o .: "rightExpression"
+        "call"         -> Call ()         <$> o .: "expression"
+                                          <*> o .: "arguments"
+        "index"        -> Index ()        <$> o .: "leftExpression"
+                                          <*> o .: "rightExpression"
+        "interpolated" -> Interpolated () <$> o .: "value"
+        "literal"      -> Literal ()      <$> o .: "value"
+        "parenthesis"  -> Parenthesis ()  <$> o .: "expression"
+        "structure"    -> Structure ()    <$> o .: "structure"
+        "unaryOp"      -> UnaryOp ()      <$> o .: "symbol"
+                                          <*> o .: "expression"
+        "variable"     -> Variable ()     <$> o .: "name"
+        other          -> fail $
+            "Expected 'access', 'binaryOp', 'call', 'index', 'interpolated', 'literal',\
             \ 'parenthesis', 'structure', 'unaryOp' or 'variable', but got '"
             <> other <> "'."
     parseJSON other = prependFailure "Expected String or Object, but got " (unexpected other)
@@ -247,6 +271,9 @@ instance ToJSON (Expression metadata) where
         Index _ left right -> withTag "index"
             [ "leftExpression"  .= left
             , "rightExpression" .= right
+            ]
+        Interpolated _ i -> withTag "interpolated"
+            [ "value"           .= i
             ]
         Literal _ value' -> withTag "literal"
             [ "value"           .= value'
@@ -445,8 +472,26 @@ expression1 !minPrecedence lhs = maybe (pure lhs) (loop lhs) =<< peek
 
     peek = optional $ lookAhead $ binarySymbolToOperator <$> binaryOperator
 
+interpolatedText :: Parser [InterpolatedElement ()]
+interpolatedText = string "#\"" *> fmap concatTexts (manyTill (hashLit <|> intExpr <|> charLit) (char '"'))
+  where
+    hashLit = InterpolatedText <$> (string "\\#" $> "#")
+    intExpr = InterpolatedExpression <$> (string "#(" *> expression0 <* char ')')
+    charLit = InterpolatedText <$> (one <$> Lexer.charLiteral)
+
+    concatTexts [] = []
+    concatTexts (InterpolatedText t1 : InterpolatedText t2 : is) =
+        let t = InterpolatedText (t1 <> t2)
+         in concatTexts (t : is)
+    concatTexts (i : is) = i : concatTexts is
+
 primary :: Parser (Expression ())
-primary = lexeme (secondary =<< choice [value, unary, Parenthesis () <$> parenthesis expression0])
+primary = lexeme (secondary =<< choice
+    [ value
+    , Interpolated () <$> interpolatedText
+    , unary
+    , Parenthesis () <$> parenthesis expression0
+    ])
 
 secondary :: Expression () -> Parser (Expression ())
 secondary lhs = lexeme do

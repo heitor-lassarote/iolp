@@ -3,6 +3,7 @@ module Language.JavaScript.AST
     , Module (..)
     , AST (..)
     , Expression (..)
+    , InterpolatedElement (..)
     , Literal (..)
     , binarySymbolToText
     , unarySymbolToText
@@ -36,12 +37,18 @@ data AST
     | While !Expression !AST
     deriving (Eq, Ord, Show)
 
+data InterpolatedElement
+    = InterpolatedText !Text
+    | InterpolatedExpression !Expression
+    deriving (Eq, Ord, Show)
+
 data Expression
     = Access !Expression !Name
     | BinaryOp !Expression !BinarySymbol !Expression
     | Call !Expression ![Expression]
     | Function !(Maybe Text) ![Text] !AST
     | Index !Expression !Expression
+    | Interpolated ![InterpolatedElement]
     | Literal !Literal
     | Parenthesis !Expression
     | UnaryOp !UnarySymbol !Expression

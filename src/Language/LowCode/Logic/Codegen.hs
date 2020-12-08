@@ -216,6 +216,11 @@ instance Codegen (Expression metadata) where
             [ codegen expr
             , emitBetween' "[" "]" $ codegen inner
             ]
+        Interpolated _ values -> mconcatA
+            [ emitM "#\""
+            , mconcat <$> genInterpolated values
+            , emitM "\""
+            ]
         Literal _ value' -> codegen value'
         Parenthesis _ expr -> emitBetween' "(" ")" $ codegen expr
         Structure _ structure' -> codegen structure'
@@ -224,6 +229,10 @@ instance Codegen (Expression metadata) where
             , codegen expr
             ]
         Variable _ name' -> emitM name'
+      where
+        genInterpolated = traverse \case
+            InterpolatedText t -> emitM t
+            InterpolatedExpression e -> mconcatA [emitM "#(", codegen e, emitM ")"]
 
 instance (GeneratorState a ~ LogicGeneratorState, Codegen a) => Codegen (Structure a) where
     type GeneratorState (Structure a) = LogicGeneratorState

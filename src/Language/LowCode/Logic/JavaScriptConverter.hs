@@ -2,6 +2,7 @@
 
 module Language.LowCode.Logic.JavaScriptConverter
     ( module Language.LanguageConverter
+    , LogicConverter
     , LogicConverterState (..)
     ) where
 
@@ -182,11 +183,18 @@ instance LanguageConverter (L.Expression L.Type) JS.Expression where
             liftA3 JS.BinaryOp (convert left) (pure JS.Add) (convert arg)
         L.Call _ expr exprs -> liftA2 JS.Call (convert expr) (traverse convert exprs)
         L.Index _ expr inner -> liftA2 JS.Index (convert expr) (convert inner)
+        L.Interpolated _ values -> JS.Interpolated <$> convertInterpolated values
         L.Literal _ literal -> JS.Literal <$> convert literal
         L.Parenthesis _ expr -> JS.Parenthesis <$> convert expr
         L.Structure _ struct -> convert struct
         L.UnaryOp _ op expr -> JS.UnaryOp op <$> convert expr
         L.Variable _ name -> pure $ JS.Variable name
+
+convertInterpolated :: [L.InterpolatedElement L.Type] -> LogicConverter [JS.InterpolatedElement]
+convertInterpolated values = traverse convertElement values
+  where
+    convertElement (L.InterpolatedText t) = pure $ JS.InterpolatedText $ Text.replace "$" "\\$" t
+    convertElement (L.InterpolatedExpression e) = JS.InterpolatedExpression <$> convert e
 
 instance LanguageConverter L.Literal JS.Literal where
     type ConverterState L.Literal JS.Literal = LogicConverterState

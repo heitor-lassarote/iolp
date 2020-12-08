@@ -69,7 +69,7 @@ genElements
     -> HTMLCodegen gen
 genElements = \case
     x : xs -> do
-        code <- withIndent (htmlCodegen x)
+        code <- withIndent (htmlCodegenImpl x)
         elements <- genElements xs
         pure $ mconcat [code, elements]
     [] -> pure $ emit ""

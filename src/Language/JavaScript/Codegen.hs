@@ -13,6 +13,7 @@ import Universum hiding (Const)
 import Control.Monad.Trans.Except (throwE)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Default.Class
+import Data.Text (replace)
 
 import Language.Codegen
 import Language.Emit
@@ -215,6 +216,11 @@ genExpression = \case
         [ genExpression expr
         , emitBetween' "[" "]" $ genExpression inner
         ]
+    Interpolated values -> mconcatA
+        [ emitM "`"
+        , mconcat <$> genInterpolated values
+        , emitM "`"
+        ]
     Literal value -> genLiteral value
     Parenthesis expr -> emitBetween' "(" ")" $ genExpression expr
     UnaryOp op expr -> mconcatA
@@ -222,6 +228,10 @@ genExpression = \case
         , genExpression expr
         ]
     Variable name -> emitIfValid name
+  where
+    genInterpolated = traverse \case
+        InterpolatedText t -> emitM $ replace "$" "\\$" t
+        InterpolatedExpression e -> mconcatA [emitM "${", codegen e, emitM "}"]
 
 javaScriptCodegen :: (Emit gen, Monoid gen) => Module -> JavaScriptCodegen gen
 javaScriptCodegen m = do

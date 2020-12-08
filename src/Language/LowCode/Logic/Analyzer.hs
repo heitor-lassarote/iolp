@@ -585,6 +585,7 @@ analyzeExpr = \case
             (indexType typeL)
         exprR <- analyzeExprWithHint IntegerType right
         pure $ setMetadata indexed $ Index typeL exprL exprR
+    Interpolated _ values -> analyzeInterpolated values
     Literal _ l -> pure $ Literal (literalType l) l
     Parenthesis _ expr -> analyzeExpr expr
     Structure _ struct -> do
@@ -659,6 +660,7 @@ analyzeExprWithHint !expectedType = \case
             fatalError (TypeMismatch (unsafeCodegen' left) (ArrayType expectedType) typeL)
         exprR <- analyzeExprWithHint IntegerType right
         pure $ Index expectedType exprL exprR
+    Interpolated _ values -> analyzeInterpolated values
     Literal _ l -> do
         let typeL = literalType l
         when (typeL /= expectedType) $
@@ -683,6 +685,13 @@ analyzeExprWithHint !expectedType = \case
         when (typeV /= expectedType) $
             addError (TypeMismatch v expectedType typeV)
         pure $ Variable expectedType v
+
+analyzeInterpolated :: [InterpolatedElement e] -> Analyzer e' (Expression Type)
+analyzeInterpolated values = do
+    values' <- forM values \case
+        InterpolatedText t -> pure $ InterpolatedText t
+        InterpolatedExpression e -> InterpolatedExpression <$> analyzeExpr e
+    pure $ Interpolated TextType values'
 
 analyzeApply :: Name -> [Type] -> Type -> Analyzer e' Type
 analyzeApply name arguments (FunctionType argTypes ret) = do

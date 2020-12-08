@@ -33,6 +33,7 @@ mkYesod "LowCode" [parseRoutes|
 /editor/#ProjectId       ProjectR GET PUT DELETE
 /editor/#ProjectId/build BuildR   GET
 /user                    UserR    GET POST
+/user/login              LoginR   PUT
 |]
 
 data EditorPOST = EditorPOST
@@ -84,7 +85,13 @@ authenticate = maybe notAuthenticated validate' =<< lookupBasicAuth
             hash = userPassword $ entityVal user
         if validatePassword pwd hash
         then pure $ entityKey user
-        else notFound  -- We don't return permission denied to not leak available emails.
+        else notAuthenticated
+
+assertProjectOwner :: UserId -> ProjectId -> Handler ()
+assertProjectOwner uid pid = do
+    actualUid <- runDB (projectUserId <$> get404 pid)
+    when (uid /= actualUid) $
+        permissionDenied "You do not have access to this project."
 
 postEditorR :: Handler Value
 postEditorR = do
@@ -95,27 +102,31 @@ postEditorR = do
 
 getProjectR :: ProjectId -> Handler Value
 getProjectR pid = do
-    void authenticate
+    userId <- authenticate
+    assertProjectOwner userId pid
     runDB (toJSON . projectAst <$> get404 pid)
 
-putProjectR :: ProjectId -> Handler ()
+putProjectR :: ProjectId -> Handler Value
 putProjectR pid = do
     userId <- authenticate
+    assertProjectOwner userId pid
     post <- requireCheckJsonBody :: Handler EditorPOST
     let project = Project (toJSON $ editorPOSTAst post) (editorPOSTName post) userId
     runDB $ P.repsert pid project
-    sendResponse ("OK" :: Text)
+    sendResponse (Object $ one ("message", "OK"))
 
 deleteProjectR :: ProjectId -> Handler ()
 deleteProjectR pid = do
     userId <- authenticate
+    assertProjectOwner userId pid
     runDB $ delete $ from \project ->
         where_ (project ^. ProjectUserId ==. val userId &&. project ^. ProjectId ==. val pid)
-    sendResponse ("OK" :: Text)
+    sendResponse (Object $ one ("message", "OK"))
 
 getBuildR :: ProjectId -> Handler Value
 getBuildR pid = do
-    void authenticate
+    userId <- authenticate
+    assertProjectOwner userId pid
     project <- runDB $ get404 pid
     let bundle = fromJSON $ projectAst project :: Result BundleCssHtmlLogic
     status <- case bundle of
@@ -148,3 +159,6 @@ postUserR = do
     pwd <- liftIO $ hashPassword 13 (encodeUtf8 $ userPOSTPassword userPOST :: ByteString)
     let user = User (userPOSTEmail userPOST) pwd
     runDB $ toJSON <$> insert400 user
+
+putLoginR :: Handler Value
+putLoginR = toJSON <$> authenticate
