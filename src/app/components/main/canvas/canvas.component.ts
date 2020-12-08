@@ -80,13 +80,11 @@ const consoleType: Type = new RecordType([
 ]);
 
 @Component({
-    selector: "app-canvas",
     templateUrl: "./canvas.component.html",
     styleUrls: ["./canvas.component.scss"],
 })
 export class CanvasComponent implements OnInit {
     // Forms
-    uiForm: FormGroup;
     logicForm: FormGroup;
     decisionForm: FormGroup;
     repetitionForm: FormGroup;
@@ -98,8 +96,6 @@ export class CanvasComponent implements OnInit {
     consoleForm: FormGroup;
 
     // Attributes
-    // isLogicContainer: boolean = true; //TODO: Change to false
-    // $logicContainer: BehaviorSubject<boolean>;
     public style: object = {};
     elements: Element[] = [];
     cssObject: CssOut[] = [];
@@ -123,9 +119,7 @@ export class CanvasComponent implements OnInit {
         private toastr: ToastrService,
         private formBuilder: FormBuilder,
         private alert: AlertService
-    ) {
-        // this.$logicContainer = new BehaviorSubject<boolean>(true); //TODO: Change to false
-    }
+    ) {}
 
     ngOnInit() {
         this.spawnService.getElements().subscribe((element: Element) => {
@@ -133,20 +127,10 @@ export class CanvasComponent implements OnInit {
             this.elements.push(element);
         });
 
-        // this.checkLogicContainerState(this.isLogicContainer);
-
-        // this.$logicContainer.subscribe((value: boolean) => {
-        //     this.checkLogicContainerState(value);
-        // });
-
         this.createForms();
     }
 
     private createForms() {
-        this.uiForm = this.formBuilder.group({
-            components: this.formBuilder.array([]),
-        });
-
         this.logicForm = this.formBuilder.group({
             functions: this.formBuilder.array([]),
         });
@@ -229,9 +213,6 @@ export class CanvasComponent implements OnInit {
     }
 
     // Begin Get Form Array Datas
-    get uiComponentsArrayData() {
-        return <FormArray>this.uiForm.get("components");
-    }
 
     get eventsArrayData() {
         let func: AbstractControl = this.formData.controls[0];
@@ -696,16 +677,6 @@ export class CanvasComponent implements OnInit {
 
         return formGroup.get("expression") as FormGroup;
     }
-
-    // Change Container listeners
-    // setLogicContainer(value: boolean) {
-    //     this.isLogicContainer = value;
-    //     this.$logicContainer.next(value);
-    // }
-
-    // getLogicContainer(): Observable<boolean> {
-    //     return this.$logicContainer.asObservable();
-    // }
 
     // Resize Components
     validate(event: ResizeEvent): boolean {

@@ -1,16 +1,11 @@
 <form [formGroup]="infosForm" (ngSubmit)="apply()">
-    <div id="smarttab">
-        <ul class="nav">
-            <li>
-                <a class="nav-link" href="#tab-1"> Informações </a>
-            </li>
-            <li>
-                <a class="nav-link" href="#tab-2"> Estilo </a>
-            </li>
-        </ul>
-
-        <div class="tab-content">
-            <div id="tab-1" class="tab-pane col-md-12" role="tabpanel">
+    <mat-tab-group
+        dynamicHeight
+        animationDuration="0ms"
+        mat-align-tabs="center"
+    >
+        <mat-tab label="Informações">
+            <div class="col-md-12 m-t-sm">
                 <h3>Tipo: {{ infosForm.get("type").value }}</h3>
                 <div class="col-12">
                     <div class="row m-b-sm">
@@ -39,7 +34,9 @@
                     </div>
                 </div>
             </div>
-            <div id="tab-2" class="tab-pane col-md-12" role="tabpanel">
+        </mat-tab>
+        <mat-tab label="Estilo">
+            <div class="col-md-12 m-t-sm">
                 <div class="col-12">
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
@@ -132,8 +129,9 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
+        </mat-tab>
+    </mat-tab-group>
+
     <div class="col-12 text-right m-t-sm">
         <button
             type="submit"

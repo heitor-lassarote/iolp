@@ -1,39 +1,11 @@
-<!-- <div class="row col-md-12 text-left m-b-md" style="padding-right: 0 !important">
-    <div class="col-md-6 text-left">
-        <button
-            type="button"
-            class="btn m-r-md tab-btn"
-            [class.btn-default]="isLogicContainer"
-            [class.btn-primary]="!isLogicContainer"
-            (click)="setLogicContainer(false)"
-        >
-            Interface
-        </button>
-        <button
-            type="button"
-            class="btn btn-default tab-btn"
-            [class.btn-default]="!isLogicContainer"
-            [class.btn-primary]="isLogicContainer"
-            (click)="setLogicContainer(true)"
-        >
-            Lógica
-        </button>
-    </div>
-    <div class="col-md-6 text-right" style="padding-right: 0 !important">
-        <button
-            type="button"
-            class="btn btn-primary tab-btn"
-            (click)="apply()"
-            [disabled]="!isValid()"
-        >
-            Aplicar
-        </button>
-    </div>
-</div> -->
-
-<mat-tab-group dynamicHeight animationDuration="0ms" mat-align-tabs="start" (selectedIndexChange)="checkLogicContainerState($event)">
+<mat-tab-group
+    dynamicHeight
+    animationDuration="0ms"
+    mat-align-tabs="start"
+    (selectedIndexChange)="checkLogicContainerState($event)"
+>
     <mat-tab label="Interface">
-        <div id="gui" class="col-md-12">
+        <div id="gui" class="col-md-12 m-t-xs">
             <div class="screen" id="canvas">
                 <div *ngFor="let e of elements; let i = index">
                     <div
@@ -100,7 +72,7 @@
     </mat-tab>
 
     <mat-tab label="Lógica">
-        <div id="logic" class="col-md-12">
+        <div id="logic" class="col-md-12 m-t-xs">
             <div class="ibox">
                 <div class="ibox-title">
                     <div class="ibox-tools">
