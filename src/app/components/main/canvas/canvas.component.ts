@@ -62,8 +62,8 @@ import {
     Validators,
 } from "@angular/forms";
 import { AlertService } from "src/app/services/alert/alert.service";
-import { BehaviorSubject, Observable } from "rxjs";
 import { LOWCODEFUNCTIONS } from "../../constants/low-code-functions.constant";
+import { SetComponentService } from "src/app/services/set-component/set-component.service";
 
 declare let $: any;
 declare let css: any;
@@ -85,6 +85,7 @@ const consoleType: Type = new RecordType([
 })
 export class CanvasComponent implements OnInit {
     // Forms
+    uiForm: FormGroup;
     logicForm: FormGroup;
     decisionForm: FormGroup;
     repetitionForm: FormGroup;
@@ -118,19 +119,65 @@ export class CanvasComponent implements OnInit {
         private spinner: NgxSpinnerService,
         private toastr: ToastrService,
         private formBuilder: FormBuilder,
-        private alert: AlertService
+        private alert: AlertService,
+        private newValueService: SetComponentService
     ) {}
 
     ngOnInit() {
         this.spawnService.getElements().subscribe((element: Element) => {
+            const control = this.uiArrayData.controls;
             element.name = `component${this.elements.length}`;
+            element.formIndex = control.length;
             this.elements.push(element);
+            control.push(
+                this.initUiForm({
+                    name: element.name,
+                    type: element.type,
+                    width: element.width,
+                    height: element.height,
+                    position: element.position,
+                    selectOptions: element.selectOptions,
+                })
+            );
+        });
+
+        this.newValueService.getNewValue().subscribe((info: Info) => {
+            this.setNewValueToUiComponent(info);
         });
 
         this.createForms();
     }
 
+    private setNewValueToUiComponent(info: Info) {
+        const formGroup = this.uiArrayData.controls[info.formIndex];
+        formGroup.get("type").setValue(info.html.type);
+        formGroup.get("name").setValue(info.html.name);
+        formGroup.get("width").setValue(info.css.width);
+        formGroup.get("height").setValue(info.css.height);
+        formGroup.get("selectOptions").setValue(info.html.selectOptions);
+
+        let elementIndex: number;
+        let element = this.elements.find((el, index) => {
+            elementIndex = index;
+            return el.formIndex === info.formIndex;
+        });
+        let newElementValue: Element = {
+            formIndex: info.formIndex,
+            type: info.html.type,
+            name: info.html.name,
+            width: info.css.width,
+            height: info.css.height,
+            position: element.position,
+            selectOptions: info.html.selectOptions,
+        };
+        this.elements[elementIndex] = newElementValue;
+    }
+
     private createForms() {
+        this.uiForm = this.formBuilder.group({
+            components: this.formBuilder.array([]),
+        });
+
         this.logicForm = this.formBuilder.group({
             functions: this.formBuilder.array([]),
         });
@@ -213,6 +260,13 @@ export class CanvasComponent implements OnInit {
     }
 
     // Begin Get Form Array Datas
+    get uiArrayData() {
+        return <FormArray>this.uiForm.get("components");
+    }
+
+    getCssFromForm(formIndex: number): FormArray {
+        return <FormArray>this.uiArrayData.controls[formIndex].get("css");
+    }
 
     get eventsArrayData() {
         let func: AbstractControl = this.formData.controls[0];
@@ -325,6 +379,29 @@ export class CanvasComponent implements OnInit {
     // End Get Form Array Datas
 
     // Begin Create Array Data
+    private initUiForm(ui: {
+        type: string;
+        name: string;
+        width: string;
+        height: string;
+        position: {
+            x: number;
+            y: number;
+        };
+        selectOptions?: string[];
+    }): FormGroup {
+        return this.formBuilder.group({
+            type: ui.type,
+            name: ui.name,
+            width: ui.width,
+            height: ui.height,
+            positionX: ui.position.x,
+            positionY: ui.position.y,
+            selectedOptions: ui.selectOptions ? [] : ui.selectOptions,
+            css: this.formBuilder.array([]),
+        });
+    }
+
     private initForm(func: {
         funcName: string;
         parameters: { paramName: string; paramValue: any; paramType: Type }[];
@@ -707,20 +784,43 @@ export class CanvasComponent implements OnInit {
     click(ev: MouseEvent, targ: HTMLElement) {
         let comp: string = `#${targ.id}`;
         let infos: Info = {
+            formIndex: this.elements.find((el) => (el.name = comp)).formIndex,
             html: {
                 name: $(comp).prop("id") !== null ? $(comp).prop("id") : "",
                 type:
                     $(comp).prop("tagName") !== null
                         ? $(comp).prop("tagName").toLowerCase()
                         : "",
-                text: $(comp).text() !== null ? $(comp).text() : "",
+                text:
+                    $(comp).text() !== null
+                        ? $(comp).prop("tagName").toLowerCase() === "select"
+                            ? ""
+                            : $(comp).text()
+                        : "",
+                selectOptions:
+                    $(comp).prop("tagName").toLowerCase() === "select"
+                        ? this.getSelectOptions(comp)
+                        : [],
             },
             css: {
                 width: $(comp).css("width"),
                 height: $(comp).css("height"),
+                alignText: $(comp).css("text-align"),
+                justifyContent: $(comp).css("justify-content"),
             },
         };
+        console.log(infos);
         this.showInfosService.setComponentInfos(infos);
+    }
+
+    private getSelectOptions(component: string): string[] {
+        let selectOptions: string[] = [];
+        [...$(component).children()].forEach((opt) => {
+            console.log(opt);
+            selectOptions.push(opt.value);
+        });
+
+        return selectOptions;
     }
 
     // Create an event to component

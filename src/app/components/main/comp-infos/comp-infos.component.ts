@@ -1,5 +1,6 @@
 import { Component, OnInit } from "@angular/core";
 import { FormGroup, FormBuilder, Validators } from "@angular/forms";
+import { SetComponentService } from "src/app/services/set-component/set-component.service";
 import { ShowComponentInfoService } from "src/app/services/show-component-info/show-component-info.service";
 import { Info } from "../../domain/info";
 
@@ -17,11 +18,11 @@ export class CompInfosComponent implements OnInit {
 
     constructor(
         private formBuilder: FormBuilder,
-        private showInfosService: ShowComponentInfoService
+        private showInfosService: ShowComponentInfoService,
+        private newValueService: SetComponentService
     ) {}
 
     ngOnInit() {
-        this.initTabs();
         this.infosForm = this.formBuilder.group({
             // html
             type: "",
@@ -30,6 +31,7 @@ export class CompInfosComponent implements OnInit {
                 Validators.required,
             ],
             text: { value: "", disabled: !this.haveComponent },
+            selectOptions: { value: "", disabled: !this.haveComponent },
 
             // css
             width: [
@@ -42,6 +44,7 @@ export class CompInfosComponent implements OnInit {
                 [Validators.required, Validators.min(1)],
             ],
             heightUnity: { value: "", disabled: !this.haveComponent },
+            textAlign: "",
         });
         this.showInfosService.getComponentInfos().subscribe((info: Info) => {
             this.originInfo = info;
@@ -56,23 +59,29 @@ export class CompInfosComponent implements OnInit {
         let css = info.css;
 
         // html
-        form.get("type").setValue(html.type);
-        form.get("name").setValue(html.name);
+        form.get("type").setValue(html.type.trim());
+        form.get("name").setValue(html.name.trim());
         this.infosForm.get("name").enable();
-        form.get("text").setValue(html.text);
-        this.infosForm.get("text").enable();
+        form.get("text").setValue(html.text.trim());
+        if (html.type.trim() !== "select") this.infosForm.get("text").enable();
+        else {
+            form.get("selectOptions").setValue(
+                this.buildSelectOptionsString(html.selectOptions)
+            );
+            this.infosForm.get("selectOptions").enable();
+        }
 
         //css
         let size: { value: number; unity: string } = this.getSizePart(
-            css.width
+            css.width.trim()
         );
         form.get("width").setValue(size.value);
-        form.get("widthUnity").setValue(size.unity);
+        form.get("widthUnity").setValue(size.unity.trim());
         this.infosForm.get("width").enable();
         this.infosForm.get("widthUnity").enable();
-        size = this.getSizePart(css.height);
+        size = this.getSizePart(css.height.trim());
         form.get("height").setValue(size.value);
-        form.get("heightUnity").setValue(size.unity);
+        form.get("heightUnity").setValue(size.unity.trim());
         this.infosForm.get("height").enable();
         this.infosForm.get("heightUnity").enable();
     }
@@ -93,48 +102,51 @@ export class CompInfosComponent implements OnInit {
         };
     }
 
-    clearFields() {
-        this.infosForm.get("type").setValue("");
-        $(".form-control").val("");
-    }
-
     alignText(align: string) {
-        let comp = `#${this.originInfo.html.name}`;
-        $(comp).css("text-align", align);
-        $(comp).css("justify-content", align);
-    }
-
-    initTabs() {
-        $("#smarttab").smartTab({
-            selected: 0,
-            theme: "brick",
-            orientation: "horizontal",
-            enableURLhash: false,
-            transition: {
-                animation: "slide-horizontal",
-                speed: "400",
-            },
-            keyboardSettings: {
-                keyNavigation: false,
-            },
-        });
+        this.infosForm.get("textAlign").setValue(align);
     }
 
     apply() {
-        let formValue = this.infosForm.value;
+        let formValue = this.infosForm.getRawValue();
         this.setNewInfo(formValue);
-        this.clearFields();
         this.originInfo = null;
         this.haveComponent = false;
         this.infosForm.get("name").disable();
         this.infosForm.get("text").disable();
+        this.infosForm.get("selectOptions").disable();
+        this.infosForm.get("width").disable();
+        this.infosForm.get("widthUnity").disable();
+        this.infosForm.get("height").disable();
+        this.infosForm.get("heightUnity").disable();
+        this.infosForm.reset();
     }
 
     setNewInfo(value: any) {
-        let comp = `#${this.originInfo.html.name}`;
-        $(comp).text(value["text"]);
-        $(comp).css("width", value["width"]);
-        $(comp).css("height", value["height"]);
-        $(comp).prop("id", value["name"]);
+        let newValue: Info = {
+            formIndex: this.originInfo.formIndex,
+            html: {
+                name: value["name"],
+                text: value["text"],
+                type: value["type"],
+                selectOptions: this.getSelectOptionsArray(
+                    value["selectOptions"]
+                ),
+            },
+            css: {
+                height: value["height"],
+                width: value["width"],
+                alignText: value["textAlign"],
+                justifyContent: value["textAlign"],
+            },
+        };
+        this.newValueService.setNewValue(newValue);
+    }
+
+    buildSelectOptionsString(selectOptions: string[]): string {
+        return selectOptions.join(",");
+    }
+
+    getSelectOptionsArray(selectOptions: string): string[] {
+        return selectOptions.split(",");
     }
 }

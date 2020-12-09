@@ -32,6 +32,22 @@
                             />
                         </div>
                     </div>
+                    <div
+                        *ngIf="infosForm.get('type').value === 'select'"
+                        class="row m-b-sm"
+                    >
+                        <div class="col-3 m-auto">
+                            <h5>Options</h5>
+                        </div>
+                        <div class="col-9">
+                            <textarea
+                                class="form-control"
+                                cols="30"
+                                rows="10"
+                                formControlName="selectOptions"
+                            ></textarea>
+                        </div>
+                    </div>
                 </div>
             </div>
         </mat-tab>

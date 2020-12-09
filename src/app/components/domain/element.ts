@@ -1,4 +1,5 @@
 export class Element {
+    formIndex: number;
     type: string;
     name: string;
     width: string;
