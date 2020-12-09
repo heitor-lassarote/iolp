@@ -129,6 +129,7 @@ export class CanvasComponent implements OnInit {
             element.name = `component${this.elements.length}`;
             element.formIndex = control.length;
             this.elements.push(element);
+            console.log(element.position);
             control.push(
                 this.initUiForm({
                     name: element.name,
@@ -149,12 +150,16 @@ export class CanvasComponent implements OnInit {
     }
 
     private setNewValueToUiComponent(info: Info) {
-        const formGroup = this.uiArrayData.controls[info.formIndex];
-        formGroup.get("type").setValue(info.html.type);
-        formGroup.get("name").setValue(info.html.name);
-        formGroup.get("width").setValue(info.css.width);
-        formGroup.get("height").setValue(info.css.height);
-        formGroup.get("selectOptions").setValue(info.html.selectOptions);
+        const formGroup = (this.uiArrayData.controls[
+            info.formIndex
+        ] as FormGroup).controls;
+        console.log(formGroup);
+        console.log(info.css);
+        formGroup["type"].patchValue(info.html.type);
+        formGroup["name"].patchValue(info.html.name);
+        formGroup["width"].patchValue(info.css.width);
+        formGroup["height"].patchValue(info.css.height);
+        formGroup["selectOptions"].patchValue(info.html.selectOptions);
 
         let elementIndex: number;
         let element = this.elements.find((el, index) => {
@@ -266,6 +271,12 @@ export class CanvasComponent implements OnInit {
 
     getCssFromForm(formIndex: number): FormArray {
         return <FormArray>this.uiArrayData.controls[formIndex].get("css");
+    }
+
+    getSelectOptionsArray(formIndex: number): FormArray {
+        return <FormArray>(
+            this.uiArrayData.controls[formIndex].get("selectOptions")
+        );
     }
 
     get eventsArrayData() {
@@ -395,9 +406,11 @@ export class CanvasComponent implements OnInit {
             name: ui.name,
             width: ui.width,
             height: ui.height,
-            positionX: ui.position.x,
-            positionY: ui.position.y,
-            selectedOptions: ui.selectOptions ? [] : ui.selectOptions,
+            positionX: ui.position.x.toString() + "px",
+            positionY: ui.position.y.toString() + "px",
+            selectOptions: this.formBuilder.array(
+                ui.selectOptions ? [] : ui.selectOptions
+            ),
             css: this.formBuilder.array([]),
         });
     }
@@ -809,7 +822,6 @@ export class CanvasComponent implements OnInit {
                 justifyContent: $(comp).css("justify-content"),
             },
         };
-        console.log(infos);
         this.showInfosService.setComponentInfos(infos);
     }
 

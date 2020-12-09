@@ -128,13 +128,17 @@ export class CompInfosComponent implements OnInit {
                 name: value["name"],
                 text: value["text"],
                 type: value["type"],
-                selectOptions: this.getSelectOptionsArray(
-                    value["selectOptions"]
-                ),
+                selectOptions:
+                    value["type"] === "select"
+                        ? this.getSelectOptionsArray(value["selectOptions"])
+                        : [],
             },
             css: {
-                height: value["height"],
-                width: value["width"],
+                height:
+                    value["height"].toString() +
+                    value["heightUnity"].toString(),
+                width:
+                    value["width"].toString() + value["widthUnity"].toString(),
                 alignText: value["textAlign"],
                 justifyContent: value["textAlign"],
             },

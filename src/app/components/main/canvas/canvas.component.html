@@ -7,25 +7,35 @@
     <mat-tab label="Interface">
         <div id="gui" class="col-md-12 m-t-xs">
             <div class="screen" id="canvas">
-                <div *ngFor="let e of elements; let i = index">
+                <div
+                    *ngFor="let e of uiArrayData.controls; let i = index"
+                    [formGroup]="e"
+                >
                     <div
-                        *ngIf="e.type === 'container'"
+                        *ngIf="e.get('type').value === 'container'"
                         [ngStyle]="{
-                            width: e.width,
-                            height: e.height,
+                            width: e.get('width').value,
+                            height: e.get('height').value,
                             position: 'absolut',
+                            top: e.get('positionY').value,
+                            left: e.get('positionX').value,
                             border: 'solid'
                         }"
                         mwlResizable
                         (click)="click($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
-                        [id]="e.name"
+                        [id]="e.get('name').value"
                     ></div>
                     <button
-                        *ngIf="e.type === 'button'"
+                        *ngIf="e.get('type').value === 'button'"
+                        [ngStyle]="{
+                            position: 'absolut',
+                            top: e.get('positionY').value,
+                            left: e.get('positionX').value
+                        }"
                         class="btn btn-default draggable"
-                        [id]="e.name"
+                        [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
                         (dblclick)="onDoubleClick($event, $event.target)"
                         cdkDrag
@@ -34,9 +44,14 @@
                         Botão
                     </button>
                     <p
-                        *ngIf="e.type === 'label'"
+                        *ngIf="e.get('type').value === 'label'"
+                        [ngStyle]="{
+                            position: 'absolut',
+                            top: e.get('positionY').value,
+                            left: e.get('positionX').value
+                        }"
                         class="draggable"
-                        [id]="e.name"
+                        [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
@@ -44,23 +59,36 @@
                         Novo Label
                     </p>
                     <input
-                        *ngIf="e.type === 'input'"
+                        *ngIf="e.get('type').value === 'input'"
+                        [ngStyle]="{
+                            position: 'absolut',
+                            top: e.get('positionY').value,
+                            left: e.get('positionX').value
+                        }"
                         class="draggable input-field"
-                        [id]="e.name"
+                        [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
                     />
                     <select
-                        *ngIf="e.type === 'select'"
+                        *ngIf="e.get('type').value === 'select'"
+                        [ngStyle]="{
+                            position: 'absolut',
+                            top: e.get('positionY').value,
+                            left: e.get('positionX').value
+                        }"
                         class="draggable select-field"
-                        [id]="e.name"
+                        [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
+                        (dblclick)="onDoubleClick($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
                     >
                         <option
-                            *ngFor="let item of e.selectOptions"
+                            *ngFor="
+                                let item of getSelectOptionsArray(i).controls
+                            "
                             [value]="item"
                         >
                             {{ item }}

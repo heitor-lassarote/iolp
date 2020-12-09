@@ -53,8 +53,8 @@ export class SideNavigationComponent implements OnInit {
             height: "50px",
             width: "50px",
             position: {
-                x: 50,
-                y: 50,
+                x: $("#canvas").offset().left,
+                y: $("#canvas").offset().top,
             },
             selectOptions: [],
         };
