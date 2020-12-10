@@ -14,7 +14,12 @@ export class SendService {
         this.header = new HttpHeaders()
             .set(
                 "Authorization",
-                "Basic " + btoa("brunocaputo@gec.inatel.br:teste123")
+                "Basic " +
+                    btoa(
+                        `${sessionStorage.getItem(
+                            "email"
+                        )}:${sessionStorage.getItem("password")}`
+                    )
             )
             .set("Content-Type", "application/json");
     }

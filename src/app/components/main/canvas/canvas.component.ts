@@ -129,17 +129,22 @@ export class CanvasComponent implements OnInit {
             element.name = `component${this.elements.length}`;
             element.formIndex = control.length;
             this.elements.push(element);
-            console.log(element.position);
             control.push(
                 this.initUiForm({
+                    class: "",
                     name: element.name,
                     type: element.type,
+                    text: element.text,
                     width: element.width,
                     height: element.height,
                     position: element.position,
                     selectOptions: element.selectOptions,
                 })
             );
+
+            setTimeout(() => {
+                this.checkComponentCss(control);
+            }, 100);
         });
 
         this.newValueService.getNewValue().subscribe((info: Info) => {
@@ -149,33 +154,178 @@ export class CanvasComponent implements OnInit {
         this.createForms();
     }
 
+    private checkComponentCss(control: AbstractControl[]) {
+        $("#canvas")
+            .children()
+            .each((index: number, child: HTMLElement) => {
+                let nodes = child.childNodes;
+                let childElement: HTMLElement;
+
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i].nodeType !== Node.COMMENT_NODE) {
+                        childElement = nodes[i] as HTMLElement;
+                    }
+                }
+                for (let i = 0; i < childElement.attributes.length; i++) {
+                    let nodeName: string = childElement.attributes[i].nodeName;
+                    let value: string = childElement.attributes[i].value;
+                    switch (nodeName) {
+                        case "class":
+                            let classArray = value.split(" ");
+                            classArray = classArray.filter((value) => {
+                                return !(
+                                    value.includes("drag") ||
+                                    value.includes("ng")
+                                );
+                            });
+                            let classString: string = classArray.join(" ");
+                            control[control.length - 1]
+                                .get("class")
+                                .patchValue(classString);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                let elementCss: string[] = css(childElement);
+                let localCssObj: CssOut;
+                elementCss.forEach((css: string) => {
+                    let className = css.substring(0, css.indexOf("{"));
+                    let attributes = css.substring(
+                        css.indexOf("{") + 1,
+                        css.indexOf("}")
+                    );
+                    if (!className.includes("drag")) {
+                        localCssObj = {
+                            className: className.trim(),
+                            attributes: [],
+                        };
+                        let cssAttr = attributes.split("; ");
+                        let classAttributes: {
+                            attributeName: string;
+                            attributeValue: string;
+                        }[] = [];
+                        cssAttr.forEach((attr) => {
+                            attr = attr.trim();
+                            if (attr !== "") {
+                                localCssObj.attributes.push([
+                                    attr.split(":")[0].trim(),
+                                    attr.split(":")[1].trim(),
+                                ]);
+                                classAttributes.push({
+                                    attributeName: attr.split(":")[0].trim(),
+                                    attributeValue: attr.split(":")[1].trim(),
+                                });
+                            }
+                        });
+                        this.cssObject.push(localCssObj);
+                    }
+                });
+            });
+    }
+
     private setNewValueToUiComponent(info: Info) {
-        const formGroup = (this.uiArrayData.controls[
-            info.formIndex
-        ] as FormGroup).controls;
-        console.log(formGroup);
-        console.log(info.css);
+        const formIndex: number = info.formIndex;
+        const formGroup = (this.uiArrayData.controls[formIndex] as FormGroup)
+            .controls;
+        const oldName: string = formGroup["name"].value;
+
+        let elementIndex = this.elements.findIndex((el) => el.name === oldName);
+        let newElementValue: Element = {
+            formIndex,
+            name: info.html.name,
+            height: info.css.height,
+            position: {
+                x: formGroup["positionX"].value,
+                y: formGroup["positionY"].value,
+            },
+            selectOptions: info.html.selectOptions,
+            text: info.html.text,
+            type: info.html.type,
+            width: info.css.width,
+        };
+        this.elements.splice(elementIndex, 1, newElementValue);
+
         formGroup["type"].patchValue(info.html.type);
         formGroup["name"].patchValue(info.html.name);
+        formGroup["text"].patchValue(info.html.text);
         formGroup["width"].patchValue(info.css.width);
         formGroup["height"].patchValue(info.css.height);
-        formGroup["selectOptions"].patchValue(info.html.selectOptions);
 
-        let elementIndex: number;
-        let element = this.elements.find((el, index) => {
-            elementIndex = index;
-            return el.formIndex === info.formIndex;
+        const selectOptionFormArray = this.getSelectOptionsArray(formIndex);
+        selectOptionFormArray.clear();
+        info.html.selectOptions.forEach((item) => {
+            selectOptionFormArray.controls.push(
+                this.initSelectOptions({ name: item })
+            );
         });
-        let newElementValue: Element = {
-            formIndex: info.formIndex,
-            type: info.html.type,
-            name: info.html.name,
-            width: info.css.width,
-            height: info.css.height,
-            position: element.position,
-            selectOptions: info.html.selectOptions,
-        };
-        this.elements[elementIndex] = newElementValue;
+
+        $(`#${oldName}`).css("width", info.css.width);
+        $(`#${oldName}`).css("height", info.css.height);
+        $(`#${oldName}`).css("text-align", info.css.alignText);
+        $(`#${oldName}`).css("justify-content", info.css.justifyContent);
+
+        if (oldName !== info.html.name) {
+            let index: number = this.cssObject.findIndex(
+                (cssItem) => cssItem.className === `#${oldName}`
+            );
+            if (index === -1) {
+                this.cssObject.push({
+                    className: `#${info.html.name}`,
+                    attributes: [
+                        ["width", formGroup["width"].value],
+                        ["height", formGroup["height"].value],
+                        ["text-align", info.css.alignText],
+                        ["justify-content", info.css.justifyContent],
+                        ["position", "absolute"],
+                        ["top", formGroup["positionY"].value],
+                        ["left", formGroup["positionX"].value],
+                    ],
+                });
+            } else {
+                let newCssObj: CssOut = {
+                    className: `#${info.html.name}`,
+                    attributes: [
+                        ["width", formGroup["width"].value],
+                        ["height", formGroup["height"].value],
+                        ["text-align", info.css.alignText],
+                        ["justify-content", info.css.justifyContent],
+                        ["position", "absolute"],
+                        ["top", formGroup["positionY"].value],
+                        ["left", formGroup["positionX"].value],
+                    ],
+                };
+                this.cssObject.splice(index, 1, newCssObj);
+            }
+        } else {
+            let cssObj = this.cssObject.find(
+                (cssItem) => cssItem.className === `#${oldName}`
+            );
+            if (cssObj) {
+                cssObj.attributes = [
+                    ["width", formGroup["width"].value],
+                    ["height", formGroup["height"].value],
+                    ["text-align", info.css.alignText],
+                    ["justify-content", info.css.justifyContent],
+                    ["position", "absolute"],
+                    ["top", formGroup["positionY"].value],
+                    ["left", formGroup["positionX"].value],
+                ];
+            } else {
+                this.cssObject.push({
+                    className: `#${info.html.name}`,
+                    attributes: [
+                        ["width", formGroup["width"].value],
+                        ["height", formGroup["height"].value],
+                        ["text-align", info.css.alignText],
+                        ["justify-content", info.css.justifyContent],
+                        ["position", "absolute"],
+                        ["top", formGroup["positionY"].value],
+                        ["left", formGroup["positionX"].value],
+                    ],
+                });
+            }
+        }
     }
 
     private createForms() {
@@ -267,10 +417,6 @@ export class CanvasComponent implements OnInit {
     // Begin Get Form Array Datas
     get uiArrayData() {
         return <FormArray>this.uiForm.get("components");
-    }
-
-    getCssFromForm(formIndex: number): FormArray {
-        return <FormArray>this.uiArrayData.controls[formIndex].get("css");
     }
 
     getSelectOptionsArray(formIndex: number): FormArray {
@@ -391,8 +537,10 @@ export class CanvasComponent implements OnInit {
 
     // Begin Create Array Data
     private initUiForm(ui: {
+        class: string;
         type: string;
         name: string;
+        text: string;
         width: string;
         height: string;
         position: {
@@ -402,8 +550,10 @@ export class CanvasComponent implements OnInit {
         selectOptions?: string[];
     }): FormGroup {
         return this.formBuilder.group({
+            class: ui.class,
             type: ui.type,
             name: ui.name,
+            text: ui.text,
             width: ui.width,
             height: ui.height,
             positionX: ui.position.x.toString() + "px",
@@ -412,6 +562,12 @@ export class CanvasComponent implements OnInit {
                 ui.selectOptions ? [] : ui.selectOptions
             ),
             css: this.formBuilder.array([]),
+        });
+    }
+
+    private initSelectOptions(option: { name: string }): FormGroup {
+        return this.formBuilder.group({
+            name: option.name,
         });
     }
 
@@ -797,13 +953,15 @@ export class CanvasComponent implements OnInit {
     click(ev: MouseEvent, targ: HTMLElement) {
         let comp: string = `#${targ.id}`;
         let infos: Info = {
-            formIndex: this.elements.find((el) => (el.name = comp)).formIndex,
+            formIndex: this.elements.find((el) => el.name === targ.id)
+                .formIndex,
             html: {
                 name: $(comp).prop("id") !== null ? $(comp).prop("id") : "",
-                type:
+                type: this.getTypeByTagName(
                     $(comp).prop("tagName") !== null
                         ? $(comp).prop("tagName").toLowerCase()
-                        : "",
+                        : ""
+                ),
                 text:
                     $(comp).text() !== null
                         ? $(comp).prop("tagName").toLowerCase() === "select"
@@ -825,14 +983,66 @@ export class CanvasComponent implements OnInit {
         this.showInfosService.setComponentInfos(infos);
     }
 
+    private getTagNameByType(type: string): string {
+        switch (type) {
+            case "container":
+                return "div";
+            case "label":
+                return "p";
+            default:
+                return type;
+        }
+    }
+
+    private getTypeByTagName(tagName: string): string {
+        switch (tagName) {
+            case "div":
+                return "container";
+            case "p":
+                return "label";
+            default:
+                return tagName;
+        }
+    }
+
     private getSelectOptions(component: string): string[] {
         let selectOptions: string[] = [];
         [...$(component).children()].forEach((opt) => {
-            console.log(opt);
             selectOptions.push(opt.value);
         });
 
         return selectOptions;
+    }
+
+    // Drag components
+    onDragEnd(evt: DragEvent, index: number) {
+        const canvasPosition = $("#canvas").offset();
+        const control = this.uiArrayData.controls[index];
+        let elementPosition = $(`#${control.get("name").value}`).offset();
+        let top = elementPosition.top - canvasPosition.top;
+        let left = elementPosition.left - canvasPosition.left;
+        top = top < 0 ? 0 : top;
+        left = left < 0 ? 0 : left;
+
+        control
+            .get("positionX")
+            .patchValue(this.convertToPercent(left, $("#canvas").width()));
+        control
+            .get("positionY")
+            .patchValue(this.convertToPercent(top, $("#canvas").height()));
+
+        this.cssObject.push({
+            className: `#${control.get("name").value}`,
+            attributes: [
+                ["position", "absolute"],
+                ["top", control.get("positionY").value],
+                ["left", control.get("positionX").value],
+            ],
+        });
+    }
+
+    convertToPercent(value: number, canvasDimension: number): string {
+        return ((value * 100.0) / canvasDimension).toString() + "%";
     }
 
     // Create an event to component
@@ -871,24 +1081,18 @@ export class CanvasComponent implements OnInit {
             logic: [],
             html: [],
         };
-        $("#canvas")
-            .children()
-            .each((index: number, child: HTMLElement) => {
-                let nodes = child.childNodes;
-                let element: HTMLElement;
-                let htmlObject: HtmlTagOut = {
-                    tag: "",
-                    ast: [],
-                    attributes: [],
-                };
-                for (let i = 0; i < nodes.length; i++) {
-                    if (nodes[i].nodeType !== Node.COMMENT_NODE) {
-                        element = nodes[i] as HTMLElement;
-                    }
-                }
-                htmlObject = this.createComponent(element, htmlObject, false);
-                pageTest.html.push(htmlObject);
-            });
+        this.uiArrayData.controls.forEach((formGroup, formIndex) => {
+            let htmlObject: HtmlTagOut = {
+                tag: "",
+                ast: [],
+                attributes: [],
+            };
+            htmlObject = this.createComponent(
+                formGroup as FormGroup,
+                htmlObject
+            );
+            pageTest.html.push(htmlObject);
+        });
         let externs: Map<string, Type> = new Map<string, Type>([
             ["console", consoleType],
         ]);
@@ -943,114 +1147,25 @@ export class CanvasComponent implements OnInit {
 
     // begin HTML part
     private createComponent(
-        element: HTMLElement,
-        htmlObject: HtmlTagOut,
-        isChild: boolean
+        formGroup: FormGroup,
+        htmlObject: HtmlTagOut
     ): HtmlTagOut {
-        let childNodes = element.childNodes;
-        htmlObject.tag = element.tagName.toLowerCase();
-        const canvasPosition = $("#canvas").offset();
-        for (let i = 0; i < element.attributes.length; i++) {
-            let nodeName: string = element.attributes[i].nodeName;
-            let value: string = element.attributes[i].value;
-            switch (nodeName) {
-                case "id":
-                    htmlObject.attributes.push(["id", value]);
-                    break;
-                case "class":
-                    let classArray = value.split(" ");
-                    classArray = classArray.filter((value) => {
-                        return !(
-                            value.includes("drag") || value.includes("ng")
-                        );
-                    });
-                    let classString: string = classArray.join(" ");
-                    htmlObject.attributes.push(["class", classString]);
-                    break;
-                case "style":
-                    let css: CssOut = {
-                        className: `#${element.id.trim()}`,
-                        attributes: [],
-                    };
-                    if (!isChild) {
-                        let elementPosition = $(`#${element.id}`).offset();
-                        let top = elementPosition.top - canvasPosition.top;
-                        let left = elementPosition.left - canvasPosition.left;
-                        top = top < 0 ? 0 : top;
-                        left = left < 0 ? 0 : left;
-                        css.attributes.push(["top", top.toString()]);
-                        css.attributes.push(["left", left.toString()]);
-                        css.attributes.push(["position", "absolute"]);
-                    }
-                    let cssAttr = value.split("; ");
-                    cssAttr.forEach((attr) => {
-                        attr = attr.trim();
-                        if (
-                            attr !== "" &&
-                            !attr.includes("transform") &&
-                            !attr.includes("translate")
-                        ) {
-                            css.attributes.push([
-                                attr.split(":")[0].trim(),
-                                attr.split(":")[1].trim(),
-                            ]);
-                        }
-                    });
-                    this.cssObject.push(css);
-                    break;
-                default:
-                    break;
-            }
+        htmlObject.tag = this.getTagNameByType(formGroup.get("type").value);
+        htmlObject.attributes.push(["id", formGroup.get("name").value]);
+        htmlObject.attributes.push(["class", formGroup.get("class").value]);
+        if (formGroup.get("text").value !== "") {
+            htmlObject.ast.push(new HtmlTextOut(formGroup.get("text").value));
         }
-        let elementCss: string[] = css(element);
-        let localCssObj: CssOut;
-        elementCss.forEach((css: string) => {
-            let className = css.substring(0, css.indexOf("{"));
-            let attributes = css.substring(
-                css.indexOf("{") + 1,
-                css.indexOf("}")
-            );
-            if (!className.includes("drag")) {
-                localCssObj = {
-                    className: className.trim(),
-                    attributes: [],
+        (formGroup.controls["selectOptions"] as FormArray).controls.forEach(
+            (option) => {
+                let optionsAst: HtmlTagOut = {
+                    ast: [new HtmlTextOut(option.get("name").value)],
+                    attributes: [["value", option.get("name").value]],
+                    tag: "option",
                 };
-                let cssAttr = attributes.split("; ");
-                cssAttr.forEach((attr) => {
-                    attr = attr.trim();
-                    if (attr !== "") {
-                        localCssObj.attributes.push([
-                            attr.split(":")[0].trim(),
-                            attr.split(":")[1].trim(),
-                        ]);
-                    }
-                });
-                this.cssObject.push(localCssObj);
+                htmlObject.ast.push(optionsAst);
             }
-        });
-        if (element.hasChildNodes()) {
-            let childNodes = element.childNodes;
-            for (let i = 0; i < childNodes.length; i++) {
-                let child = childNodes[i];
-                switch (child.nodeType) {
-                    case Node.TEXT_NODE:
-                        let htmlText: HtmlTextOut = {
-                            text: child.nodeValue.trim(),
-                        };
-                        htmlObject.ast.push(htmlText);
-                        break;
-                    case Node.ELEMENT_NODE:
-                        htmlObject.ast.push(
-                            this.createComponent(
-                                child as HTMLElement,
-                                htmlObject,
-                                true
-                            )
-                        );
-                        break;
-                }
-            }
-        }
+        );
         return htmlObject;
     }
     // end HTML part
@@ -1111,7 +1226,7 @@ export class CanvasComponent implements OnInit {
                             name: `${event.get("eventName").value}${
                                 event.get("eventType").value
                             }Event`,
-                            type: UNIT,
+                            type: new FunctionType([], UNIT),
                             arguments: [],
                             body: [],
                         };
@@ -1135,10 +1250,14 @@ export class CanvasComponent implements OnInit {
                         });
                         functions.push(evtFunction);
                         let eventAst: AST = new Expression_(
-                            new Call(new Variable("event"), [
-                                new Text(event.get("eventName").value),
-                                new Text(event.get("eventType").value),
-                                new Call(new Variable(evtFunction.name), []),
+                            new Call(new Variable("callEvent"), [
+                                new Literal_(
+                                    new Text(event.get("eventName").value)
+                                ),
+                                new Literal_(
+                                    new Text(event.get("eventType").value)
+                                ),
+                                new Variable(evtFunction.name),
                             ])
                         );
                         funct.body.push(eventAst);

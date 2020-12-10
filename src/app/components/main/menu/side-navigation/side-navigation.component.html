@@ -1,14 +1,16 @@
-<nav class="navbar-default navbar-static-side menu-animation animated slideInLeft"
-    role="navigation">
+<nav
+    class="navbar-default navbar-static-side menu-animation animated slideInLeft"
+    role="navigation"
+>
     <div class="sidebar-collapse">
         <ul class="nav metismenu" id="side-menu">
             <li class="nav-header">
                 <div class="dropdown profile-element">
-                    <!-- <img alt="image" class="logo"
-                        src="assets/img/logo-flash.png"/> -->
                     <a data-toggle="dropdown" class="dropdown-toggle" href="#">
-                        <span class="block m-t-xs font-bold text-overflow-ellipsis">
-                            {{username}} <b class="caret"></b>
+                        <span
+                            class="block m-t-xs font-bold text-overflow-ellipsis"
+                        >
+                            {{ username }} <b class="caret"></b>
                         </span>
                         <ul class="dropdown-menu">
                             <li>
@@ -24,12 +26,21 @@
                         </ul>
                     </a>
                     <div class="text-center m-t-md">
-                        <button type="button" class="btn btn-default" data-toggle="modal" data-target="#exampleModalCenter">
+                        <button
+                            type="button"
+                            class="btn btn-default"
+                            data-toggle="modal"
+                            data-target="#exampleModalCenter"
+                        >
                             Detalhes do projeto
                         </button>
                     </div>
                     <div class="text-center m-t-md">
-                        <button type="button" class="btn btn-default" (click)="getBuild()">
+                        <button
+                            type="button"
+                            class="btn btn-default"
+                            (click)="getBuild()"
+                        >
                             Baixar Projeto <i class="fa fa-download"></i>
                         </button>
                     </div>
@@ -65,12 +76,29 @@
     </div>
 </nav>
 
-<div class="modal fade" id="exampleModalCenter" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+<div
+    class="modal fade"
+    id="exampleModalCenter"
+    tabindex="-1"
+    role="dialog"
+    aria-labelledby="exampleModalCenterTitle"
+    aria-hidden="true"
+>
+    <div
+        class="modal-dialog modal-dialog-centered modal-dialog-scrollable"
+        role="document"
+    >
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="exampleModalCenterTitle">Detalhes do projeto</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                <h5 class="modal-title" id="exampleModalCenterTitle">
+                    Detalhes do projeto
+                </h5>
+                <button
+                    type="button"
+                    class="close"
+                    data-dismiss="modal"
+                    aria-label="Close"
+                >
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
@@ -79,36 +107,33 @@
                     <div id="project-detail-tabs">
                         <ul class="nav">
                             <li>
-                                <a class="nav-link" href="#tab-1">
-                                    Geral
-                                </a>
+                                <a class="nav-link" href="#tab-1"> Geral </a>
                             </li>
                             <li>
-                                <a class="nav-link" href="#tab-2">
-                                    Tab 2
-                                </a>
+                                <a class="nav-link" href="#tab-2"> Tab 2 </a>
                             </li>
                             <li>
-                                <a class="nav-link" href="#tab-3">
-                                    Tab 3
-                                </a>
+                                <a class="nav-link" href="#tab-3"> Tab 3 </a>
                             </li>
                             <li>
-                                <a class="nav-link" href="#tab-4">
-                                    Tab 4
-                                </a>
+                                <a class="nav-link" href="#tab-4"> Tab 4 </a>
                             </li>
                         </ul>
                         <div class="tab-content">
                             <div id="tab-1" class="tab-pane" role="tabpanel">
                                 <div class="col-md-12">
                                     <div class="row">
-                                        <div class="col-lg-3 col-md-4 m-b-xs m-auto">
+                                        <div
+                                            class="col-lg-3 col-md-4 m-b-xs m-auto"
+                                        >
                                             Nome:
                                         </div>
                                         <div class="col-lg-9 col-md-8 m-b-xs">
-                                            <input type="text" class="form-control"
-                                                formControlName="project_name">
+                                            <input
+                                                type="text"
+                                                class="form-control"
+                                                formControlName="project_name"
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -127,7 +152,13 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-dismiss="modal"
+                >
+                    Close
+                </button>
             </div>
         </div>
     </div>

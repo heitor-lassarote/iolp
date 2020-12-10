@@ -13,85 +13,65 @@
                 >
                     <div
                         *ngIf="e.get('type').value === 'container'"
-                        [ngStyle]="{
-                            width: e.get('width').value,
-                            height: e.get('height').value,
-                            position: 'absolut',
-                            top: e.get('positionY').value,
-                            left: e.get('positionX').value,
-                            border: 'solid'
-                        }"
-                        mwlResizable
+                        class="draggable container"
                         (click)="click($event, $event.target)"
+                        (dblclick)="onDoubleClick($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
                         [id]="e.get('name').value"
+                        (cdkDragEnded)="onDragEnd($event, i)"
                     ></div>
                     <button
                         *ngIf="e.get('type').value === 'button'"
-                        [ngStyle]="{
-                            position: 'absolut',
-                            top: e.get('positionY').value,
-                            left: e.get('positionX').value
-                        }"
                         class="btn btn-default draggable"
                         [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
                         (dblclick)="onDoubleClick($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
+                        (cdkDragEnded)="onDragEnd($event, i)"
                     >
-                        Botão
+                        {{ e.get("text").value }}
                     </button>
                     <p
                         *ngIf="e.get('type').value === 'label'"
-                        [ngStyle]="{
-                            position: 'absolut',
-                            top: e.get('positionY').value,
-                            left: e.get('positionX').value
-                        }"
                         class="draggable"
                         [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
+                        (dblclick)="onDoubleClick($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
+                        (cdkDragEnded)="onDragEnd($event, i)"
                     >
-                        Novo Label
+                        {{ e.get("text").value }}
                     </p>
                     <input
                         *ngIf="e.get('type').value === 'input'"
-                        [ngStyle]="{
-                            position: 'absolut',
-                            top: e.get('positionY').value,
-                            left: e.get('positionX').value
-                        }"
                         class="draggable input-field"
                         [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
+                        (dblclick)="onDoubleClick($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
+                        (cdkDragEnded)="onDragEnd($event, i)"
                     />
                     <select
                         *ngIf="e.get('type').value === 'select'"
-                        [ngStyle]="{
-                            position: 'absolut',
-                            top: e.get('positionY').value,
-                            left: e.get('positionX').value
-                        }"
                         class="draggable select-field"
                         [id]="e.get('name').value"
                         (click)="click($event, $event.target)"
                         (dblclick)="onDoubleClick($event, $event.target)"
                         cdkDrag
                         cdkDragBoundary=".screen"
+                        (cdkDragEnded)="onDragEnd($event, i)"
                     >
                         <option
                             *ngFor="
                                 let item of getSelectOptionsArray(i).controls
                             "
-                            [value]="item"
+                            [value]="item.get('name').value"
                         >
-                            {{ item }}
+                            {{ item.get("name").value }}
                         </option>
                     </select>
                 </div>
@@ -681,7 +661,8 @@
                                                                 evtIndex: evtIndex,
                                                                 isEvt: true,
                                                                 funcName:
-                                                                    func.funcName
+                                                                    func.funcName,
+                                                                cascade: evtClIndex.toString()
                                                             }"
                                                         ></ng-container>
                                                         <ng-container
@@ -699,7 +680,8 @@
                                                                 evtIndex: evtIndex,
                                                                 isEvt: true,
                                                                 funcName:
-                                                                    func.funcName
+                                                                    func.funcName,
+                                                                cascade: evtClIndex.toString()
                                                             }"
                                                         ></ng-container>
                                                         <ng-container
@@ -717,7 +699,8 @@
                                                                 evtIndex: evtIndex,
                                                                 isEvt: true,
                                                                 funcName:
-                                                                    func.funcName
+                                                                    func.funcName,
+                                                                cascade: evtClIndex.toString()
                                                             }"
                                                         ></ng-container>
                                                         <ng-container
@@ -735,7 +718,8 @@
                                                                 evtIndex: evtIndex,
                                                                 isEvt: true,
                                                                 funcName:
-                                                                    func.funcName
+                                                                    func.funcName,
+                                                                cascade: evtClIndex.toString()
                                                             }"
                                                         ></ng-container>
                                                     </div>

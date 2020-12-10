@@ -139,8 +139,10 @@ export class CompInfosComponent implements OnInit {
                     value["heightUnity"].toString(),
                 width:
                     value["width"].toString() + value["widthUnity"].toString(),
-                alignText: value["textAlign"],
-                justifyContent: value["textAlign"],
+                alignText:
+                    value["textAlign"] === null ? "" : value["textAlign"],
+                justifyContent:
+                    value["textAlign"] === null ? "" : value["textAlign"],
             },
         };
         this.newValueService.setNewValue(newValue);

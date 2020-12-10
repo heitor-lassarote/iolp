@@ -1,26 +1,26 @@
-import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
-import { smoothlyMenu } from 'src/app/app.helpers';
+import { Component, OnInit } from "@angular/core";
+import { Router } from "@angular/router";
+import { smoothlyMenu } from "src/app/app.helpers";
 
 declare let $: any;
 
 @Component({
-    selector: 'app-top-navbar',
-    templateUrl: './top-navbar.component.html',
-    styleUrls: ['./top-navbar.component.scss'],
+    selector: "app-top-navbar",
+    templateUrl: "./top-navbar.component.html",
+    styleUrls: ["./top-navbar.component.scss"],
 })
 export class TopNavbarComponent implements OnInit {
-    constructor(private router: Router) // private auth: AuthService,
-    {}
+    constructor(private router: Router) {}
 
     ngOnInit() {}
 
     toggleNavigation(): void {
-        $('body').toggleClass('mini-navbar');
+        $("body").toggleClass("mini-navbar");
         smoothlyMenu();
     }
 
     logout() {
-        this.router.navigate(['/']);
+        sessionStorage.removeItem("projectID");
+        this.router.navigate(["/dashboard"]);
     }
 }

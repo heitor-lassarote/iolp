@@ -1,7 +1,6 @@
 function css(el) {
     var sheets = document.styleSheets,
         ret = [];
-    console.log(sheets);
     el.matches =
         el.matches ||
         el.webkitMatchesSelector ||
@@ -9,7 +8,10 @@ function css(el) {
         el.msMatchesSelector ||
         el.oMatchesSelector;
     for (var i in sheets) {
-        if (sheets[i].href === null) {
+        if (
+            sheets[i].href === null ||
+            sheets[i].href?.includes(window.location.hostname)
+        ) {
             var rules = sheets[i].rules || sheets[i].cssRules;
             for (var r in rules) {
                 if (el.matches(rules[r].selectorText)) {

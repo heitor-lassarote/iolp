@@ -33,7 +33,7 @@ export class SideNavigationComponent implements OnInit {
     ngOnInit() {
         this.initTabs();
         $("#side-menu").metisMenu();
-        this.username = "admin";
+        this.username = "Usuário";
         sessionStorage.setItem("projectName", "Teste");
         this.projectDetailForm = this.formBuilder.group({
             project_name: ["", Validators.required],
@@ -41,8 +41,8 @@ export class SideNavigationComponent implements OnInit {
     }
 
     logout() {
-        console.log("Sair");
-        // this.router.navigate(['/']);
+        sessionStorage.clear();
+        this.router.navigate(["/"]);
     }
 
     createComponent(type: string) {
@@ -50,6 +50,7 @@ export class SideNavigationComponent implements OnInit {
             formIndex: 0,
             type: type,
             name: "",
+            text: this.getTextByType(type),
             height: "50px",
             width: "50px",
             position: {
@@ -59,6 +60,19 @@ export class SideNavigationComponent implements OnInit {
             selectOptions: [],
         };
         this.spawnService.createComponent(element);
+    }
+
+    private getTextByType(type: string): string {
+        switch (type.toLowerCase()) {
+            case "label":
+                return "Novo Label";
+            case "button":
+                return "Botão";
+            case "container":
+            case "input":
+            case "select":
+                return "";
+        }
     }
 
     initTabs() {

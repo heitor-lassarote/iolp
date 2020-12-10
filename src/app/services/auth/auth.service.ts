@@ -13,6 +13,21 @@ export class AuthService {
         this.header = new HttpHeaders().set("Content-Type", "application/json");
     }
 
+    login(email: string, password: string): Promise<number> {
+        return this.http
+            .put<number>(
+                `${this.url}/login`,
+                {},
+                {
+                    headers: this.header.set(
+                        "Authorization",
+                        "Basic " + btoa(`${email}:${password}`)
+                    ),
+                }
+            )
+            .toPromise();
+    }
+
     signUp(email: string, password: string): Promise<any> {
         return this.http
             .post<any>(this.url, { email, password }, { headers: this.header })

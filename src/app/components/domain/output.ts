@@ -26,6 +26,11 @@ export class HtmlTagOut extends HtmlOut {
 }
 
 export class HtmlTextOut extends HtmlOut {
+    constructor(text: string) {
+        super();
+        this.text = text;
+    }
+
     text: string;
 }
 
