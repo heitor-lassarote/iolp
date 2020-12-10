@@ -1,1 +1,172 @@
-<p>dashboard works!</p>
+<ng-container *ngIf="isAuthenticated()">
+    <div id="wrapper">
+        <div class="gray-bg dashbard-1" id="page-wrapper">
+            <dashboard-top-navbar></dashboard-top-navbar>
+            <div class="row">
+                <div class="col-lg-12" id="dashboard-container">
+                    <div
+                        class="wrapper wrapper-content animated fadeInRight"
+                        style="padding-bottom: 10px"
+                    >
+                        <div class="ibox">
+                            <div class="ibox-title">
+                                <h4>Projetos</h4>
+                                <div class="ibox-tools">
+                                    <div class="row-flex">
+                                        <h4 class="m-h-auto">Novo projeto</h4>
+                                        <button
+                                            type="button"
+                                            class="btn btn-primary add-btn m-l-sm"
+                                            data-toggle="modal"
+                                            data-target="#add-new-project-modal"
+                                        >
+                                            <i class="fa fa-plus"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ibox-content">
+                                <div
+                                    class="text-center"
+                                    *ngIf="projects.length === 0"
+                                >
+                                    <i class="fa fa-warning text-danger"></i>
+                                    <h3>Não há Projetos para este usuário</h3>
+                                </div>
+
+                                <div
+                                    class="col-md-12 projects"
+                                    *ngIf="projects.length > 0"
+                                >
+                                    <div class="project-header m-w-auto">
+                                        <div class="col-4 text-center">
+                                            <h4>ID</h4>
+                                        </div>
+                                        <div class="col-4 text-center">
+                                            <h4>Nome</h4>
+                                        </div>
+                                        <div class="col-2 text-center">
+                                            <h4>Editar</h4>
+                                        </div>
+                                        <div class="col-2 text-center">
+                                            <h4>Deletar</h4>
+                                        </div>
+                                    </div>
+                                    <div
+                                        class="project-container m-t-sm m-w-auto"
+                                        *ngFor="
+                                            let project of projects;
+                                            let i = index
+                                        "
+                                    >
+                                        <div class="col-4 text-center m-h-auto">
+                                            {{ project.id }}
+                                        </div>
+                                        <div class="col-4 text-center m-h-auto">
+                                            {{ project.name }}
+                                        </div>
+                                        <div class="col-2 text-center m-h-auto">
+                                            <button
+                                                type="button"
+                                                class="btn btn-edit"
+                                                (click)="
+                                                    editProject(
+                                                        project.id,
+                                                        project.name
+                                                    )
+                                                "
+                                            >
+                                                <i class="fa fa-pencil"></i>
+                                            </button>
+                                        </div>
+                                        <div class="col-2 text-center m-h-auto">
+                                            <button
+                                                type="button"
+                                                class="btn btn-remove"
+                                                (click)="
+                                                    removeProject(project.id, i)
+                                                "
+                                            >
+                                                <i class="fa fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</ng-container>
+
+<div
+    class="modal fade"
+    id="add-new-project-modal"
+    tabindex="-1"
+    role="dialog"
+    aria-hidden="true"
+>
+    <div
+        class="modal-dialog modal-dialog-centered modal-dialog-scrollable"
+        role="document"
+    >
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Novo Projeto</h5>
+                <button
+                    type="button"
+                    class="close"
+                    data-dismiss="modal"
+                    aria-label="Close"
+                >
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form
+                    role="form"
+                    [formGroup]="newProjectForm"
+                    (ngSubmit)="addNewProject()"
+                >
+                    <div class="col-md-12">
+                        <div class="row">
+                            <div class="col-md-4 col-lg-3">
+                                <h4>Nome:</h4>
+                            </div>
+                            <div class="col-md-8 col-lg-9">
+                                <input
+                                    type="text"
+                                    class="form-control"
+                                    formControlName="projectName"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12 text-right">
+                        <button
+                            type="submit"
+                            class="btn btn-primary m-t-sm"
+                            [disabled]="newProjectForm.invalid"
+                        >
+                            Criar Projeto
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ngx-spinner
+    name="loadingSpinner"
+    bdOpacity="1"
+    bdColor="rgba(0,0,0,0.5)"
+    size="default"
+    color="#ff0000"
+    type="pacman"
+    [fullScreen]="true"
+>
+    <p style="color: rgba(0, 0, 0, 0.5)">Carregando...</p>
+</ngx-spinner>

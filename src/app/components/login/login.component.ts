@@ -41,7 +41,7 @@ export class LoginComponent implements OnInit {
                 "password",
                 this.loginForm.get("password").value
             );
-            this.router.navigate(["/canvas"]);
+            this.router.navigate(["/dashboard"]);
         } catch (e) {
             if (e instanceof HttpErrorResponse) {
                 switch (e.status) {

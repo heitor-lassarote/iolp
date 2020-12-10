@@ -34,7 +34,6 @@ export class SideNavigationComponent implements OnInit {
         this.initTabs();
         $("#side-menu").metisMenu();
         this.username = "Usuário";
-        sessionStorage.setItem("projectName", "Teste");
         this.projectDetailForm = this.formBuilder.group({
             project_name: ["", Validators.required],
         });
