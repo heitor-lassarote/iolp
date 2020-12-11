@@ -35,6 +35,10 @@ import {
     Return,
     StringExpression,
     Field,
+    Interpolated,
+    InterpolatedExpression,
+    InterpolatedElement,
+    InterpolatedText,
 } from "./../../domain/output";
 import { Info } from "./../../domain/info";
 import { Element } from "src/app/components/domain/element";
@@ -1507,18 +1511,36 @@ export class CanvasComponent implements OnInit {
                     }
                     switch (paramType.constructor) {
                         case DoubleType:
-                            exp = new Literal_(
-                                new Double(
+                            if (
+                                Number.isNaN(
                                     parseFloat(param.get("paramValue").value)
                                 )
-                            );
+                            ) {
+                                exp = param.get("paramValue").value;
+                            } else {
+                                exp = new Literal_(
+                                    new Double(
+                                        parseFloat(
+                                            param.get("paramValue").value
+                                        )
+                                    )
+                                );
+                            }
                             break;
                         case IntegerType:
-                            exp = new Literal_(
-                                new Integer(
+                            if (
+                                Number.isNaN(
                                     parseInt(param.get("paramValue").value)
                                 )
-                            );
+                            ) {
+                                exp = param.get("paramValue").value;
+                            } else {
+                                exp = new Literal_(
+                                    new Integer(
+                                        parseInt(param.get("paramValue").value)
+                                    )
+                                );
+                            }
                             break;
                         case TextType:
                             exp = new Literal_(
@@ -1555,10 +1577,13 @@ export class CanvasComponent implements OnInit {
                     new Literal_(new Text(control.get("elementName").value)),
                     new Literal_(
                         new Text(
-                            this.getHtmlElementDataType(
-                                control.get("elementData").value,
-                                control.get("elementValue").value
-                            )
+                            this.getMethod(control.get("elementData").value)
+                        )
+                    ),
+                    new Interpolated(
+                        this.getInterpolatedItems(
+                            control.get("elementData").value,
+                            control.get("elementValue").value
                         )
                     ),
                 ]);
@@ -1600,19 +1625,67 @@ export class CanvasComponent implements OnInit {
         return newExpression;
     }
 
-    private getHtmlElementDataType(data: string, value: string): string {
+    private getMethod(data: string): string {
         switch (data) {
             case "id":
-                return `attr("id", "${value}")`;
+                return "attr";
             case "addClass":
-                return `addClass("${value}")`;
+                return "addClass";
             case "removeClass":
-                return `removeClass("${value}")`;
+                return "removeClass";
             case "text":
-                return `text("${value}")`;
+                return "text";
             case "value":
-                return `val("${value}")`;
+                return "val";
         }
+    }
+
+    private getInterpolatedItems(
+        data: string,
+        value: string
+    ): InterpolatedElement[] {
+        let interpolatedElementArray: InterpolatedElement[] = [];
+        switch (data) {
+            case "id":
+                interpolatedElementArray.push(
+                    new InterpolatedText(`\"id\", \"`)
+                );
+                interpolatedElementArray.push(
+                    new InterpolatedExpression(value)
+                );
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                break;
+            case "addClass":
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                interpolatedElementArray.push(
+                    new InterpolatedExpression(value)
+                );
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                break;
+            case "removeClass":
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                interpolatedElementArray.push(
+                    new InterpolatedExpression(value)
+                );
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                break;
+            case "text":
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                interpolatedElementArray.push(
+                    new InterpolatedExpression(value)
+                );
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                break;
+            case "value":
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                interpolatedElementArray.push(
+                    new InterpolatedExpression(value)
+                );
+                interpolatedElementArray.push(new InterpolatedText(`\"`));
+                break;
+        }
+
+        return interpolatedElementArray;
     }
 
     private getValueByVarType(varType: string, value: string): number | string {

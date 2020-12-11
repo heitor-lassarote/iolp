@@ -38,7 +38,8 @@ export class DashboardComponent implements OnInit {
     async getProjectList() {
         this.spinner.show("loadingSpinner");
         try {
-            this.projects = await this.dashService.getProjectList();
+            let projectList: any = await this.dashService.getProjectList();
+            this.projects = projectList.projects;
         } catch (e) {
             this.projects = [];
             this.toastr.error("Falha ao buscar projetos do usuário!", "Erro!", {

@@ -356,6 +356,35 @@ export class Index extends Expression {
     rightExpression: Expression | string;
 }
 
+export class Interpolated extends Expression {
+    constructor(value: InterpolatedElement[]) {
+        super();
+        this.value = value;
+    }
+
+    tag = "interpolated";
+    value: InterpolatedElement[];
+}
+
+export abstract class InterpolatedElement {}
+
+export class InterpolatedText extends InterpolatedElement {
+    constructor(text: string) {
+        super();
+        this.text = text;
+    }
+
+    text: string;
+}
+
+export class InterpolatedExpression extends InterpolatedElement {
+    constructor(expression: Expression | string) {
+        super();
+        this.expression = expression;
+    }
+    expression: Expression | string;
+}
+
 export class Literal_ extends Expression {
     constructor(value: Literal) {
         super();
