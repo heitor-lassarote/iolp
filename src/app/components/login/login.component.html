@@ -1,0 +1,46 @@
+<div class="middle-box text-center loginscreen animated fadeInDown">
+    <div>
+        <div></div>
+        <div class="m-t-md">
+            <form
+                class="m-t"
+                role="form"
+                [formGroup]="loginForm"
+                (ngSubmit)="login()"
+            >
+                <div class="form-group">
+                    <input
+                        type="email"
+                        email
+                        formControlName="email"
+                        class="form-control"
+                        placeholder="E-mail"
+                    />
+                </div>
+                <div class="form-group">
+                    <input
+                        type="password"
+                        formControlName="password"
+                        class="form-control"
+                        placeholder="Senha"
+                    />
+                </div>
+                <button
+                    [disabled]="loginForm.invalid"
+                    class="btn btn-primary block full-width m-b"
+                >
+                    Entrar
+                </button>
+                <p class="text-muted text-center">
+                    <small>Não tem uma conta?</small>
+                </p>
+                <a
+                    class="btn btn-sm btn-white btn-block"
+                    [routerLink]="['/signup']"
+                >
+                    Criar uma Conta
+                </a>
+            </form>
+        </div>
+    </div>
+</div>

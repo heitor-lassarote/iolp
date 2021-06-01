@@ -1,0 +1,88 @@
+/* You can add global styles to this file, and also import other style files */
+@import "~bootstrap/dist/css/bootstrap.min.css";
+@import "~font-awesome/css/font-awesome.css";
+@import "~ngx-toastr/toastr.css";
+@import "~animate.css/animate.min.css";
+@import "~jquery-smarttab/dist/css/smart_tab_all.min.css";
+@import "~jquery-smarttab/dist/css/smart_tab.min.css";
+@import "assets/css/style.min.css";
+
+@-webkit-keyframes fadeInRight {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(20px);
+        transform: translateX(20px);
+    }
+    100% {
+        opacity: 1;
+        -webkit-transform: translateX(0);
+        transform: translateX(0);
+    }
+}
+@keyframes fadeInRight {
+    0% {
+        opacity: 0;
+        -webkit-transform: translateX(20px);
+        -ms-transform: translateX(20px);
+        transform: translateX(20px);
+    }
+    100% {
+        opacity: 1;
+        -webkit-transform: translateX(0);
+        -ms-transform: translateX(0);
+        transform: translateX(0);
+    }
+}
+.navbar-default.navbar-static-side,
+#page-wrapper {
+    transition: all 0.4s;
+}
+.btn:disabled {
+    cursor: not-allowed;
+}
+
+//SweetAlert
+.swal-text {
+    text-align: center;
+}
+
+// Smart Tab
+.st-theme-default > .nav .nav-link.active {
+    color: #18a689 !important;
+}
+.st-theme-default > .nav .nav-link.active::after {
+    background: #18a689 !important;
+}
+.st-theme-classic > .nav .nav-link.active {
+    color: #18a689 !important;
+}
+.st-theme-brick > .nav {
+    border-bottom: 2px solid #18a689 !important;
+}
+.st-theme-brick > .nav .nav-link.active {
+    background: #18a689 !important;
+}
+.st-theme-brick.st-vertical > .nav {
+    border-right: 2px solid #18a689 !important;
+}
+.st-theme-pills > .nav {
+    background: #18a689 !important;
+}
+
+#canvas-container {
+    height: fit-content !important;
+    max-height: fit-content !important;
+}
+
+.m-h-auto {
+    margin-top: auto !important;
+    margin-bottom: auto !important;
+}
+.m-w-auto {
+    margin-left: auto !important;
+    margin-right: auto !important;
+}
+.column {
+    display: flex !important;
+    flex-direction: column !important;
+}

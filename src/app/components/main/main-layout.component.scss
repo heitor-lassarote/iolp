@@ -1,0 +1,14 @@
+.col-lg-3.white-bg {
+    padding: 0;
+    box-sizing: border-box;
+    border-left: 0.5px solid #d7d7d7;
+    align-items: center;
+    text-align: center;
+}
+#infos-container {
+    position: absolute !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    top: 60px !important;
+    height: calc(100vh - 60px);
+}

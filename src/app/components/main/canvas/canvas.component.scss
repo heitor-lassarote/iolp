@@ -1,0 +1,148 @@
+.screen {
+    border: solid;
+    width: 100%;
+    height: 75vh;
+    background: white;
+}
+.draggable {
+    transition: box-shadow 200ms cubic-bezier(0, 0, 0.2, 1);
+    box-shadow: 0 3px 1px -2px rgba(0, 0, 0, 0.2),
+        0 2px 2px 0 rgba(0, 0, 0, 0.14), 0 1px 5px 0 rgba(0, 0, 0, 0.12);
+    box-sizing: border-box;
+    display: inline-flex;
+}
+.draggable:active {
+    box-shadow: 0 5px 5px -3px rgba(0, 0, 0, 0.2),
+        0 8px 10px 1px rgba(0, 0, 0, 0.14), 0 3px 14px 2px rgba(0, 0, 0, 0.12);
+}
+mwlResizable {
+    box-sizing: border-box;
+}
+.rectangle {
+    position: relative;
+    top: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 300px;
+    height: 150px;
+    margin: auto;
+    border-radius: 30px;
+    font-size: 25px;
+    font-weight: bold;
+}
+.resize-handle-top,
+.resize-handle-bottom {
+    position: absolute;
+    height: 5px;
+    cursor: row-resize;
+    width: 100%;
+}
+.resize-handle-top {
+    top: 0;
+}
+.resize-handle-bottom {
+    bottom: 0;
+}
+.resize-handle-left,
+.resize-handle-right {
+    position: absolute;
+    height: 100%;
+    cursor: col-resize;
+    width: 5px;
+}
+.resize-handle-left {
+    left: 0;
+}
+.resize-handle-right {
+    right: 0;
+}
+.input-field {
+    background-color: #ffffff;
+    background-image: none;
+    border: 1px solid #a0a4a8;
+    border-radius: 1px;
+    color: inherit;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    height: calc(1.5em + 0.75rem + 2px);
+    font-weight: 400;
+    line-height: 1.5;
+    background-clip: padding-box;
+}
+.select-field {
+    width: 200px;
+    height: calc(1.5em + 0.75rem + 2px);
+    background-color: #ffffff;
+    background-image: none;
+    border: 1px solid #e5e6e7;
+    border-radius: 1px;
+    color: inherit;
+    padding: 6px 12px;
+    font-size: 0.9rem;
+    font-weight: 400;
+    line-height: 1.5;
+    background-clip: padding-box;
+}
+.container {
+    border: solid;
+    width: 50px;
+    height: 50px;
+}
+.inside-ibox {
+    border-top: 1px !important;
+    display: flex;
+}
+.func-name {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+.add-btn {
+    padding: 0 !important;
+    height: 25px;
+    width: 25px;
+    border-radius: 50%;
+    margin-top: auto;
+    margin-bottom: auto;
+}
+.add-title {
+    margin-top: auto;
+    margin-bottom: auto;
+}
+.row-flex {
+    display: flex;
+    flex-direction: row;
+}
+.create-item.dropdown-menu.show {
+    left: -30px !important;
+    top: 30px !important;
+}
+.column {
+    display: flex;
+    flex-direction: column !important;
+}
+#logic {
+    height: max-content;
+}
+.tab-btn {
+    width: 100px;
+    justify-content: center !important;
+    text-align: center;
+}
+.btn-remove {
+    color: red;
+    vertical-align: middle;
+    font-size: 20px;
+    background-color: white;
+    cursor: pointer !important;
+    padding: 0;
+    margin-bottom: auto;
+    margin-top: auto;
+}
+input::placeholder {
+    color: #cccccc;
+}
+.no-h-padding {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+}
