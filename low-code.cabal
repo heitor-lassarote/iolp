@@ -1,0 +1,169 @@
+cabal-version:       2.2
+author:              Heitor Toledo Lassarote de Paula
+build-type:          Simple
+category:            Language
+copyright:           Copyright (c) 2020 Bruno Pereira Garcia Caputo, Heitor Toledo Lassarote de Paula & Mauro Alexandre Amaro da Cruz
+extra-source-files:  ChangeLog.md
+homepage:            https://github.com/heitor-lassarote/low-code
+license:             MIT
+license-file:        LICENSE
+maintainer:          heitortoledo@gec.inatel.br
+name:                low-code
+synopsis:            A low-code platform for generating builds and source codes.
+version:             0.1.0.0
+
+data-files:
+    jsbits/jquery-3.5.1.min.js
+  , jsbits/LowCode.js
+
+source-repository head
+  type: git
+  location: https://github.com/heitor-lassarote/low-code
+
+flag lib-Werror
+  default: False
+  manual:  True
+
+common shared-properties
+  build-depends:
+      base                  >=4 && <5
+    , universum             >=1 && <2
+  default-extensions:
+      ApplicativeDo
+    , BangPatterns
+    , BlockArguments
+    , DeriveFunctor
+    , DerivingStrategies
+    , DuplicateRecordFields
+    , FlexibleContexts
+    , FlexibleInstances
+    , GADTs
+    , GeneralizedNewtypeDeriving
+    , LambdaCase
+    , NoImplicitPrelude
+    , OverloadedStrings
+    , QuasiQuotes
+    , RecordWildCards
+    , ScopedTypeVariables
+    , StandaloneDeriving
+    , TypeFamilies
+  default-language:     Haskell2010
+
+executable low-code
+  import:               shared-properties
+  build-depends:
+      aeson                 >=1 && <2
+    , cryptonite            >=0 && <1
+    , data-default-class    >=0 && <1
+    , esqueleto             >=3 && <4
+    , fast-logger           >=3 && <4
+    , http-types            >=0 && <1
+    , low-code              >=0 && <1
+    , monad-logger          >=0 && <1
+    , optparse-applicative  >=0 && <1
+    , persistent            >=2 && <3
+    , persistent-postgresql >=2 && <3
+    , persistent-template   >=2 && <3
+    , template-haskell      >=2 && <3
+    , text                  >=1 && <2
+    , unliftio-core         >=0 && <1
+    , wai                   >=3 && <4
+    , wai-cors              >=0 && <1
+    , wai-extra             >=3 && <4
+    , warp                  >=3 && <4
+    , warp-tls              >=3 && <4
+    , yesod                 >=1 && <2
+    , yesod-core            >=1 && <2
+    , yesod-persistent      >=1 && <2
+  default-extensions:
+      DeriveAnyClass
+    , DeriveGeneric
+    , MultiParamTypeClasses
+    , TemplateHaskell
+    , ViewPatterns
+  if flag(lib-Werror)
+    ghc-options:        -Werror
+  ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat
+  other-extensions:
+      UndecidableInstances
+  other-modules:
+      Config
+    , Database
+    , Foundation
+  hs-source-dirs:       app
+  main-is:              Main.hs
+
+library
+  import:               shared-properties
+  build-depends:
+      aeson                 >=1 && <2
+    , algebraic-graphs      >=0 && <1
+    , containers            >=0 && <1
+    , data-default-class    >=0 && <1
+    , directory             >=1 && <2
+    , filepath              >=1 && <2
+    , formatting            >=6 && <7
+    , megaparsec            >=8 && <9
+    , monad-chronicle       >=1 && <2
+    , raw-strings-qq        >=1 && <2
+    , temporary             >=1 && <2
+    , text                  >=1 && <2
+    , these                 >=1 && <2
+    , transformers          >=0 && <1
+    , zip                   >=1 && <2
+  default-extensions:
+      DeriveAnyClass
+    , DeriveDataTypeable
+    , DeriveGeneric
+    , MultiParamTypeClasses
+    , TupleSections
+  exposed-modules:
+      Language.Bundles
+    , Language.Codegen
+    , Language.Common
+    , Language.CSS
+    , Language.CSS.AST
+    , Language.CSS.Codegen
+    , Language.Emit
+    , Language.HTML
+    , Language.HTML.AST
+    , Language.HTML.Codegen
+    , Language.JavaScript
+    , Language.JavaScript.AST
+    , Language.JavaScript.Codegen
+    , Language.LanguageConverter
+    , Language.LowCode.Logic
+    , Language.LowCode.Logic.Analyzer
+    , Language.LowCode.Logic.AST
+    , Language.LowCode.Logic.Codegen
+    , Language.LowCode.Logic.Error
+    , Language.LowCode.Logic.JavaScriptConverter
+    , Language.LowCode.Logic.Module
+    , Language.LowCode.Logic.Parser
+    , Language.LowCode.Logic.Standard
+    , Language.LowCode.Logic.Standard.JSON
+    , Language.LowCode.Logic.Standard.Prelude
+    , Language.LowCode.Logic.Standard.REST
+    , Language.LowCode.Logic.Structure
+    , Language.LowCode.Logic.Type
+    , Utility
+  if flag(lib-Werror)
+    ghc-options:        -Werror
+  ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat
+  hs-source-dirs:       src
+
+test-suite test
+  import:               shared-properties
+  build-depends:
+      containers            >=0 && <1
+    , data-default-class    >=0 && <1
+    , hspec                 >=2 && <3
+    , low-code              >=0 && <1
+    , QuickCheck            >=2 && <3
+    , these                 >=1 && <2
+  other-modules:
+      LogicModuleTests
+  ghc-options:          -Wall -Wincomplete-uni-patterns -Wcompat
+  hs-source-dirs:       test
+  main-is:              Main.hs
+  type:                 exitcode-stdio-1.0
