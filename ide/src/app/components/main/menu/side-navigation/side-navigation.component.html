@@ -1,5 +1,10 @@
 <nav
-    class="navbar-default navbar-static-side menu-animation animated slideInLeft"
+    class="
+        navbar-default navbar-static-side
+        menu-animation
+        animated
+        slideInLeft
+    "
     role="navigation"
 >
     <div class="sidebar-collapse">
@@ -8,7 +13,12 @@
                 <div class="dropdown profile-element">
                     <a data-toggle="dropdown" class="dropdown-toggle" href="#">
                         <span
-                            class="block m-t-xs font-bold text-overflow-ellipsis"
+                            class="
+                                block
+                                m-t-xs
+                                font-bold
+                                text-overflow-ellipsis
+                            "
                         >
                             {{ username }} <b class="caret"></b>
                         </span>
@@ -16,11 +26,11 @@
                             <li>
                                 <a (click)="logout()">
                                     <i class="fa fa-user"></i>
-                                    Detalhes da conta
+                                    Account Details
                                 </a>
                                 <a (click)="logout()">
                                     <i class="fa fa-sign-out"></i>
-                                    Sair
+                                    Exit
                                 </a>
                             </li>
                         </ul>
@@ -32,7 +42,7 @@
                             data-toggle="modal"
                             data-target="#exampleModalCenter"
                         >
-                            Detalhes do projeto
+                            Project Details
                         </button>
                     </div>
                     <div class="text-center m-t-md">
@@ -41,11 +51,11 @@
                             class="btn btn-default"
                             (click)="getBuild()"
                         >
-                            Baixar Projeto <i class="fa fa-download"></i>
+                            Download Project <i class="fa fa-download"></i>
                         </button>
                     </div>
                 </div>
-                <div class="logo-element">LC</div>
+                <div class="logo-element">IOLP</div>
             </li>
             <li>
                 <a (click)="createComponent('container')">
@@ -72,6 +82,11 @@
                     <span class="nav-label">Select</span>
                 </a>
             </li>
+            <li>
+                <a (click)="createComponent('image')">
+                    <span class="nav-label">Image</span>
+                </a>
+            </li>
         </ul>
     </div>
 </nav>
@@ -91,7 +106,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="exampleModalCenterTitle">
-                    Detalhes do projeto
+                    Project Details
                 </h5>
                 <button
                     type="button"
@@ -107,7 +122,7 @@
                     <div id="project-detail-tabs">
                         <ul class="nav">
                             <li>
-                                <a class="nav-link" href="#tab-1"> Geral </a>
+                                <a class="nav-link" href="#tab-1"> General </a>
                             </li>
                             <li>
                                 <a class="nav-link" href="#tab-2"> Tab 2 </a>
@@ -124,9 +139,12 @@
                                 <div class="col-md-12">
                                     <div class="row">
                                         <div
-                                            class="col-lg-3 col-md-4 m-b-xs m-auto"
+                                            class="
+                                                col-lg-3 col-md-4
+                                                m-b-xs m-auto
+                                            "
                                         >
-                                            Nome:
+                                            Name:
                                         </div>
                                         <div class="col-lg-9 col-md-8 m-b-xs">
                                             <input

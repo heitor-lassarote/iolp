@@ -33,7 +33,7 @@ export class SideNavigationComponent implements OnInit {
     ngOnInit() {
         this.initTabs();
         $("#side-menu").metisMenu();
-        this.username = "Usuário";
+        this.username = "User";
         this.projectDetailForm = this.formBuilder.group({
             project_name: ["", Validators.required],
         });

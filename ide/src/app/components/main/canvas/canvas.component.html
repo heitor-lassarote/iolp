@@ -74,18 +74,29 @@
                             {{ item.get("name").value }}
                         </option>
                     </select>
+                    <img
+                        *ngIf="e.get('type').value === 'image'"
+                        [src]="e.get('imgSrc').value"
+                        class="draggable img-field"
+                        [id]="e.get('name').value"
+                        (click)="click($event, $event.target)"
+                        (dblclick)="onDoubleClick($event, $event.target)"
+                        cdkDrag
+                        cdkDragBoundary=".screen"
+                        (cdkDragEnded)="onDragEnd($event, i)"
+                    />
                 </div>
             </div>
         </div>
     </mat-tab>
 
-    <mat-tab label="Lógica">
+    <mat-tab label="Logic">
         <div id="logic" class="col-md-12 m-t-xs">
             <div class="ibox">
                 <div class="ibox-title">
                     <div class="ibox-tools">
                         <div class="row-flex">
-                            <h4 class="add-title">Nova função</h4>
+                            <h4 class="add-title">New function</h4>
                             <button
                                 type="button"
                                 class="btn btn-primary add-btn m-l-sm"
@@ -118,30 +129,30 @@
                                         >
                                             <option value="void">Void</option>
                                             <option value="adt">
-                                                Algébrico
+                                                Algebraic
                                             </option>
                                             <option value="array">Array</option>
                                             <option value="bool">
-                                                Booleano
+                                                Boolean
                                             </option>
                                             <option value="char">
-                                                Caracter
+                                                Character
                                             </option>
                                             <option value="double">
                                                 Double
                                             </option>
                                             <option value="integer">
-                                                Inteiro
+                                                Integer
                                             </option>
                                             <option value="record">
-                                                Registro
+                                                Record
                                             </option>
-                                            <option value="text">Texto</option>
+                                            <option value="text">Text</option>
                                         </select>
                                         <input
                                             class="m-l-sm form-control col-4"
                                             type="text"
-                                            placeholder="Noma da função"
+                                            placeholder="Function name"
                                             [value]="func.funcName"
                                             formControlName="funcName"
                                             [attr.readOnly]="
@@ -151,7 +162,11 @@
                                         <button
                                             *ngIf="funcIndex !== 0"
                                             type="button"
-                                            class="btn btn-primary add-btn m-l-sm"
+                                            class="
+                                                btn btn-primary
+                                                add-btn
+                                                m-l-sm
+                                            "
                                             (click)="
                                                 addParameterToFunction(
                                                     funcIndex
@@ -177,31 +192,31 @@
                                             formControlName="paramType"
                                         >
                                             <option value="adt">
-                                                Algébrico
+                                                Algebraic
                                             </option>
                                             <option value="array">Array</option>
                                             <option value="bool">
-                                                Booleano
+                                                Boolean
                                             </option>
                                             <option value="char">
-                                                Caracter
+                                                Character
                                             </option>
                                             <option value="double">
                                                 Double
                                             </option>
                                             <option value="integer">
-                                                Inteiro
+                                                Integer
                                             </option>
                                             <option value="record">
-                                                Registro
+                                                Record
                                             </option>
-                                            <option value="text">Texto</option>
+                                            <option value="text">Text</option>
                                         </select>
                                         <input
                                             type="text"
                                             class="form-control col-4 m-l-sm"
                                             formControlName="paramName"
-                                            placeholder="Nome do parâmetro"
+                                            placeholder="Parameter name"
                                         />
                                         <button
                                             *ngIf="funcIndex !== 0"
@@ -220,11 +235,16 @@
 
                                 <div class="ibox-tools">
                                     <div class="row-flex">
-                                        <h4 class="add-title">Novo item</h4>
+                                        <h4 class="add-title">New item</h4>
                                         <button
                                             *ngIf="funcIndex === 0"
                                             type="button"
-                                            class="btn btn-primary add-btn m-l-sm dropdown-toggle"
+                                            class="
+                                                btn btn-primary
+                                                add-btn
+                                                m-l-sm
+                                                dropdown-toggle
+                                            "
                                             data-toggle="dropdown"
                                         >
                                             <i class="fa fa-plus"></i>
@@ -241,7 +261,7 @@
                                                     )
                                                 "
                                             >
-                                                <a> Linha de comando </a>
+                                                <a> Command line </a>
                                             </li>
                                             <li *ngIf="funcIndex === 0">
                                                 <a
@@ -252,7 +272,7 @@
                                                         )
                                                     "
                                                 >
-                                                    Evento
+                                                    Event
                                                 </a>
                                             </li>
                                         </ul>
@@ -260,7 +280,11 @@
                                         <button
                                             *ngIf="funcIndex !== 0"
                                             type="button"
-                                            class="btn btn-primary add-btn m-l-sm"
+                                            class="
+                                                btn btn-primary
+                                                add-btn
+                                                m-l-sm
+                                            "
                                             (click)="
                                                 createItem(func.funcName, 'cl')
                                             "
@@ -303,28 +327,28 @@
                                                     "
                                                 >
                                                     <option value="decision">
-                                                        Decisão
+                                                        Decision
                                                     </option>
                                                     <option value="repetition">
-                                                        Repetição
+                                                        Repetition
                                                     </option>
                                                     <option value="declaration">
-                                                        Declaração
+                                                        Declaration
                                                     </option>
                                                     <option value="call">
-                                                        Chamada de Função
+                                                        Call Function
                                                     </option>
                                                     <option value="attribution">
-                                                        Atribuição
+                                                        Assignment
                                                     </option>
                                                     <option value="htmlElement">
-                                                        Elemento HTML
+                                                        HTML Element
                                                     </option>
                                                     <option
                                                         value="return"
                                                         *ngIf="funcIndex !== 0"
                                                     >
-                                                        Retorno
+                                                        Return
                                                     </option>
                                                     <option value="console">
                                                         Console
@@ -345,7 +369,8 @@
                                                         evtIndex: -1,
                                                         isEvt: false,
                                                         funcName: func.funcName,
-                                                        cascade: funcClIndex.toString()
+                                                        cascade:
+                                                            funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
@@ -358,7 +383,8 @@
                                                         evtIndex: -1,
                                                         isEvt: false,
                                                         funcName: func.funcName,
-                                                        cascade: funcClIndex.toString()
+                                                        cascade:
+                                                            funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
@@ -374,7 +400,8 @@
                                                         evtIndex: -1,
                                                         isEvt: false,
                                                         funcName: func.funcName,
-                                                        cascade: funcClIndex.toString()
+                                                        cascade:
+                                                            funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
@@ -390,7 +417,8 @@
                                                         evtIndex: -1,
                                                         isEvt: false,
                                                         funcName: func.funcName,
-                                                        cascade: funcClIndex.toString()
+                                                        cascade:
+                                                            funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                                 <ng-container
@@ -403,7 +431,8 @@
                                                         evtIndex: -1,
                                                         isEvt: false,
                                                         funcName: func.funcName,
-                                                        cascade: funcClIndex.toString(),
+                                                        cascade:
+                                                            funcClIndex.toString(),
                                                         type: getCurFunction(
                                                             funcIndex
                                                         ).get('returnType')
@@ -421,13 +450,17 @@
                                                         evtIndex: -1,
                                                         isEvt: false,
                                                         funcName: func.funcName,
-                                                        cascade: funcClIndex.toString()
+                                                        cascade:
+                                                            funcClIndex.toString()
                                                     }"
                                                 ></ng-container>
                                             </div>
                                             <div class="col-md-1">
                                                 <button
-                                                    class="m-l-md btn btn-remove"
+                                                    class="
+                                                        m-l-md
+                                                        btn btn-remove
+                                                    "
                                                     (click)="
                                                         removeItem(
                                                             func.funcName,
@@ -451,7 +484,8 @@
                                                     evtIndex: -1,
                                                     isEvt: false,
                                                     funcName: func.funcName,
-                                                    cascade: funcClIndex.toString(),
+                                                    cascade:
+                                                        funcClIndex.toString(),
                                                     branch: '',
                                                     funcIndex: funcIndex
                                                 }"
@@ -467,7 +501,8 @@
                                                     evtIndex: -1,
                                                     isEvt: false,
                                                     funcName: func.funcName,
-                                                    cascade: funcClIndex.toString(),
+                                                    cascade:
+                                                        funcClIndex.toString(),
                                                     funcIndex: funcIndex
                                                 }"
                                             ></ng-container>
@@ -486,7 +521,7 @@
                                         <div class="ibox">
                                             <div class="ibox-title inside-ibox">
                                                 <h5 class="func-name">
-                                                    Componente:
+                                                    Component:
                                                 </h5>
                                                 <select
                                                     class="m-l-sm form-control"
@@ -526,12 +561,15 @@
                                                 <div class="ibox-tools">
                                                     <div class="row-flex">
                                                         <h4 class="add-title">
-                                                            Nova linha de
-                                                            comando
+                                                            New command line
                                                         </h4>
                                                         <button
                                                             type="button"
-                                                            class="btn btn-primary add-btn m-l-sm"
+                                                            class="
+                                                                btn btn-primary
+                                                                add-btn
+                                                                m-l-sm
+                                                            "
                                                             (click)="
                                                                 createEvtCl(
                                                                     func.funcName,
@@ -540,11 +578,16 @@
                                                             "
                                                         >
                                                             <i
-                                                                class="fa fa-plus"
+                                                                class="
+                                                                    fa fa-plus
+                                                                "
                                                             ></i>
                                                         </button>
                                                         <button
-                                                            class="m-l-md btn btn-remove"
+                                                            class="
+                                                                m-l-md
+                                                                btn btn-remove
+                                                            "
                                                             (click)="
                                                                 removeItem(
                                                                     func.funcName,
@@ -554,7 +597,9 @@
                                                             "
                                                         >
                                                             <i
-                                                                class="fa fa-trash"
+                                                                class="
+                                                                    fa fa-trash
+                                                                "
                                                             ></i>
                                                         </button>
                                                     </div>
@@ -576,7 +621,9 @@
                                                     <div class="row">
                                                         <div class="col-md-3">
                                                             <select
-                                                                class="form-control"
+                                                                class="
+                                                                    form-control
+                                                                "
                                                                 (change)="
                                                                     clTypeChange(
                                                                         $event
@@ -593,34 +640,33 @@
                                                                 <option
                                                                     value="decision"
                                                                 >
-                                                                    Decisão
+                                                                    Decision
                                                                 </option>
                                                                 <option
                                                                     value="repetition"
                                                                 >
-                                                                    Repetição
+                                                                    Repetition
                                                                 </option>
                                                                 <option
                                                                     value="declaration"
                                                                 >
-                                                                    Declaração
+                                                                    Declaration
                                                                 </option>
                                                                 <option
                                                                     value="call"
                                                                 >
-                                                                    Chamada de
-                                                                    Função
+                                                                    Call
+                                                                    Function
                                                                 </option>
                                                                 <option
                                                                     value="attribution"
                                                                 >
-                                                                    Atribuição
+                                                                    Assignment
                                                                 </option>
                                                                 <option
                                                                     value="htmlElement"
                                                                 >
-                                                                    Elemento
-                                                                    HTML
+                                                                    HTML Element
                                                                 </option>
                                                                 <option
                                                                     value="console"
@@ -642,11 +688,13 @@
                                                                 "
                                                                 [ngTemplateOutletContext]="{
                                                                     index: evtClIndex,
-                                                                    evtIndex: evtIndex,
+                                                                    evtIndex:
+                                                                        evtIndex,
                                                                     isEvt: true,
                                                                     funcName:
                                                                         func.funcName,
-                                                                    cascade: evtClIndex.toString()
+                                                                    cascade:
+                                                                        evtClIndex.toString()
                                                                 }"
                                                             ></ng-container>
                                                             <ng-container
@@ -661,11 +709,13 @@
                                                                 "
                                                                 [ngTemplateOutletContext]="{
                                                                     index: evtClIndex,
-                                                                    evtIndex: evtIndex,
+                                                                    evtIndex:
+                                                                        evtIndex,
                                                                     isEvt: true,
                                                                     funcName:
                                                                         func.funcName,
-                                                                    cascade: evtClIndex.toString()
+                                                                    cascade:
+                                                                        evtClIndex.toString()
                                                                 }"
                                                             ></ng-container>
                                                             <ng-container
@@ -680,11 +730,13 @@
                                                                 "
                                                                 [ngTemplateOutletContext]="{
                                                                     index: evtClIndex,
-                                                                    evtIndex: evtIndex,
+                                                                    evtIndex:
+                                                                        evtIndex,
                                                                     isEvt: true,
                                                                     funcName:
                                                                         func.funcName,
-                                                                    cascade: evtClIndex.toString()
+                                                                    cascade:
+                                                                        evtClIndex.toString()
                                                                 }"
                                                             ></ng-container>
                                                             <ng-container
@@ -699,11 +751,13 @@
                                                                 "
                                                                 [ngTemplateOutletContext]="{
                                                                     index: evtClIndex,
-                                                                    evtIndex: evtIndex,
+                                                                    evtIndex:
+                                                                        evtIndex,
                                                                     isEvt: true,
                                                                     funcName:
                                                                         func.funcName,
-                                                                    cascade: evtClIndex.toString()
+                                                                    cascade:
+                                                                        evtClIndex.toString()
                                                                 }"
                                                             ></ng-container>
                                                             <ng-container
@@ -718,17 +772,23 @@
                                                                 "
                                                                 [ngTemplateOutletContext]="{
                                                                     index: evtClIndex,
-                                                                    evtIndex: evtIndex,
+                                                                    evtIndex:
+                                                                        evtIndex,
                                                                     isEvt: true,
                                                                     funcName:
                                                                         func.funcName,
-                                                                    cascade: evtClIndex.toString()
+                                                                    cascade:
+                                                                        evtClIndex.toString()
                                                                 }"
                                                             ></ng-container>
                                                         </div>
                                                         <div class="col-md-1">
                                                             <button
-                                                                class="m-l-md btn btn-remove"
+                                                                class="
+                                                                    m-l-md
+                                                                    btn
+                                                                    btn-remove
+                                                                "
                                                                 (click)="
                                                                     removeEvtCl(
                                                                         evt.get(
@@ -740,13 +800,19 @@
                                                                 "
                                                             >
                                                                 <i
-                                                                    class="fa fa-trash"
+                                                                    class="
+                                                                        fa
+                                                                        fa-trash
+                                                                    "
                                                                 ></i>
                                                             </button>
                                                         </div>
                                                     </div>
                                                     <div
-                                                        class="col-md-12 no-h-padding"
+                                                        class="
+                                                            col-md-12
+                                                            no-h-padding
+                                                        "
                                                     >
                                                         <ng-container
                                                             *ngIf="
@@ -760,13 +826,16 @@
                                                             "
                                                             [ngTemplateOutletContext]="{
                                                                 index: evtClIndex,
-                                                                evtIndex: evtIndex,
+                                                                evtIndex:
+                                                                    evtIndex,
                                                                 isEvt: true,
                                                                 funcName:
                                                                     func.funcName,
-                                                                cascade: evtClIndex.toString(),
+                                                                cascade:
+                                                                    evtClIndex.toString(),
                                                                 branch: '',
-                                                                funcIndex: funcIndex
+                                                                funcIndex:
+                                                                    funcIndex
                                                             }"
                                                         ></ng-container>
                                                         <ng-container
@@ -781,12 +850,15 @@
                                                             "
                                                             [ngTemplateOutletContext]="{
                                                                 index: evtClIndex,
-                                                                evtIndex: evtIndex,
+                                                                evtIndex:
+                                                                    evtIndex,
                                                                 isEvt: true,
                                                                 funcName:
                                                                     func.funcName,
-                                                                cascade: evtClIndex.toString(),
-                                                                funcIndex: funcIndex
+                                                                cascade:
+                                                                    evtClIndex.toString(),
+                                                                funcIndex:
+                                                                    funcIndex
                                                             }"
                                                         ></ng-container>
                                                     </div>
@@ -811,7 +883,7 @@
         [disabled]="!isValid()"
         (click)="apply()"
     >
-        Aplicar
+        Apply
     </button>
 </div>
 
@@ -832,7 +904,7 @@
         <div class="ibox">
             <div class="ibox-title inside-ibox">
                 <div class="row col-md-12 m-b-sm">
-                    <div class="col-1 m-h-auto">Se</div>
+                    <div class="col-1 m-h-auto">If</div>
                     <div class="col-3">
                         <select
                             class="form-control"
@@ -848,11 +920,9 @@
                                 )
                             "
                         >
-                            <option value="comparison">Comparação</option>
-                            <option value="booleanLogic">
-                                Lógica Booleana
-                            </option>
-                            <option value="custom">Customizado</option>
+                            <option value="comparison">Comparison</option>
+                            <option value="booleanLogic">Boolean Logic</option>
+                            <option value="custom">Custom</option>
                         </select>
                     </div>
                     <div class="col-8">
@@ -959,27 +1029,25 @@
                                         )
                                     "
                                 >
-                                    <option value="decision">Decisão</option>
+                                    <option value="decision">Decision</option>
                                     <option value="repetition">
-                                        Repetição
+                                        Repetition
                                     </option>
                                     <option value="declaration">
-                                        Declaração
+                                        Declaration
                                     </option>
-                                    <option value="call">
-                                        Chamada de Função
-                                    </option>
+                                    <option value="call">Call Function</option>
                                     <option value="attribution">
-                                        Atribuição
+                                        Assignment
                                     </option>
                                     <option value="htmlElement">
-                                        Elemento HTML
+                                        HTML Element
                                     </option>
                                     <option
                                         value="return"
                                         *ngIf="funcName !== 'main'"
                                     >
-                                        Retorno
+                                        Return
                                     </option>
                                     <option value="console">Console</option>
                                 </select>
@@ -1145,7 +1213,7 @@
         </div>
         <div class="ibox">
             <div class="ibox-title inside-ibox">
-                <div class="col-3 m-h-auto">Senão</div>
+                <div class="col-3 m-h-auto">Else</div>
                 <div class="ibox-tools">
                     <button
                         type="button"
@@ -1196,27 +1264,25 @@
                                         )
                                     "
                                 >
-                                    <option value="decision">Decisão</option>
+                                    <option value="decision">Decision</option>
                                     <option value="repetition">
-                                        Repetição
+                                        Repetition
                                     </option>
                                     <option value="declaration">
-                                        Declaração
+                                        Declaration
                                     </option>
-                                    <option value="call">
-                                        Chamada de Função
-                                    </option>
+                                    <option value="call">Call Function</option>
                                     <option value="attribution">
-                                        Atribuição
+                                        Assignment
                                     </option>
                                     <option value="htmlElement">
-                                        Elemento HTML
+                                        HTML Element
                                     </option>
                                     <option
                                         value="return"
                                         *ngIf="funcName !== 'main'"
                                     >
-                                        Retorno
+                                        Return
                                     </option>
                                     <option value="console">Console</option>
                                 </select>
@@ -1399,7 +1465,7 @@
         <div class="ibox">
             <div class="ibox-title inside-ibox">
                 <div class="row col-md-12 m-b-sm">
-                    <div class="col-1 m-h-auto">Enquanto</div>
+                    <div class="col-1 m-h-auto">While</div>
                     <div class="col-3">
                         <select
                             class="form-control"
@@ -1415,11 +1481,9 @@
                                 )
                             "
                         >
-                            <option value="comparison">Comparação</option>
-                            <option value="booleanLogic">
-                                Lógica Booleana
-                            </option>
-                            <option value="custom">Customizado</option>
+                            <option value="comparison">Comparison</option>
+                            <option value="booleanLogic">Boolean Logic</option>
+                            <option value="custom">Custom</option>
                         </select>
                     </div>
                     <div class="col-8">
@@ -1527,27 +1591,25 @@
                                         )
                                     "
                                 >
-                                    <option value="decision">Decisão</option>
+                                    <option value="decision">Decision</option>
                                     <option value="repetition">
-                                        Repetição
+                                        Repetition
                                     </option>
                                     <option value="declaration">
-                                        Declaração
+                                        Declaration
                                     </option>
-                                    <option value="call">
-                                        Chamada de Função
-                                    </option>
+                                    <option value="call">Call Function</option>
                                     <option value="attribution">
-                                        Atribuição
+                                        Assignment
                                     </option>
                                     <option value="htmlElement">
-                                        Elemento HTML
+                                        HTML Element
                                     </option>
                                     <option
                                         value="return"
                                         *ngIf="funcName !== 'main'"
                                     >
-                                        Retorno
+                                        Return
                                     </option>
                                     <option value="console">Console</option>
                                 </select>
@@ -1731,14 +1793,14 @@
             <div class="row">
                 <div class="col-4">
                     <select class="form-control" formControlName="varType">
-                        <option value="adt">Algébrico</option>
+                        <option value="adt">Algebraic</option>
                         <option value="array">Array</option>
-                        <option value="bool">Booleano</option>
-                        <option value="char">Caracter</option>
+                        <option value="bool">Boolean</option>
+                        <option value="char">Character</option>
                         <option value="double">Double</option>
-                        <option value="integer">Inteiro</option>
-                        <option value="record">Registro</option>
-                        <option value="text">Texto</option>
+                        <option value="integer">Integer</option>
+                        <option value="record">Record</option>
+                        <option value="text">Text</option>
                     </select>
                 </div>
                 <div class="col-4">
@@ -1746,7 +1808,7 @@
                         type="text"
                         class="form-control"
                         formControlName="varName"
-                        placeholder="Nome"
+                        placeholder="Name"
                     />
                 </div>
                 <div class="col-4">
@@ -1769,7 +1831,7 @@
                         type="text"
                         class="form-control"
                         formControlName="varValue"
-                        placeholder="Valor"
+                        placeholder="Value"
                         *ngIf="
                             getInnermostFormGroup(
                                 isEvt,
@@ -1910,8 +1972,8 @@
             <div class="row">
                 <div class="col-3">
                     <select class="form-control" formControlName="returnType">
-                        <option value="with-return">Atribuição</option>
-                        <option value="without-return">Execução</option>
+                        <option value="with-return">Assignment</option>
+                        <option value="without-return">Execution</option>
                     </select>
                 </div>
                 <div
@@ -1997,7 +2059,7 @@
                 [formGroup]="param"
             >
                 <div class="col-3 text-center m-h-auto">
-                    <h4 *ngIf="i === 0">Parâmetros</h4>
+                    <h4 *ngIf="i === 0">Parameters</h4>
                 </div>
                 <div class="col-4 text-center m-h-auto">
                     <h4>
@@ -2079,7 +2141,7 @@
         <div class="col-md-12">
             <div class="row">
                 <div class="col-2 text-center m-auto">
-                    <div>Buscar por ID:</div>
+                    <div>Find by ID:</div>
                 </div>
                 <div class="col-3">
                     <select class="form-control" formControlName="elementName">
@@ -2094,10 +2156,10 @@
                 <div class="col-3">
                     <select class="form-control" formControlName="elementData">
                         <option value="id">ID</option>
-                        <option value="addClass">Adicionar Classe</option>
-                        <option value="removeClass">Remover Classe</option>
-                        <option value="text">Texto</option>
-                        <option value="value">Valor</option>
+                        <option value="addClass">Add Class</option>
+                        <option value="removeClass">Remove Class</option>
+                        <option value="text">Text</option>
+                        <option value="value">Value</option>
                     </select>
                 </div>
                 <div class="col-4">
@@ -2106,7 +2168,7 @@
                         required
                         class="form-control"
                         formControlName="elementValue"
-                        placeholder="novo valor"
+                        placeholder="New value"
                     />
                 </div>
             </div>

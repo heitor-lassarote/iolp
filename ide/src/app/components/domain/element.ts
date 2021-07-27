@@ -9,5 +9,6 @@ export class Element {
         x: number;
         y: number;
     };
-    selectOptions: string[];
+    selectOptions?: string[];
+    imgSrc?: string;
 }

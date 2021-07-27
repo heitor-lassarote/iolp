@@ -32,6 +32,7 @@ export class CompInfosComponent implements OnInit {
             ],
             text: { value: "", disabled: !this.haveComponent },
             selectOptions: { value: "", disabled: !this.haveComponent },
+            imgSrc: { value: "", disabled: !this.haveComponent },
 
             // css
             width: [
@@ -63,12 +64,16 @@ export class CompInfosComponent implements OnInit {
         form.get("name").setValue(html.name.trim());
         this.infosForm.get("name").enable();
         form.get("text").setValue(html.text.trim());
-        if (html.type.trim() !== "select") this.infosForm.get("text").enable();
-        else {
+        if (html.type.trim() !== "select" && html.type.trim() !== "img") {
+            this.infosForm.get("text").enable();
+        } else if (html.type.trim() === "select") {
             form.get("selectOptions").setValue(
                 this.buildSelectOptionsString(html.selectOptions)
             );
             this.infosForm.get("selectOptions").enable();
+        } else {
+            form.get("imgSrc").setValue(html.imgSrc);
+            this.infosForm.get("imgSrc").enable();
         }
 
         //css
@@ -132,6 +137,7 @@ export class CompInfosComponent implements OnInit {
                     value["type"] === "select"
                         ? this.getSelectOptionsArray(value["selectOptions"])
                         : [],
+                imgSrc: value["type"] === "img" ? value["imgSrc"] : "",
             },
             css: {
                 height:

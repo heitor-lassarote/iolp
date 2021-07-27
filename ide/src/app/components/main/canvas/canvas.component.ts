@@ -143,6 +143,7 @@ export class CanvasComponent implements OnInit {
                     height: element.height,
                     position: element.position,
                     selectOptions: element.selectOptions,
+                    imgSrc: element.imgSrc,
                 })
             );
 
@@ -552,6 +553,7 @@ export class CanvasComponent implements OnInit {
             y: number;
         };
         selectOptions?: string[];
+        imgSrc?: string;
     }): FormGroup {
         return this.formBuilder.group({
             class: ui.class,
@@ -565,6 +567,7 @@ export class CanvasComponent implements OnInit {
             selectOptions: this.formBuilder.array(
                 ui.selectOptions ? [] : ui.selectOptions
             ),
+            imgSrc: ui.imgSrc !== undefined ? ui.imgSrc : "",
             css: this.formBuilder.array([]),
         });
     }
@@ -976,6 +979,7 @@ export class CanvasComponent implements OnInit {
                     $(comp).prop("tagName").toLowerCase() === "select"
                         ? this.getSelectOptions(comp)
                         : [],
+                imgSrc: $(comp).prop("src"),
             },
             css: {
                 width: $(comp).css("width"),
@@ -1198,9 +1202,8 @@ export class CanvasComponent implements OnInit {
                     returnType: control.get("paramType").value,
                 });
             });
-            const returnValue = this.formData.controls[funcIndex].get(
-                "returnType"
-            ).value;
+            const returnValue =
+                this.formData.controls[funcIndex].get("returnType").value;
             funct.type = this.getType(
                 "function",
                 paramTypes,
@@ -1224,8 +1227,8 @@ export class CanvasComponent implements OnInit {
             if (funcIndex === 0) {
                 this.eventsArrayData.controls.forEach(
                     (event: FormGroup, evtIndex: number) => {
-                        let evtClControls = this.getEventCommandLines(evtIndex)
-                            .controls;
+                        let evtClControls =
+                            this.getEventCommandLines(evtIndex).controls;
                         let evtFunction: Function = {
                             name: `${event.get("eventName").value}${
                                 event.get("eventType").value
@@ -1792,8 +1795,8 @@ export class CanvasComponent implements OnInit {
                         "É necessário haver algum componente antes de criar um evento!"
                     );
                 } else {
-                    const control: AbstractControl[] = this.eventsArrayData
-                        .controls;
+                    const control: AbstractControl[] =
+                        this.eventsArrayData.controls;
                     curElement = this.logicElements[0];
                     control.push(
                         this.initEvent({
@@ -1827,8 +1830,8 @@ export class CanvasComponent implements OnInit {
                 curElement.commandLine.splice(index, 1);
                 break;
             case "evt":
-                const control: AbstractControl[] = this.eventsArrayData
-                    .controls;
+                const control: AbstractControl[] =
+                    this.eventsArrayData.controls;
                 curElement = this.logicElements.find(
                     (element) => func === element.funcName
                 );
@@ -1873,8 +1876,8 @@ export class CanvasComponent implements OnInit {
     }
 
     removeEvtCl(evtName: string, index: number, evtIndex: number) {
-        let evtCls: AbstractControl[] = this.getEventCommandLines(evtIndex)
-            .controls;
+        let evtCls: AbstractControl[] =
+            this.getEventCommandLines(evtIndex).controls;
         let curEvt: LogicEvent = this.logicElements[0].events[evtIndex];
         const clTypeName: string = evtCls[index].get("clTypeName").value;
         const formIndex: number = evtCls[index].get("originFormIndex").value;
@@ -1989,8 +1992,12 @@ export class CanvasComponent implements OnInit {
         clTypeName: string,
         formIndex: number
     ) {
-        let control = this.getWhileAst(isEvt, evtIndex, funcName, cascade)
-            .controls;
+        let control = this.getWhileAst(
+            isEvt,
+            evtIndex,
+            funcName,
+            cascade
+        ).controls;
 
         this.checkFormControlType(clTypeName).splice(formIndex, 1);
 
@@ -2148,12 +2155,10 @@ export class CanvasComponent implements OnInit {
                     isEvt,
                     evtIndex
                 );
-                curElement.events[evtIndex].commandLine[
-                    index
-                ].type.name = value;
-                curElement.events[evtIndex].commandLine[
-                    index
-                ].formIndex = formIndex;
+                curElement.events[evtIndex].commandLine[index].type.name =
+                    value;
+                curElement.events[evtIndex].commandLine[index].formIndex =
+                    formIndex;
             }
         }
     }

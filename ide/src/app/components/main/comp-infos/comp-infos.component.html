@@ -4,13 +4,13 @@
         animationDuration="0ms"
         mat-align-tabs="center"
     >
-        <mat-tab label="Informações">
+        <mat-tab label="Informations">
             <div class="col-md-12 m-t-sm">
-                <h3>Tipo: {{ infosForm.get("type").value }}</h3>
+                <h3>Type: {{ infosForm.get("type").value }}</h3>
                 <div class="col-12">
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
-                            <h5>Nome:</h5>
+                            <h5>Name:</h5>
                         </div>
                         <div class="col-9">
                             <input
@@ -22,7 +22,7 @@
                     </div>
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
-                            <h5>Texto:</h5>
+                            <h5>Text:</h5>
                         </div>
                         <div class="col-9">
                             <input
@@ -48,15 +48,30 @@
                             ></textarea>
                         </div>
                     </div>
+                    <div
+                        *ngIf="infosForm.get('type').value === 'img'"
+                        class="row m-b-sm"
+                    >
+                        <div class="col-3 m-auto">
+                            <h5>Source:</h5>
+                        </div>
+                        <div class="col-9">
+                            <input
+                                type="text"
+                                class="form-control"
+                                formControlName="imgSrc"
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
         </mat-tab>
-        <mat-tab label="Estilo">
+        <mat-tab label="Style">
             <div class="col-md-12 m-t-sm">
                 <div class="col-12">
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
-                            <h5>Altura:</h5>
+                            <h5>Height:</h5>
                         </div>
                         <div class="col-5 size-input">
                             <input
@@ -79,7 +94,7 @@
                     </div>
                     <div class="row m-b-sm">
                         <div class="col-3 m-auto">
-                            <h5>Largura:</h5>
+                            <h5>Width:</h5>
                         </div>
                         <div class="col-5 size-input">
                             <input
@@ -100,7 +115,7 @@
                             </select>
                         </div>
                     </div>
-                    <h4 class="m-b-sm">Centralização</h4>
+                    <h4 class="m-b-sm">Centering</h4>
                     <div class="row m-b-sm">
                         <div class="col-3">
                             <button
@@ -154,7 +169,7 @@
             [disabled]="infosForm.invalid || !haveComponent"
             class="btn btn-primary"
         >
-            Aplicar
+            Apply
         </button>
     </div>
 </form>

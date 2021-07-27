@@ -5,6 +5,7 @@ export class Info {
         name: string;
         text: string;
         selectOptions: string[];
+        imgSrc: string;
     };
     css: {
         width: string;
