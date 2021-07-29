@@ -6,7 +6,7 @@ copyright:           Copyright (c) 2020 Bruno Pereira Garcia Caputo, Heitor Tole
 extra-source-files:  ChangeLog.md
 homepage:            https://github.com/heitor-lassarote/low-code
 license:             MIT
-license-file:        LICENSE
+license-file:        ../LICENSE
 maintainer:          heitortoledo@gec.inatel.br
 name:                low-code
 synopsis:            A low-code platform for generating builds and source codes.

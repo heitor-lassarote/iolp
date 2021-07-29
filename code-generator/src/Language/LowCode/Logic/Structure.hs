@@ -59,7 +59,7 @@ array :: Parser a -> Parser [a]
 array p = braces (p `sepEndBy` lexeme (char ','))
 
 record :: Parser a -> Parser [Field a]
-record p = try $ brackets $ flip sepBy (lexeme (char ',')) do
+record p = try $ brackets $ flip sepEndBy (lexeme (char ',')) do
     fieldName <- variableName
     void (lexeme (char ':'))
     value' <- p
